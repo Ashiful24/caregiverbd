@@ -5,7 +5,7 @@
 
 // API Base URL - Update this with your backend API URL
 // Reads from .env file in project root: VITE_API_BASE_URL
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3001/api";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://116.68.207.105:8080/api";
 
 // API Request Logging disabled (console logs are never emitted)
 const _API_LOG_REQUESTS = false;
