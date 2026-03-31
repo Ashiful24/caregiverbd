@@ -1,9 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { startOfDay } from "date-fns";
 import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import PageMeta from "../components/common/PageMeta";
 import { ActionsMenu } from "../components/common/ActionsMenu";
 import { DetailModal } from "../components/common/DetailModal";
 import { ProviderFullDetailsView } from "../components/common/ProfileDetailBlocks";
+import {
+  DateRangePicker,
+  type DateRangePickerValue,
+} from "../components/ui/date-range-picker";
 import {
   Table,
   TableBody,
@@ -21,18 +26,38 @@ import {
   type ProviderListItem,
   type ConsultationType,
   type ProviderListStatusFilter,
+  type ProviderListAvailableTypeFilter,
   type VerificationDocumentTypeItem,
 } from "../services/api";
 import { formatDate } from "../utils/format";
 
 const LIMIT_OPTIONS = [10, 20, 50];
 
-/** Status tabs: All | Pending | Rejected | Active | Deactivated | Archived (matches backend enum) */
+const AVAILABLE_TYPE_OPTIONS: { value: ProviderListAvailableTypeFilter; label: string }[] = [
+  { value: "daily", label: "Daily" },
+  { value: "weekly", label: "Weekly" },
+  { value: "monthly", label: "Monthly" },
+];
+
+/** GET /admin/providers — startDate/endDate (inclusive local days as ISO). Single-day: same instant range; range: different days. */
+function listDateRangeToApiParams(
+  value: DateRangePickerValue
+): { startDate: string; endDate: string } | null {
+  if (!value.startDate || !value.endDate) return null;
+  const start = value.startDate;
+  const end = value.endDate;
+  const startIso = new Date(start.getFullYear(), start.getMonth(), start.getDate()).toISOString();
+  const endIso = new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59, 999).toISOString();
+  return { startDate: startIso, endDate: endIso };
+}
+
+/** Status tabs: All | Pending | Rejected | Active | Available | Deactivated | Archived (matches backend enum) */
 const STATUS_TABS: { value: ProviderListStatusFilter; label: string }[] = [
   { value: "all", label: "All" },
   { value: "pending", label: "Pending" },
   { value: "rejected", label: "Rejected" },
   { value: "active", label: "Active" },
+  { value: "available", label: "Available" },
   { value: "deactivated", label: "Deactivated" },
   { value: "archived", label: "Archived" },
 ];
@@ -62,6 +87,7 @@ function flattenConsultationTypes(
 function providerStatusBadgeColor(status: string): "success" | "warning" | "error" | "light" {
   switch (String(status).toUpperCase()) {
     case "ACTIVE":
+    case "AVAILABLE":
       return "success";
     case "PENDING":
       return "warning";
@@ -88,6 +114,12 @@ export default function ProviderList() {
   const [documentTypes, setDocumentTypes] = useState<VerificationDocumentTypeItem[]>([]);
   const [documentTypeFilterCode, setDocumentTypeFilterCode] = useState<string>("");
   const [statusTab, setStatusTab] = useState<ProviderListStatusFilter>("all");
+  const [availableFilterType, setAvailableFilterType] =
+    useState<ProviderListAvailableTypeFilter>("daily");
+  const [availabilityDateValue, setAvailabilityDateValue] = useState<DateRangePickerValue>(() => {
+    const d = startOfDay(new Date());
+    return { startDate: d, endDate: d };
+  });
   const [openActionsId, setOpenActionsId] = useState<number | null>(null);
   const actionsButtonRef = useRef<HTMLButtonElement>(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
@@ -131,6 +163,11 @@ export default function ProviderList() {
     [consultationTypes]
   );
 
+  const availabilityDateKey = useMemo(() => {
+    if (!availabilityDateValue.startDate || !availabilityDateValue.endDate) return "";
+    return `${availabilityDateValue.startDate.getTime()}-${availabilityDateValue.endDate.getTime()}`;
+  }, [availabilityDateValue.startDate, availabilityDateValue.endDate]);
+
   /** Refetch list. Use silent: true after detail updates to avoid full-page skeleton. */
   const fetchProviders = async (signal?: AbortSignal, options?: { silent?: boolean }) => {
     const silent = options?.silent === true;
@@ -140,6 +177,8 @@ export default function ProviderList() {
     }
     let aborted = false;
     try {
+      const dateBounds =
+        statusTab === "available" ? listDateRangeToApiParams(availabilityDateValue) : null;
       const response = await providersApi.getList(
         {
           page,
@@ -151,6 +190,12 @@ export default function ProviderList() {
           status: statusTab === "all" ? undefined : statusTab,
           documentType:
             documentTypeFilterCode === "" ? undefined : documentTypeFilterCode,
+          ...(statusTab === "available"
+            ? { availableType: availableFilterType }
+            : {}),
+          ...(dateBounds
+            ? { startDate: dateBounds.startDate, endDate: dateBounds.endDate }
+            : {}),
         },
         { signal }
       );
@@ -190,7 +235,15 @@ export default function ProviderList() {
     const controller = new AbortController();
     fetchProviders(controller.signal);
     return () => controller.abort();
-  }, [page, limit, consultationTypeFilterId, documentTypeFilterCode, statusTab]);
+  }, [
+    page,
+    limit,
+    consultationTypeFilterId,
+    documentTypeFilterCode,
+    statusTab,
+    availableFilterType,
+    availabilityDateKey,
+  ]);
 
   const loadProviderDetail = useCallback(async (providerId: number) => {
     setDetailLoading(true);
@@ -228,6 +281,12 @@ export default function ProviderList() {
 
   const from = total === 0 ? 0 : (page - 1) * limit + 1;
   const to = Math.min(page * limit, total);
+
+  const showAvailabilityDates = statusTab === "available";
+  const formatAvailabilityCell = (value: string | null | undefined) =>
+    value ? formatDate(String(value)) : "—";
+  const providerAvailabilityStart = (p: ProviderListItem) => p.startDate ?? p.start_date;
+  const providerAvailabilityEnd = (p: ProviderListItem) => p.endDate ?? p.end_date;
 
   return (
     <>
@@ -285,6 +344,39 @@ export default function ProviderList() {
                 ))}
               </select>
             </label>
+            {statusTab === "available" && (
+              <>
+                <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                  <span className="shrink-0">Available type</span>
+                  <select
+                    value={availableFilterType}
+                    onChange={(e) => {
+                      setAvailableFilterType(e.target.value as ProviderListAvailableTypeFilter);
+                      setPage(1);
+                    }}
+                    className="min-w-[140px] rounded-lg border border-gray-300 bg-white py-2 pl-3 pr-8 text-sm text-gray-800 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                  >
+                    {AVAILABLE_TYPE_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex w-full min-w-0 flex-col gap-2 text-sm text-gray-600 dark:text-gray-400 sm:w-auto sm:flex-row sm:items-center">
+                  <span className="shrink-0">Date</span>
+                  <DateRangePicker
+                    value={availabilityDateValue}
+                    onChange={(next) => {
+                      setAvailabilityDateValue(next);
+                      setPage(1);
+                    }}
+                    className="w-full sm:w-[min(100%,280px)]"
+                    align="end"
+                  />
+                </label>
+              </>
+            )}
           </div>
         </div>
 
@@ -327,7 +419,9 @@ export default function ProviderList() {
               {statusTab === "all" && "No providers found."}
               {statusTab === "pending" && "No pending providers found."}
               {statusTab === "active" && "No active providers found."}
+              {statusTab === "available" && "No available providers found."}
               {statusTab === "rejected" && "No rejected providers found."}
+              {statusTab === "deactivated" && "No deactivated providers found."}
               {statusTab === "archived" && "No archived providers found."}
             </div>
           ) : (
@@ -388,6 +482,22 @@ export default function ProviderList() {
                           <dd className="text-gray-800 dark:text-gray-200">{formatDate(provider.createdAt)}</dd>
                         </div>
                       )}
+                      {showAvailabilityDates && (
+                        <>
+                          <div className="flex justify-between gap-2">
+                            <dt className="text-gray-500 dark:text-gray-400">Start date</dt>
+                            <dd className="text-gray-800 dark:text-gray-200">
+                              {formatAvailabilityCell(providerAvailabilityStart(provider))}
+                            </dd>
+                          </div>
+                          <div className="flex justify-between gap-2">
+                            <dt className="text-gray-500 dark:text-gray-400">End date</dt>
+                            <dd className="text-gray-800 dark:text-gray-200">
+                              {formatAvailabilityCell(providerAvailabilityEnd(provider))}
+                            </dd>
+                          </div>
+                        </>
+                      )}
                     </dl>
                   </div>
                 ))}
@@ -404,6 +514,16 @@ export default function ProviderList() {
                       <TableCell isHeader className="w-[16%] py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Email</TableCell>
                       <TableCell isHeader className="w-[12%] py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Phone</TableCell>
                       <TableCell isHeader className="w-[12%] py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Created</TableCell>
+                      {showAvailabilityDates && (
+                        <>
+                          <TableCell isHeader className="w-[11%] py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                            Start date
+                          </TableCell>
+                          <TableCell isHeader className="w-[11%] py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                            End date
+                          </TableCell>
+                        </>
+                      )}
                       <TableCell isHeader className="w-[8%] py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Actions</TableCell>
                     </TableRow>
                   </TableHeader>
@@ -425,6 +545,16 @@ export default function ProviderList() {
                         <TableCell className="py-3 text-theme-sm text-gray-600 dark:text-gray-400">
                           {provider.createdAt ? formatDate(String(provider.createdAt)) : "—"}
                         </TableCell>
+                        {showAvailabilityDates && (
+                          <>
+                            <TableCell className="py-3 text-theme-sm text-gray-600 dark:text-gray-400">
+                              {formatAvailabilityCell(providerAvailabilityStart(provider))}
+                            </TableCell>
+                            <TableCell className="py-3 text-theme-sm text-gray-600 dark:text-gray-400">
+                              {formatAvailabilityCell(providerAvailabilityEnd(provider))}
+                            </TableCell>
+                          </>
+                        )}
                         <TableCell className="py-3 text-right">
                           <ActionsMenu
                             isOpen={openActionsId === provider.id}

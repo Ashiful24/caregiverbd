@@ -683,7 +683,7 @@ export const upgradeRequestsApi = {
  * GET /v1/admin/providers — providers table + users + consultation_types.
  * Status replaces previous isVerified: PENDING | ACTIVE | REJECTED | ARCHIVED.
  */
-export type ProviderStatus = "PENDING" | "ACTIVE" | "REJECTED" | "ARCHIVED";
+export type ProviderStatus = "PENDING" | "ACTIVE" | "AVAILABLE" | "REJECTED" | "ARCHIVED";
 
 export interface ProviderListItem {
   id: number;
@@ -701,6 +701,12 @@ export interface ProviderListItem {
   consultationTypeName?: string | null;
   createdAt: string;
   updatedAt?: string;
+  /** Availability window when listing AVAILABLE providers (admin list). */
+  startDate?: string | null;
+  endDate?: string | null;
+  /** Same as startDate/endDate if API returns snake_case. */
+  start_date?: string | null;
+  end_date?: string | null;
 }
 
 /** Single document item (for provider documents block). */
@@ -722,8 +728,18 @@ export interface AdminProviderListResponse {
   limit: number;
 }
 
-/** UI status filter for provider list. Sent to API as uppercase (PENDING, ACTIVE, REJECTED, DEACTIVATED, ARCHIVED). */
-export type ProviderListStatusFilter = "all" | "pending" | "active" | "rejected" | "deactivated" | "archived";
+/** UI status filter for provider list. Sent to API as uppercase (PENDING, ACTIVE, AVAILABLE, REJECTED, DEACTIVATED, ARCHIVED). */
+export type ProviderListStatusFilter =
+  | "all"
+  | "pending"
+  | "active"
+  | "available"
+  | "rejected"
+  | "deactivated"
+  | "archived";
+
+/** Availability window type for admin provider list when status=AVAILABLE. Sent as DAILY | WEEKLY | MONTHLY. */
+export type ProviderListAvailableTypeFilter = "daily" | "weekly" | "monthly";
 
 // ============== Admin Full Details DTOs (GET .../details) ==============
 
@@ -984,7 +1000,9 @@ export interface PatientFullDetailsDto {
 export const providersApi = {
   /**
    * GET /v1/admin/providers — List all provider profiles (providers table).
-   * Role: ADMIN. Query: page, limit, consultationTypeId, status (PENDING | ACTIVE | REJECTED | DEACTIVATED | ARCHIVED).
+   * Role: ADMIN. Query: page, limit, consultationTypeId, status (PENDING | ACTIVE | AVAILABLE | REJECTED | DEACTIVATED | ARCHIVED).
+   * When status=AVAILABLE: optional availableType (DAILY|WEEKLY|MONTHLY) and startDate/endDate (ISO).
+   * Optional startDate/endDate (ISO): inclusive filter; single-day selection uses equal start/end.
    */
   getList: async (
     params?: {
@@ -993,6 +1011,10 @@ export const providersApi = {
       consultationTypeId?: number;
       status?: ProviderListStatusFilter;
       documentType?: string;
+      availableType?: ProviderListAvailableTypeFilter;
+      /** Inclusive date range filter (ISO strings). */
+      startDate?: string;
+      endDate?: string;
     },
     config?: { signal?: AbortSignal }
   ) => {
@@ -1008,6 +1030,15 @@ export const providersApi = {
     }
     if (params?.documentType != null && params.documentType !== "") {
       query.documentType = params.documentType;
+    }
+    if (params?.availableType) {
+      query.availableType = params.availableType.toUpperCase();
+    }
+    if (params?.startDate != null && String(params.startDate).trim() !== "") {
+      query.startDate = String(params.startDate).trim();
+    }
+    if (params?.endDate != null && String(params.endDate).trim() !== "") {
+      query.endDate = String(params.endDate).trim();
     }
     return httpService.get<AdminProviderListResponse>("/admin/providers", {
       params: query,

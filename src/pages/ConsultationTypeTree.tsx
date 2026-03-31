@@ -829,8 +829,8 @@ export default function ConsultationTypeTree() {
             <Input
               id="edit-commission"
               type="number"
-              min={0}
-              max={100}
+              min="0"
+              max="100"
               step={0.01}
               value={formCommissionPercent}
               onChange={(e) => setFormCommissionPercent(e.target.value)}
@@ -921,8 +921,8 @@ export default function ConsultationTypeTree() {
             <Input
               id="add-commission"
               type="number"
-              min={0}
-              max={100}
+              min="0"
+              max="100"
               step={0.01}
               value={formCommissionPercent}
               onChange={(e) => setFormCommissionPercent(e.target.value)}
@@ -997,8 +997,8 @@ export default function ConsultationTypeTree() {
             <Input
               id="root-commission"
               type="number"
-              min={0}
-              max={100}
+              min="0"
+              max="100"
               step={0.01}
               value={formCommissionPercent}
               onChange={(e) => setFormCommissionPercent(e.target.value)}
