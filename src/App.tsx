@@ -19,6 +19,8 @@ import UpgradeRequests from "./pages/UpgradeRequests";
 import UpgradeRequestDetail from "./pages/UpgradeRequestDetail";
 import Notifications from "./pages/Notifications";
 import FinancialReports from "./pages/FinancialReports";
+import NurseScheduleList from "./pages/NurseScheduleList";
+import NurseScheduleCalendarPage from "./pages/NurseScheduleCalendarPage";
 import ProtectedRoute from "./components/common/ProtectedRoute";
 import PublicRoute from "./components/common/PublicRoute";
 
@@ -38,6 +40,8 @@ export default function App() {
           <Route index path="/" element={<Home />} />
           <Route path="/patients" element={<PatientList />} />
           <Route path="/providers" element={<ProviderList />} />
+          <Route path="/schedule/:requestId" element={<NurseScheduleCalendarPage />} />
+          <Route path="/schedule" element={<NurseScheduleList />} />
           <Route path="/users" element={<UserList />} />
           <Route path="/consultation-types" element={<ConsultationTypeTree />} />
           <Route path="/consultation-types/config/:id" element={<ConsultationTypeConfig />} />

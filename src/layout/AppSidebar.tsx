@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router";
 
 import {
   BoltIcon,
+  CalenderIcon,
   ChevronDownIcon,
   FolderIcon,
   GridIcon,
@@ -40,6 +41,7 @@ const navSections: NavSection[] = [
     items: [
       { icon: <GroupIcon />, name: "Providers", path: "/providers" },
       { icon: <UserIcon />, name: "Patients", path: "/patients" },
+      { icon: <CalenderIcon />, name: "Schedule", path: "/schedule" },
     ],
   },
   {
@@ -81,9 +83,13 @@ const AppSidebar: React.FC = () => {
   );
   const subMenuRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
-  // const isActive = (path: string) => location.pathname === path;
   const isActive = useCallback(
-    (path: string) => location.pathname === path,
+    (path: string) => {
+      if (path === "/schedule") {
+        return location.pathname === "/schedule" || location.pathname.startsWith("/schedule/");
+      }
+      return location.pathname === path;
+    },
     [location.pathname]
   );
 
