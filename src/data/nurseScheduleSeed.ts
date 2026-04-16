@@ -1,11 +1,4 @@
-import {
-  addDays,
-  addHours,
-  addMinutes,
-  format,
-  isAfter,
-  startOfDay,
-} from "date-fns";
+import { format } from "date-fns";
 
 export type NurseRecord = {
   id: string;
@@ -97,67 +90,33 @@ function nurseById(id: string): NurseRecord | undefined {
   return NURSES.find((n) => n.id === id);
 }
 
-function overlapsRange(aStart: Date, aEnd: Date, rangeStart: Date, rangeEnd: Date): boolean {
-  return aStart < rangeEnd && aEnd > rangeStart;
+export function rangesOverlap(aStart: Date, aEnd: Date, bStart: Date, bEnd: Date): boolean {
+  return aStart < bEnd && aEnd > bStart;
 }
 
-function buildEventsForServiceRequest(request: ServiceRequestRecord): ScheduleEventRecord[] {
-  const start = startOfDay(new Date(request.startDate));
-  const end = startOfDay(new Date(request.endDate));
-  const totalDays = Math.max(1, Math.floor((end.getTime() - start.getTime()) / 86400000) + 1);
+/** Demo seed no longer fabricates per-day visits; calendar events come from admin scheduling UI. */
+function buildEventsForServiceRequest(_request: ServiceRequestRecord): ScheduleEventRecord[] {
+  return [];
+}
 
-  const events: ScheduleEventRecord[] = [];
-
-  for (let day = 0; day < totalDays; day += 1) {
-    const dayBase = addDays(start, day);
-
-    request.assignedNurseIds.forEach((nurseId, nurseIndex) => {
-      const nurse = nurseById(nurseId);
-      if (!nurse) return;
-
-      const shiftStart = addHours(addMinutes(dayBase, nurseIndex * 30), 7);
-      const shiftMid = addHours(shiftStart, 4);
-      const breakStart = addHours(shiftMid, 1);
-      const breakEnd = addMinutes(breakStart, 30);
-      const handoverStart = addHours(shiftMid, 2);
-      const handoverEnd = addHours(handoverStart, 1);
-
-      events.push(
-        {
-          id: `${request.id}-${nurseId}-${day}-visit`,
-          requestId: request.id,
-          nurseId,
-          nurseName: nurse.name,
-          title: `${nurse.name.split(" ")[0]} ? Home visit`,
-          start: shiftStart.toISOString(),
-          end: shiftMid.toISOString(),
-          type: "visit",
-        },
-        {
-          id: `${request.id}-${nurseId}-${day}-break`,
-          requestId: request.id,
-          nurseId,
-          nurseName: nurse.name,
-          title: `${nurse.name.split(" ")[0]} ? Break`,
-          start: breakStart.toISOString(),
-          end: breakEnd.toISOString(),
-          type: "break",
-        },
-        {
-          id: `${request.id}-${nurseId}-${day}-handover`,
-          requestId: request.id,
-          nurseId,
-          nurseName: nurse.name,
-          title: `${nurse.name.split(" ")[0]} ? Handover`,
-          start: handoverStart.toISOString(),
-          end: handoverEnd.toISOString(),
-          type: "training",
-        }
-      );
+/**
+ * Nurses available for a time window on this request, excluding those already booked in `existingEvents`.
+ * Used when the availability API is unavailable or as a secondary filter.
+ */
+export function filterAvailableNursesLocal(
+  nurses: NurseRecord[],
+  existingEvents: ScheduleEventRecord[],
+  rangeStart: Date,
+  rangeEnd: Date
+): NurseRecord[] {
+  return nurses.filter((n) => {
+    const busy = existingEvents.some((e) => {
+      if (e.nurseId !== n.id) return false;
+      const { start, end } = parseEventRange(e);
+      return rangesOverlap(rangeStart, rangeEnd, start, end);
     });
-  }
-
-  return events.filter((e) => !isAfter(new Date(e.start), new Date(request.endDate)));
+    return !busy;
+  });
 }
 
 export function getNurses(): NurseRecord[] {
@@ -182,12 +141,6 @@ export function formatRequestWindow(request: ServiceRequestRecord): string {
   return `${format(new Date(request.startDate), "d MMM yyyy")} - ${format(new Date(request.endDate), "d MMM yyyy")}`;
 }
 
-export function shiftCapacityForSlotHours(slotHours: number): number {
-  if (slotHours === 12) return 2;
-  if (slotHours === 8) return 3;
-  return 8;
-}
-
 export function getEventsForServiceRequestInRange(
   requestId: string,
   rangeStart: Date,
@@ -199,7 +152,7 @@ export function getEventsForServiceRequestInRange(
   return buildEventsForServiceRequest(request).filter((e) => {
     const s = new Date(e.start);
     const end = new Date(e.end);
-    return overlapsRange(s, end, rangeStart, rangeEnd);
+    return rangesOverlap(s, end, rangeStart, rangeEnd);
   });
 }
 

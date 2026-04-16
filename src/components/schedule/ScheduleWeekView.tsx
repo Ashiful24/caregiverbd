@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import {
   eachDayOfInterval,
   endOfWeek,
@@ -13,21 +14,14 @@ const START_HOUR = 0;
 const END_HOUR = 24;
 const HOUR_COUNT = END_HOUR - START_HOUR;
 const PX_PER_HOUR = 32;
-
-function formatHourLabel(hour24: number): string {
-  const normalized = ((hour24 % 24) + 24) % 24;
-  const suffix = normalized < 12 ? "AM" : "PM";
-  const hour12 = normalized % 12 === 0 ? 12 : normalized % 12;
-  return `${hour12} ${suffix}`;
-}
+/** Fixed width so time labels align with grid; must match overlay `left` offset */
+const TIME_COL_WIDTH = 52;
 
 type Props = {
   weekAnchor: Date;
   events: ScheduleEventRecord[];
-  slotHours: 4 | 8 | 12;
-  slotCapacity: number;
-  getAssignedCount: (dateKey: string, slotIndex: number) => number;
-  onSelectSlot: (day: Date, slotIndex: number) => void;
+  dayInRange: (day: Date) => boolean;
+  onSelectHour: (day: Date, hour24: number) => void;
 };
 
 function eventsForDay(events: ScheduleEventRecord[], day: Date): ScheduleEventRecord[] {
@@ -57,14 +51,10 @@ function layoutEvent(day: Date, e: ScheduleEventRecord) {
   return { topPct, heightPct };
 }
 
-export function ScheduleWeekView({
-  weekAnchor,
-  events,
-  slotHours,
-  slotCapacity,
-  getAssignedCount,
-  onSelectSlot,
-}: Props) {
+const cellBorder = "border-b border-r border-gray-300 dark:border-gray-600";
+const timeCellClass = `${cellBorder} box-border flex items-start justify-end bg-white pr-2 pt-0.5 text-right text-[10px] text-gray-400 dark:bg-gray-900/40 dark:text-gray-500`;
+
+export function ScheduleWeekView({ weekAnchor, events, dayInRange, onSelectHour }: Props) {
   const ws = startOfWeek(weekAnchor, { weekStartsOn: 1 });
   const we = endOfWeek(weekAnchor, { weekStartsOn: 1 });
   const days = eachDayOfInterval({ start: ws, end: we });
@@ -74,76 +64,79 @@ export function ScheduleWeekView({
   return (
     <div className="overflow-x-auto">
       <div className="min-w-[880px]">
-        <div className="flex border-b border-gray-200 dark:border-gray-800">
-          <div className="w-[52px] shrink-0" />
-          <div className="grid flex-1 grid-cols-7">
+        <div className="flex border-b-2 border-gray-300 dark:border-gray-600">
+          <div className="shrink-0" style={{ width: TIME_COL_WIDTH }} />
+          <div className="grid min-w-0 flex-1 grid-cols-7">
             {days.map((d) => (
               <div
-                key={d.toISOString()}
-                className="border-r border-gray-200 px-1 py-2 text-center last:border-r-0 dark:border-gray-800"
+                key={format(d, "yyyy-MM-dd")}
+                className="border-r border-gray-300 px-1 py-2 text-center last:border-r-0 dark:border-gray-600"
               >
                 <p className="text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
                   {format(d, "EEE")}
                 </p>
-                <p className="mt-0.5 text-lg font-semibold text-gray-900 dark:text-white">
-                  {format(d, "d")}
-                </p>
-                <div className="mt-1.5 flex flex-wrap items-center justify-center gap-1">
-                  {Array.from({ length: 24 / slotHours }, (_, slotIndex) => {
-                    const dateKey = format(d, "yyyy-MM-dd");
-                    const assigned = getAssignedCount(dateKey, slotIndex);
-                    const from = slotIndex * slotHours;
-                    const to = from + slotHours - 1;
-                    const slotLabel = `${formatHourLabel(from)} to ${formatHourLabel(to)}`;
-                    return (
-                      <button
-                        key={slotIndex}
-                        type="button"
-                        onClick={() => onSelectSlot(d, slotIndex)}
-                        className="rounded border border-gray-200 px-1.5 py-0.5 text-[10px] font-medium text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
-                        title={`${slotLabel} (${assigned}/${slotCapacity})`}
-                      >
-                        {slotLabel} ({assigned}/{slotCapacity})
-                      </button>
-                    );
-                  })}
-                </div>
+                <p className="mt-0.5 text-lg font-semibold text-gray-900 dark:text-white">{format(d, "d")}</p>
               </div>
             ))}
           </div>
         </div>
 
-        <div className="flex">
+        <div className="relative">
+          {/* One grid row per hour: time | day1 … day7 — shared row height guarantees line alignment */}
           <div
-            className="w-[52px] shrink-0 border-r border-gray-200 dark:border-gray-800"
-            style={{ height: gridHeight }}
+            className="grid w-full box-border bg-white dark:bg-gray-900/40"
+            style={{
+              gridTemplateColumns: `${TIME_COL_WIDTH}px repeat(7, minmax(0, 1fr))`,
+              gridTemplateRows: `repeat(${HOUR_COUNT}, ${PX_PER_HOUR}px)`,
+            }}
           >
             {hours.map((h) => (
-              <div
-                key={h}
-                className="border-b border-gray-100 pr-2 text-right text-[10px] text-gray-400 dark:border-gray-800 dark:text-gray-500"
-                style={{ height: PX_PER_HOUR }}
-              >
-                {format(new Date(2000, 0, 1, h), "h a")}
-              </div>
+              <Fragment key={h}>
+                <div className={timeCellClass} style={{ height: PX_PER_HOUR, minHeight: PX_PER_HOUR }}>
+                  {format(new Date(2000, 0, 1, h), "h a")}
+                </div>
+                {days.map((day, dayIdx) => {
+                  const inRange = dayInRange(day);
+                  const isLastDayCol = dayIdx === days.length - 1;
+                  return (
+                    <button
+                      key={`${format(day, "yyyy-MM-dd")}-${h}`}
+                      type="button"
+                      disabled={!inRange}
+                      onClick={() => onSelectHour(day, h)}
+                      className={`box-border border-b border-gray-300 text-left transition-colors dark:border-gray-600 ${
+                        isLastDayCol ? "border-r-0" : "border-r"
+                      } ${
+                        inRange
+                          ? "cursor-pointer bg-white hover:bg-brand-50/50 dark:bg-gray-900/40 dark:hover:bg-brand-950/20"
+                          : "cursor-not-allowed bg-gray-50/80 opacity-50 dark:bg-gray-900/60"
+                      }`}
+                      style={{ height: PX_PER_HOUR, minHeight: PX_PER_HOUR }}
+                      title={inRange ? `Schedule from ${format(new Date(2000, 0, 1, h), "h a")}` : "Outside request window"}
+                    />
+                  );
+                })}
+              </Fragment>
             ))}
           </div>
 
-          <div className="grid flex-1 grid-cols-7" style={{ height: gridHeight }}>
+          {/* Events sit above day columns only; same column widths as grid */}
+          <div
+            className="pointer-events-none absolute top-0 grid box-border"
+            style={{
+              left: TIME_COL_WIDTH,
+              width: `calc(100% - ${TIME_COL_WIDTH}px)`,
+              height: gridHeight,
+              gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
+            }}
+          >
             {days.map((day) => {
               const dayEvents = eventsForDay(events, day);
               return (
                 <div
-                  key={`col-${day.toISOString()}`}
-                  className="relative border-r border-gray-100 last:border-r-0 dark:border-gray-800"
+                  key={`overlay-${format(day, "yyyy-MM-dd")}`}
+                  className="relative h-full border-r border-gray-300 last:border-r-0 dark:border-gray-600"
                 >
-                  {hours.map((h) => (
-                    <div
-                      key={h}
-                      className="border-b border-gray-100 dark:border-gray-800/80"
-                      style={{ height: PX_PER_HOUR }}
-                    />
-                  ))}
                   {dayEvents.map((e) => {
                     const layout = layoutEvent(day, e);
                     if (!layout) return null;

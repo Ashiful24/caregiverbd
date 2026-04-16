@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { formatDate } from "../../utils/format";
 import { getAssetUrl } from "../../utils/assetUrl";
 import { viewDocument, downloadDocument, printDocument } from "../../utils/documentActions";
@@ -16,6 +16,7 @@ import type {
   PatientFullDetailsDto,
   ProviderWalletFundingHistoryResponseDto,
   ProviderFullDetailsDto,
+  ProviderProfileChecklistItemDto,
   SalaryHistoryResponseDto,
   VitalsEntryDto,
   WalletHistoryEntryDto,
@@ -639,7 +640,24 @@ export function ProviderFullDetailsView({
   data: ProviderFullDetailsDto;
   onRefresh?: () => void | Promise<void>;
 }) {
-  const { user, provider, consultationTypeServices = [], serviceRequestsByStatus, wallet, totalBalance, claimableBalance, nonClaimableBalance, cashCommissionDue, pendingWithdrawal, walletHistory } = data;
+  const {
+    user,
+    provider,
+    profileCheacklists: profileChecklistRaw,
+    consultationTypeServices = [],
+    serviceRequestsByStatus,
+    wallet,
+    totalBalance,
+    claimableBalance,
+    nonClaimableBalance,
+    cashCommissionDue,
+    pendingWithdrawal,
+    walletHistory,
+  } = data;
+  const profileChecklistItems = useMemo<ProviderProfileChecklistItemDto[]>(() => {
+    const list = profileChecklistRaw ?? [];
+    return [...list].sort((a, b) => a.displayOrder - b.displayOrder);
+  }, [profileChecklistRaw]);
   const [openStatus, setOpenStatus] = useState<AdminServiceRequestStatus | null>(null);
   const [servicesEditMode, setServicesEditMode] = useState(false);
   const [servicesOffered, setServicesOffered] = useState<Record<number, boolean>>({});
@@ -708,6 +726,8 @@ export function ProviderFullDetailsView({
   const [userStatusUpdating, setUserStatusUpdating] = useState(false);
   const [showProviderStatusConfirm, setShowProviderStatusConfirm] = useState(false);
   const [showUserStatusConfirm, setShowUserStatusConfirm] = useState(false);
+  const [checklistUpdating, setChecklistUpdating] = useState(false);
+  const [checklistError, setChecklistError] = useState<string | null>(null);
   const isProviderPending = currentStatus === "PENDING";
   const canChangeStatus = allowedNextStatuses.length > 0;
 
@@ -763,6 +783,24 @@ export function ProviderFullDetailsView({
       setServicesError("Failed to update services.");
     } finally {
       setServicesSaving(false);
+    }
+  };
+
+  const handleProfileChecklistToggle = async (item: ProviderProfileChecklistItemDto) => {
+    if (!provider.id || checklistUpdating) return;
+    const nextChecked = !item.checked;
+    const newIds = profileChecklistItems
+      .filter((i) => (i.id === item.id ? nextChecked : i.checked))
+      .map((i) => i.id);
+    setChecklistUpdating(true);
+    setChecklistError(null);
+    try {
+      await providersApi.updateProfileChecklist(provider.id, { checklistItemIds: newIds });
+      await onRefresh?.();
+    } catch {
+      setChecklistError("Failed to update profile checklist.");
+    } finally {
+      setChecklistUpdating(false);
     }
   };
 
@@ -995,24 +1033,112 @@ export function ProviderFullDetailsView({
     (serviceRequestsByStatus.CANCELLED?.length ?? 0);
 
   const providerDisplayName = [user.firstName, user.lastName].filter(Boolean).join(" ") || "Provider";
+  const referenceChecks = [
+    {
+      id: 1,
+      refName: "Tanvir Ahmed",
+      relation: "Previous supervisor",
+      contact: "+88017XXXXXXX",
+      status: "VERIFIED" as const,
+      note: "Confirmed punctuality and good bedside manner.",
+    },
+    {
+      id: 2,
+      refName: "Sabina Yasmin",
+      relation: "Clinical lead",
+      contact: "sabina.y@example.com",
+      status: "PENDING" as const,
+      note: "Pending outbound verification call.",
+    },
+  ];
+  const checklistTotal = profileChecklistItems.length;
+  const completedSteps = profileChecklistItems.filter((i) => i.checked).length;
+  const completionPercent =
+    checklistTotal === 0 ? 0 : Math.round((completedSteps / checklistTotal) * 100);
+  const consultationTypeLabel = provider.consultationTypeName?.trim() || null;
+  const experienceLabel =
+    provider.experience != null && String(provider.experience).trim() !== ""
+      ? String(provider.experience).trim()
+      : null;
 
   return (
     <div className="w-full min-w-0 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6">
-      <div className="w-full min-w-0 sm:col-span-2 rounded-xl border border-gray-200 bg-gray-50/50 p-4 sm:p-5 dark:border-gray-800 dark:bg-gray-800/30">
-        <h4 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Profile</h4>
-        <div className="flex flex-wrap items-center gap-4">
-          <ProfilePhotoSection
-            profilePictureUrl={user.profilePicture}
-            gender={user.gender}
-            displayName={providerDisplayName}
-          />
-          <div className="min-w-0">
-            <p className="text-lg font-semibold text-gray-900 dark:text-white/90">{providerDisplayName}</p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              {user.role}
-              {provider.consultationTypeName && ` · ${provider.consultationTypeName}`}
+      <div className="w-full min-w-0 sm:col-span-2 rounded-2xl border border-gray-200 bg-white p-0 dark:border-gray-800 dark:bg-gray-900/30">
+        <div className="flex flex-col gap-4 border-b border-gray-100 px-4 py-3 dark:border-gray-800 sm:flex-row sm:items-start sm:justify-between sm:px-5">
+          <div className="flex items-start gap-3">
+            <ProfilePhotoSection
+              profilePictureUrl={user.profilePicture}
+              gender={user.gender}
+              displayName={providerDisplayName}
+            />
+            <div className="min-w-0">
+              <p className="text-xl font-semibold text-gray-900 dark:text-white/90">{providerDisplayName}</p>
+              {consultationTypeLabel && (
+                <p className="mt-1">
+                  <span className="inline-block rounded bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+                    {consultationTypeLabel}
+                  </span>
+                </p>
+              )}
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Applied: {formatDate(user.createdAt)}
+                {experienceLabel != null && (
+                  <>
+                    {" "}
+                    • {experienceLabel}
+                    {/^\d+$/.test(experienceLabel) ? " years experience" : ""}
+                  </>
+                )}
+              </p>
+            </div>
+          </div>
+          <div className="w-full sm:max-w-[240px]">
+            <div className="flex items-center justify-between text-xs font-medium text-gray-600 dark:text-gray-300">
+              <span>Profile Completion</span>
+              <span>{checklistTotal === 0 ? "—" : `${completionPercent}%`}</span>
+            </div>
+            <div className="mt-2 h-2.5 rounded-full bg-gray-200 dark:bg-gray-700">
+              <div
+                className="h-2.5 rounded-full bg-amber-500 transition-[width]"
+                style={{ width: checklistTotal === 0 ? "0%" : `${completionPercent}%` }}
+              />
+            </div>
+            <p className="mt-1 text-right text-xs text-gray-500 dark:text-gray-400">
+              {checklistTotal === 0
+                ? "No checklist items"
+                : `${completedSteps} of ${checklistTotal} steps checked`}
             </p>
           </div>
+        </div>
+        {checklistError && (
+          <p className="px-4 pb-2 text-sm text-red-600 dark:text-red-400 sm:px-5">{checklistError}</p>
+        )}
+        <div className="grid grid-cols-1 gap-2 px-4 py-3 sm:grid-cols-3 sm:px-5">
+          {profileChecklistItems.length === 0 ? (
+            <p className="col-span-full text-sm text-gray-500 dark:text-gray-400">
+              No profile checklist items returned from the API.
+            </p>
+          ) : (
+            profileChecklistItems.map((item) => (
+              <label
+                key={item.id}
+                className={`flex items-start gap-2 rounded-lg px-1.5 py-1 text-sm text-gray-700 dark:text-gray-300 ${
+                  checklistUpdating ? "opacity-60" : ""
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={item.checked}
+                  disabled={checklistUpdating}
+                  onChange={() => void handleProfileChecklistToggle(item)}
+                  className="mt-0.5 h-4 w-4 cursor-pointer rounded border-gray-300 text-amber-500 focus:ring-amber-500 disabled:cursor-not-allowed"
+                />
+                <span>
+                  {item.displayOrder}. {item.label}
+                </span>
+              </label>
+            ))
+          )}
         </div>
       </div>
 
@@ -1376,6 +1502,42 @@ export function ProviderFullDetailsView({
               </table>
             </div>
           )}
+        </DetailBlock>
+      </div>
+
+      <div className="w-full min-w-0 sm:col-span-2">
+        <DetailBlock title="Reference Check - Minimum 2 references">
+          <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
+            UI preview only for reference-verification workflow. API integration can be added later.
+          </p>
+          <div className="w-full min-w-0 max-h-48 overflow-auto">
+            <table className="w-full min-w-[32rem] text-left text-sm">
+              <thead>
+                <tr className="border-b border-gray-200 dark:border-gray-700">
+                  <th className="py-2 pr-2 font-medium text-gray-500 dark:text-gray-400">Reference</th>
+                  <th className="py-2 pr-2 font-medium text-gray-500 dark:text-gray-400">Relation</th>
+                  <th className="py-2 pr-2 font-medium text-gray-500 dark:text-gray-400">Contact</th>
+                  <th className="py-2 pr-2 font-medium text-gray-500 dark:text-gray-400">Status</th>
+                  <th className="py-2 font-medium text-gray-500 dark:text-gray-400">Note</th>
+                </tr>
+              </thead>
+              <tbody>
+                {referenceChecks.map((ref) => (
+                  <tr key={ref.id} className="border-b border-gray-100 dark:border-gray-800">
+                    <td className="py-1.5 pr-2 font-medium text-gray-800 dark:text-white/90">{ref.refName}</td>
+                    <td className="py-1.5 pr-2 text-gray-700 dark:text-gray-300">{ref.relation}</td>
+                    <td className="py-1.5 pr-2 text-gray-700 dark:text-gray-300">{ref.contact}</td>
+                    <td className="py-1.5 pr-2">
+                      <Badge size="sm" color={ref.status === "VERIFIED" ? "success" : "warning"}>
+                        {ref.status}
+                      </Badge>
+                    </td>
+                    <td className="py-1.5 text-gray-600 dark:text-gray-400">{ref.note}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </DetailBlock>
       </div>
 

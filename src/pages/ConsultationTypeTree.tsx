@@ -13,10 +13,12 @@ import Label from "../components/form/Label";
 import Badge from "../components/ui/badge/Badge";
 import {
   consultationTypesApi,
+  uploadFileToStorage,
   type ConsultationType,
   type CreateConsultationTypeRequest,
   type UpdateConsultationTypeRequest,
 } from "../services/api";
+import { resolveConsultationTypeImageUrl } from "../utils/assetUrl";
 import { Link } from "react-router";
 import {
   AngleRightIcon,
@@ -36,6 +38,40 @@ const EMPLOYMENT_TYPE_OPTIONS = [
   { value: "INDEPENDENT", label: "Independent" },
   { value: "SALARIED", label: "Salaried" },
 ];
+
+const IMAGE_FILE_INPUT_CLASS =
+  "block w-full text-sm text-gray-600 file:mr-4 file:rounded-lg file:border-0 file:bg-brand-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-brand-700 hover:file:bg-brand-100 dark:text-gray-400 dark:file:bg-brand-500/10 dark:file:text-brand-300";
+
+/** Preview for a new file (object URL) or an existing stored image URL. */
+function ImagePickPreview({
+  previewUrl,
+  fileName,
+  existingCaption,
+}: {
+  previewUrl: string | null;
+  fileName: string | null;
+  /** Shown under the image when showing a saved image and no new file is chosen. */
+  existingCaption?: string | null;
+}) {
+  return (
+    <>
+      {previewUrl ? (
+        <div className="mt-2 overflow-hidden rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-900/50">
+          <img
+            src={previewUrl}
+            alt=""
+            className="mx-auto max-h-48 w-full object-contain"
+          />
+        </div>
+      ) : null}
+      {fileName ? (
+        <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">Selected: {fileName}</p>
+      ) : existingCaption && previewUrl ? (
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{existingCaption}</p>
+      ) : null}
+    </>
+  );
+}
 
 /** Normalize API response to array of root nodes */
 function normalizeTree(
@@ -321,6 +357,10 @@ export default function ConsultationTypeTree() {
   const [formEmploymentType, setFormEmploymentType] = useState("");
   const [formParentId, setFormParentId] = useState<number | null>(null);
   const [formCommissionPercent, setFormCommissionPercent] = useState("0");
+  const [formImageFile, setFormImageFile] = useState<File | null>(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+  /** Bumps when modals open/close so file inputs reset. */
+  const [imageFieldKey, setImageFieldKey] = useState(0);
   const [formError, setFormError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -364,6 +404,27 @@ export default function ConsultationTypeTree() {
     return () => controller.abort();
   }, [fetchTree]);
 
+  useEffect(() => {
+    if (!formImageFile || !formImageFile.type.startsWith("image/")) {
+      setImagePreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(formImageFile);
+    setImagePreviewUrl(url);
+    return () => {
+      URL.revokeObjectURL(url);
+    };
+  }, [formImageFile]);
+
+  /** Edit modal: new file preview wins; otherwise show saved `imageUrl` from the node. */
+  const editModalImagePreviewSrc = useMemo(() => {
+    if (modalMode !== "edit") return null;
+    if (imagePreviewUrl) return imagePreviewUrl;
+    const stored = selectedNode?.imageUrl?.trim();
+    if (!stored) return null;
+    return resolveConsultationTypeImageUrl(stored) || null;
+  }, [modalMode, imagePreviewUrl, selectedNode?.imageUrl]);
+
   const flatNodes = useMemo(() => flattenTree(tree), [tree]);
 
   const expandAll = () => {
@@ -394,6 +455,8 @@ export default function ConsultationTypeTree() {
         ? String(node.platformCommissionPercent)
         : ""
     );
+    setFormImageFile(null);
+    setImageFieldKey((k) => k + 1);
     setFormError("");
     setModalMode("edit");
   };
@@ -405,6 +468,8 @@ export default function ConsultationTypeTree() {
     setFormCode("");
     setFormEmploymentType("INDEPENDENT");
     setFormCommissionPercent("0");
+    setFormImageFile(null);
+    setImageFieldKey((k) => k + 1);
     setFormError("");
     setModalMode("addChild");
   };
@@ -416,6 +481,8 @@ export default function ConsultationTypeTree() {
     setFormCode("");
     setFormEmploymentType("INDEPENDENT");
     setFormCommissionPercent("0");
+    setFormImageFile(null);
+    setImageFieldKey((k) => k + 1);
     setFormError("");
     setModalMode("addRoot");
   };
@@ -429,8 +496,16 @@ export default function ConsultationTypeTree() {
     setFormEmploymentType("");
     setFormParentId(null);
     setFormCommissionPercent("0");
+    setFormImageFile(null);
+    setImageFieldKey((k) => k + 1);
     setFormError("");
     setSubmitting(false);
+  };
+
+  const uploadImageIfNeeded = async (): Promise<string | undefined> => {
+    if (!formImageFile) return undefined;
+    const uploadData = await uploadFileToStorage(formImageFile);
+    return JSON.stringify(uploadData);
   };
 
   const handleSubmitEdit = async () => {
@@ -454,6 +529,19 @@ export default function ConsultationTypeTree() {
     setFormError("");
     setSubmitting(true);
     try {
+      let imageUrl: string | undefined;
+      if (formImageFile) {
+        try {
+          imageUrl = await uploadImageIfNeeded();
+        } catch (uploadErr: unknown) {
+          const msg =
+            uploadErr && typeof uploadErr === "object" && "message" in uploadErr
+              ? String((uploadErr as { message: string }).message)
+              : "Image upload failed.";
+          setFormError(msg);
+          return;
+        }
+      }
       const payload: UpdateConsultationTypeRequest = {
         name,
         description: formDescription.trim() || undefined,
@@ -461,6 +549,7 @@ export default function ConsultationTypeTree() {
         employmentType: formEmploymentType.trim() || undefined,
         parentId: formParentId ?? undefined,
         platformCommissionPercent: commission,
+        ...(imageUrl !== undefined ? { imageUrl } : {}),
       };
       await consultationTypesApi.update(selectedNode.id, payload);
       closeModal();
@@ -497,6 +586,19 @@ export default function ConsultationTypeTree() {
     setFormError("");
     setSubmitting(true);
     try {
+      let imageUrl: string | undefined;
+      if (formImageFile) {
+        try {
+          imageUrl = await uploadImageIfNeeded();
+        } catch (uploadErr: unknown) {
+          const msg =
+            uploadErr && typeof uploadErr === "object" && "message" in uploadErr
+              ? String((uploadErr as { message: string }).message)
+              : "Image upload failed.";
+          setFormError(msg);
+          return;
+        }
+      }
       const payload: CreateConsultationTypeRequest = {
         name,
         description: formDescription.trim() || undefined,
@@ -504,6 +606,7 @@ export default function ConsultationTypeTree() {
         employmentType: formEmploymentType.trim() || undefined,
         parentId: selectedNode.id,
         platformCommissionPercent: commission,
+        ...(imageUrl !== undefined ? { imageUrl } : {}),
       };
       await consultationTypesApi.create(payload);
       closeModal();
@@ -540,12 +643,26 @@ export default function ConsultationTypeTree() {
     setFormError("");
     setSubmitting(true);
     try {
+      let imageUrl: string | undefined;
+      if (formImageFile) {
+        try {
+          imageUrl = await uploadImageIfNeeded();
+        } catch (uploadErr: unknown) {
+          const msg =
+            uploadErr && typeof uploadErr === "object" && "message" in uploadErr
+              ? String((uploadErr as { message: string }).message)
+              : "Image upload failed.";
+          setFormError(msg);
+          return;
+        }
+      }
       const payload: CreateConsultationTypeRequest = {
         name,
         description: formDescription.trim() || undefined,
         code: formCode.trim() || undefined,
         employmentType: formEmploymentType.trim() || undefined,
         platformCommissionPercent: commission,
+        ...(imageUrl !== undefined ? { imageUrl } : {}),
       };
       await consultationTypesApi.create(payload);
       closeModal();
@@ -838,6 +955,26 @@ export default function ConsultationTypeTree() {
             />
           </div>
           <div>
+            <Label htmlFor="edit-image">Image (optional)</Label>
+            <input
+              key={`edit-image-${imageFieldKey}`}
+              id="edit-image"
+              type="file"
+              accept="image/*"
+              className={IMAGE_FILE_INPUT_CLASS}
+              onChange={(e) => setFormImageFile(e.target.files?.[0] ?? null)}
+            />
+            <ImagePickPreview
+              previewUrl={editModalImagePreviewSrc}
+              fileName={formImageFile?.name ?? null}
+              existingCaption={
+                !formImageFile && selectedNode?.imageUrl?.trim()
+                  ? "Current image — choose a new file to replace"
+                  : null
+              }
+            />
+          </div>
+          <div>
             <Label htmlFor="edit-parent">Parent (move type)</Label>
             <select
               id="edit-parent"
@@ -929,6 +1066,21 @@ export default function ConsultationTypeTree() {
               placeholder="e.g. 10"
             />
           </div>
+          <div>
+            <Label htmlFor="add-image">Image (optional)</Label>
+            <input
+              key={`add-image-${imageFieldKey}`}
+              id="add-image"
+              type="file"
+              accept="image/*"
+              className={IMAGE_FILE_INPUT_CLASS}
+              onChange={(e) => setFormImageFile(e.target.files?.[0] ?? null)}
+            />
+            <ImagePickPreview
+              previewUrl={imagePreviewUrl}
+              fileName={formImageFile?.name ?? null}
+            />
+          </div>
         </div>
         <div className="mt-6 flex flex-wrap justify-end gap-3">
           <Button variant="outline" onClick={closeModal} disabled={submitting}>
@@ -1003,6 +1155,21 @@ export default function ConsultationTypeTree() {
               value={formCommissionPercent}
               onChange={(e) => setFormCommissionPercent(e.target.value)}
               placeholder="e.g. 10"
+            />
+          </div>
+          <div>
+            <Label htmlFor="root-image">Image (optional)</Label>
+            <input
+              key={`root-image-${imageFieldKey}`}
+              id="root-image"
+              type="file"
+              accept="image/*"
+              className={IMAGE_FILE_INPUT_CLASS}
+              onChange={(e) => setFormImageFile(e.target.files?.[0] ?? null)}
+            />
+            <ImagePickPreview
+              previewUrl={imagePreviewUrl}
+              fileName={formImageFile?.name ?? null}
             />
           </div>
         </div>

@@ -82,6 +82,30 @@ export interface RegisterPatientRequest {
   nidNumber: string;
 }
 
+/** POST /v1/users/register — public; creates user with fixed role (e.g. supervisor). */
+export interface RegisterSupervisorRequest {
+  email: string;
+  username: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+  role: "SUPERVISOR";
+}
+
+/** Typical user payload returned after registration (shape may vary by backend). */
+export type RegisterSupervisorUserFields = {
+  id?: number;
+  email?: string;
+  username?: string;
+  firstName?: string;
+  lastName?: string;
+  role?: string;
+};
+
+export type RegisterSupervisorResponse = RegisterSupervisorUserFields & {
+  user?: RegisterSupervisorUserFields;
+};
+
 // ============== Forgot Password ==============
 
 export interface PasswordResetRequestRequest {
@@ -115,6 +139,8 @@ export interface ConsultationType {
   employmentType?: string | null;
   /** Optional platform commission percent (0–100) configured for this type. */
   platformCommissionPercent?: number | null;
+  /** JSON string of the file upload API response (image), if stored by backend. */
+  imageUrl?: string | null;
   createdBy?: number | null;
   updatedBy?: number | null;
   deletedBy?: number | null;
@@ -401,6 +427,11 @@ export const authApi = {
     );
   },
 
+  /** POST /users/register — email/username/password + names + role (e.g. SUPERVISOR). No auth. */
+  registerSupervisor: async (data: RegisterSupervisorRequest) => {
+    return httpService.requestWithoutAuth<RegisterSupervisorResponse>("POST", "/users/register", data);
+  },
+
   /** POST /auth/password-reset/request */
   passwordResetRequest: async (data: PasswordResetRequestRequest) => {
     return httpService.requestWithoutAuth<{ message: string }>(
@@ -440,6 +471,8 @@ export interface CreateConsultationTypeRequest {
   parentId?: number;
   /** Optional platform commission percent (0–100) for this type. */
   platformCommissionPercent?: number;
+  /** JSON.stringify of POST /files/upload response body (backend field name). */
+  imageUrl?: string;
 }
 
 /** Payload for updating a consultation type (admin). */
@@ -452,6 +485,53 @@ export interface UpdateConsultationTypeRequest {
   priority?: number;
   /** Optional platform commission percent (0–100) for this type. */
   platformCommissionPercent?: number | null;
+  /** JSON.stringify of POST /files/upload response body. Omit to leave existing value. */
+  imageUrl?: string;
+}
+
+/** Multipart upload to external file service. Override with `VITE_FILE_UPLOAD_URL` (no trailing slash). */
+const FILE_UPLOAD_BASE_URL =
+  (import.meta.env.VITE_FILE_UPLOAD_URL as string | undefined)?.replace(/\/$/, "") ||
+  "http://116.68.207.105:3085";
+
+/** Required by the file service (401 if missing/wrong). Override via `VITE_FILE_UPLOAD_API_KEY`. */
+const FILE_UPLOAD_API_KEY =
+  (import.meta.env.VITE_FILE_UPLOAD_API_KEY as string | undefined)?.trim() ||
+  "hope-project-key-123";
+
+/**
+ * POST /files/upload — returns parsed JSON (or raw text if not JSON).
+ * Sends only `x-api-key` (required). Do not send `Authorization: Bearer` here: this service
+ * treats Authorization as the project API key and rejects JWTs with "Invalid API key".
+ */
+export async function uploadFileToStorage(file: File): Promise<unknown> {
+  const url = `${FILE_UPLOAD_BASE_URL}/files/upload`;
+  const formData = new FormData();
+  formData.append("file", file);
+  const headers: Record<string, string> = {
+    accept: "*/*",
+    "x-api-key": FILE_UPLOAD_API_KEY,
+  };
+  const res = await fetch(url, { method: "POST", headers, body: formData });
+  const text = await res.text();
+  if (!res.ok) {
+    let message = text?.trim() || `Upload failed (${res.status})`;
+    try {
+      const errJson = JSON.parse(text) as { message?: string };
+      if (errJson?.message && typeof errJson.message === "string") {
+        message = errJson.message;
+      }
+    } catch {
+      /* keep message */
+    }
+    throw new Error(message);
+  }
+  if (!text) return null;
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return text;
+  }
 }
 
 /** Payload for reordering consultation types (siblings under same parent). */
@@ -676,6 +756,32 @@ export const upgradeRequestsApi = {
   },
 };
 
+// ============== Admin service request schedule (nurse assignment) ==============
+
+/** Nurse row returned by GET .../available-nurses (camelCase). */
+export interface ServiceRequestAvailableNurseDto {
+  id: string;
+  name: string;
+  unit?: string;
+}
+
+export const serviceRequestScheduleApi = {
+  /**
+   * GET /admin/service-requests/:requestId/available-nurses
+   * Query: startDate, endDate (ISO 8601). Backend may not exist yet — UI uses local mock on failure.
+   */
+  getAvailableNurses: async (
+    requestId: string,
+    params: { startDate: string; endDate: string },
+    signal?: AbortSignal
+  ) => {
+    return httpService.get<ServiceRequestAvailableNurseDto[] | { nurses: ServiceRequestAvailableNurseDto[] }>(
+      `/admin/service-requests/${encodeURIComponent(requestId)}/available-nurses`,
+      { params: { startDate: params.startDate, endDate: params.endDate }, signal }
+    );
+  },
+};
+
 // ============== Providers API ==============
 
 /**
@@ -691,8 +797,15 @@ export interface ProviderListItem {
   email?: string;
   firstName?: string;
   lastName?: string;
+  /** Some list endpoints send a single display name instead of first/last. */
+  name?: string | null;
+  fullName?: string | null;
+  providerName?: string | null;
   username?: string;
   bmdcNumber?: string;
+  /** Profile photo URL or path (relative paths via `getAssetUrl`). */
+  profilePicture?: string | null;
+  profile_picture?: string | null;
   /** Backend may return string (e.g. "5 years") or number */
   experience?: number | string | null;
   /** Provider status (replaces isVerified). */
@@ -726,6 +839,154 @@ export interface AdminProviderListResponse {
   total: number;
   page: number;
   limit: number;
+}
+
+/** Flatten nested `user`, snake_case, and single `name` fields into a list row. */
+export function normalizeProviderListItem(raw: unknown): ProviderListItem {
+  if (raw == null || typeof raw !== "object") {
+    return {
+      id: 0,
+      userId: 0,
+      status: "ACTIVE",
+      createdAt: new Date().toISOString(),
+    };
+  }
+  const o = raw as Record<string, unknown>;
+  const user = o.user && typeof o.user === "object" ? (o.user as Record<string, unknown>) : null;
+
+  const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : "");
+  let firstName = str(o.firstName) || str(o.first_name) || str(user?.firstName) || str(user?.first_name);
+  let lastName = str(o.lastName) || str(o.last_name) || str(user?.lastName) || str(user?.last_name);
+
+  const singleName =
+    str(o.name) ||
+    str(o.fullName) ||
+    str(o.full_name) ||
+    str(o.providerName) ||
+    str(o.provider_name);
+  if ((!firstName || !lastName) && singleName) {
+    const parts = singleName.split(/\s+/).filter(Boolean);
+    if (!firstName && parts[0]) firstName = parts[0];
+    if (!lastName && parts.length > 1) lastName = parts.slice(1).join(" ");
+    if (!firstName && parts.length === 1) firstName = parts[0];
+  }
+
+  const email = str(o.email) || str(user?.email) || undefined;
+  const username = str(o.username) || str(user?.username) || undefined;
+  const profilePicture =
+    str(o.profilePicture) ||
+    str(o.profile_picture) ||
+    str(user?.profilePicture) ||
+    str(user?.profile_picture) ||
+    undefined;
+
+  const id = Number(o.id);
+  const userId = Number(o.userId ?? user?.id ?? o.id);
+
+  const statusRaw = String(o.status || "ACTIVE").toUpperCase();
+  const status = (
+    ["PENDING", "ACTIVE", "AVAILABLE", "REJECTED", "ARCHIVED"].includes(statusRaw)
+      ? statusRaw
+      : "ACTIVE"
+  ) as ProviderListItem["status"];
+
+  const bmdcNumber = str(o.bmdcNumber) || str(o.bmdc_number) || undefined;
+  const consultationTypeId = Number(o.consultationTypeId ?? o.consultation_type_id);
+  const consultationTypeName =
+    str(o.consultationTypeName) || str(o.consultation_type_name) || undefined;
+  const updatedAt = str(o.updatedAt) || undefined;
+  const startDate = str(o.startDate) || str(o.start_date) || undefined;
+  const endDate = str(o.endDate) || str(o.end_date) || undefined;
+  const experienceRaw = o.experience;
+  const experience =
+    typeof experienceRaw === "number" || typeof experienceRaw === "string" ? experienceRaw : null;
+
+  return {
+    id: Number.isFinite(id) ? id : 0,
+    userId: Number.isFinite(userId) ? userId : 0,
+    email,
+    firstName: firstName || undefined,
+    lastName: lastName || undefined,
+    name: singleName || undefined,
+    fullName: str(o.fullName) || str(o.full_name) || undefined,
+    providerName: str(o.providerName) || str(o.provider_name) || undefined,
+    username,
+    bmdcNumber,
+    profilePicture,
+    profile_picture: str(o.profile_picture) || undefined,
+    experience,
+    status,
+    consultationTypeId: Number.isFinite(consultationTypeId) ? consultationTypeId : undefined,
+    consultationTypeName,
+    createdAt: str(o.createdAt) || new Date().toISOString(),
+    updatedAt,
+    startDate,
+    endDate,
+    start_date: str(o.start_date) || undefined,
+    end_date: str(o.end_date) || undefined,
+  };
+}
+
+/** Read total record count from common pagination field names; avoid using page size as total. */
+function pickProvidersListTotal(o: Record<string, unknown>): number | undefined {
+  const read = (obj: Record<string, unknown>, keys: string[]): number | undefined => {
+    for (const k of keys) {
+      const v = obj[k];
+      if (v === undefined || v === null) continue;
+      const n = typeof v === "number" ? v : Number(v);
+      if (Number.isFinite(n) && n >= 0) return n;
+    }
+    return undefined;
+  };
+  const top = read(o, [
+    "total",
+    "totalCount",
+    "total_count",
+    "totalRecords",
+    "total_records",
+    "itemCount",
+    "item_count",
+  ]);
+  if (top !== undefined) return top;
+  if (o.meta && typeof o.meta === "object") {
+    const nested = read(o.meta as Record<string, unknown>, ["total", "totalCount", "total_count"]);
+    if (nested !== undefined) return nested;
+  }
+  return undefined;
+}
+
+/** Unwrap GET /v1/providers/all (same general shape as admin provider list). */
+export function normalizeProvidersAllResponse(data: unknown): AdminProviderListResponse {
+  const mapRows = (rows: unknown[]): ProviderListItem[] =>
+    rows.map((row) => normalizeProviderListItem(row));
+
+  if (Array.isArray(data)) {
+    const providers = mapRows(data);
+    return {
+      providers,
+      total: data.length,
+      page: 1,
+      limit: data.length || 10,
+    };
+  }
+  if (data && typeof data === "object") {
+    const o = data as Record<string, unknown>;
+    const raw = o.providers ?? o.data ?? o.items ?? o.results;
+    if (Array.isArray(raw)) {
+      const explicitTotal = pickProvidersListTotal(o);
+      const limit = Number(o.limit) || Number(o.pageSize) || Number(o.per_page) || 10;
+      const page = Number(o.page) || Number(o.currentPage) || 1;
+      /** 0 = total not provided; callers should use “full last page ⇒ may have more”. */
+      const total = explicitTotal ?? 0;
+      return {
+        providers: mapRows(raw),
+        total,
+        page: Number.isFinite(page) ? page : 1,
+        limit: Number.isFinite(limit) ? limit : 10,
+      };
+    }
+  }
+  return { providers: [], total: 0, page: 1, limit: 10 };
 }
 
 /** UI status filter for provider list. Sent to API as uppercase (PENDING, ACTIVE, AVAILABLE, REJECTED, DEACTIVATED, ARCHIVED). */
@@ -938,10 +1199,21 @@ export interface ProviderConsultationTypeServiceItemDto {
   offered: boolean;
 }
 
+/** One profile onboarding checklist row (GET .../details `profileCheacklists`). */
+export interface ProviderProfileChecklistItemDto {
+  id: number;
+  key: string;
+  label: string;
+  displayOrder: number;
+  checked: boolean;
+}
+
 /** Full provider details: GET /v1/admin/providers/:providerId/details. Wallet fields per api_business_flow §11. */
 export interface ProviderFullDetailsDto {
   user: AdminUserDetailUserDto;
   provider: ProviderFullProfileDto;
+  /** Profile onboarding checklist (API property name includes the historical typo `cheacklists`). */
+  profileCheacklists?: ProviderProfileChecklistItemDto[];
   /** Checklist services for this provider's consultation type; offered = true means provider offers it. */
   consultationTypeServices?: ProviderConsultationTypeServiceItemDto[];
   serviceRequestsByStatus: ServiceRequestsByStatusDto;
@@ -1046,6 +1318,25 @@ export const providersApi = {
     });
   },
 
+  /**
+   * GET /v1/providers/all — paginated providers (e.g. for supervisor nurse assignment).
+   * Query: page, limit.
+   */
+  getAllPublic: async (
+    params?: { page?: number; limit?: number },
+    config?: { signal?: AbortSignal }
+  ) => {
+    const query: Record<string, string | number | boolean> = {
+      page: params?.page ?? 1,
+      limit: params?.limit ?? 10,
+      isSupervised: false,
+    };
+    return httpService.get<unknown>("/providers/all", {
+      params: query,
+      signal: config?.signal,
+    });
+  },
+
   /** GET /v1/admin/providers/:providerId/details - Full provider details (Admin only). */
   getDetails: async (providerId: number, config?: { signal?: AbortSignal }) => {
     return httpService.get<ProviderFullDetailsDto>(`/admin/providers/${providerId}/details`, {
@@ -1059,6 +1350,16 @@ export const providersApi = {
   ) => {
     return httpService.patch<ProviderConsultationTypeServiceItemDto[]>(
       `/admin/providers/${providerId}/consultation-services`,
+      body
+    );
+  },
+  /** PATCH /v1/admin/providers/:providerId/cheaklist — Set completed checklist items (IDs that are checked). */
+  updateProfileChecklist: async (
+    providerId: number,
+    body: { checklistItemIds: number[] }
+  ) => {
+    return httpService.patch<ProviderProfileChecklistItemDto[]>(
+      `/admin/providers/${providerId}/cheaklist`,
       body
     );
   },
@@ -1582,6 +1883,99 @@ export const dashboardApi = {
   },
 };
 
+// ============== Admin Supervisors API ==============
+
+/** One row from GET /v1/admin/supervisors (field names may vary slightly by backend). */
+export interface AdminSupervisorDto {
+  id: number;
+  userId?: number;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  username?: string;
+  phone?: string | null;
+  region?: string | null;
+  teamSize?: number | null;
+  status?: string | null;
+  joinedAt?: string | null;
+  createdAt?: string | null;
+  isActive?: boolean;
+}
+
+/** Unwrap array from common response shapes. */
+export function normalizeAdminSupervisorsResponse(data: unknown): AdminSupervisorDto[] {
+  if (Array.isArray(data)) return data as AdminSupervisorDto[];
+  if (data && typeof data === "object") {
+    const o = data as Record<string, unknown>;
+    for (const key of ["supervisors", "data", "items", "results"] as const) {
+      const arr = o[key];
+      if (Array.isArray(arr)) return arr as AdminSupervisorDto[];
+    }
+  }
+  return [];
+}
+
+/** Payload used by assign/reassign supervisor-provider endpoints. */
+export interface AssignProvidersToSupervisorRequest {
+  supervisorId: number;
+  providerIds: number[];
+}
+
+/** One row from GET /v1/admin/:supervisorId/providers (shape can vary by backend). */
+export interface AssignedProviderRow {
+  id?: number;
+  providerId?: number;
+  provider_id?: number;
+  [key: string]: unknown;
+}
+
+/** Extract assigned provider IDs from common response envelopes and key names. */
+export function normalizeAssignedProviderIdsResponse(data: unknown): number[] {
+  const rowsFrom = (value: unknown): unknown[] => {
+    if (Array.isArray(value)) return value;
+    if (value && typeof value === "object") {
+      const o = value as Record<string, unknown>;
+      for (const key of ["providers", "assignedProviders", "data", "items", "results"] as const) {
+        if (Array.isArray(o[key])) return o[key] as unknown[];
+      }
+    }
+    return [];
+  };
+  const rows = rowsFrom(data);
+  const ids = rows
+    .map((row) => {
+      if (!row || typeof row !== "object") return NaN;
+      const o = row as AssignedProviderRow;
+      const rawId = o.providerId ?? o.provider_id ?? o.id;
+      const id = Number(rawId);
+      return Number.isFinite(id) && id > 0 ? id : NaN;
+    })
+    .filter((id) => Number.isFinite(id)) as number[];
+  return Array.from(new Set(ids));
+}
+
+export const adminSupervisorsApi = {
+  /** GET /v1/admin/supervisors — list supervisors (admin). */
+  getAll: async (config?: { signal?: AbortSignal }) => {
+    return httpService.get<unknown>("/admin/supervisors", { signal: config?.signal });
+  },
+
+  /** GET /v1/admin/:supervisorId/providers — already assigned providers under a supervisor. */
+  getAssignedProviders: async (supervisorId: number, config?: { signal?: AbortSignal }) => {
+    return httpService.get<unknown>(`/admin/${supervisorId}/providers`, { signal: config?.signal });
+  },
+
+  /** POST /v1/admin/assign-providers */
+  assignProviders: async (data: AssignProvidersToSupervisorRequest) => {
+    return httpService.post<{ message?: string }>("/admin/assign-providers", data);
+  },
+
+  /** PUT /v1/admin/reassign-providers — replace supervisor's assigned providers list. */
+  reassignProviders: async (data: AssignProvidersToSupervisorRequest) => {
+    return httpService.put<{ message?: string }>("/admin/reassign-providers", data);
+  },
+};
+
 // ============== Users API (admin – list all users) ==============
 
 export interface UserListItem {
@@ -1929,9 +2323,35 @@ export const adminCertificationsApi = {
 
 // ============== User API (legacy / profile) ==============
 
+/** GET /v1/users/:id — single user (camelCase or snake_case from backend). */
+export interface UserByIdDto {
+  id: number;
+  email?: string;
+  username?: string;
+  firstName?: string;
+  lastName?: string;
+  first_name?: string;
+  last_name?: string;
+  role?: string;
+  isActive?: boolean;
+  phone?: string | null;
+  mobileNumber?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export function normalizeUserByIdResponse(data: unknown): UserByIdDto | null {
+  if (data == null || typeof data !== "object") return null;
+  const o = data as Record<string, unknown>;
+  if (o.user && typeof o.user === "object") return normalizeUserByIdResponse(o.user);
+  if (o.data && typeof o.data === "object") return normalizeUserByIdResponse(o.data);
+  return data as UserByIdDto;
+}
+
 export const userApi = {
-  getProfile: async (userId: string) => {
-    return httpService.get(`/users/${userId}`);
+  /** GET /v1/users/:userId */
+  getProfile: async (userId: string, config?: { signal?: AbortSignal }) => {
+    return httpService.get<unknown>(`/users/${userId}`, { signal: config?.signal });
   },
   updateProfile: async (userId: string, data: Record<string, unknown>) => {
     return httpService.put(`/users/${userId}`, data);

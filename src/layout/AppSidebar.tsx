@@ -12,6 +12,7 @@ import {
   ListIcon,
   MailIcon,
   PageIcon,
+  TaskIcon,
   UserCircleIcon,
   UserIcon,
 } from "../icons";
@@ -42,6 +43,7 @@ const navSections: NavSection[] = [
       { icon: <GroupIcon />, name: "Providers", path: "/providers" },
       { icon: <UserIcon />, name: "Patients", path: "/patients" },
       { icon: <CalenderIcon />, name: "Schedule", path: "/schedule" },
+      { icon: <TaskIcon />, name: "Supervisor", path: "/supervisors" },
     ],
   },
   {

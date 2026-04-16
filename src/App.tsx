@@ -21,6 +21,7 @@ import Notifications from "./pages/Notifications";
 import FinancialReports from "./pages/FinancialReports";
 import NurseScheduleList from "./pages/NurseScheduleList";
 import NurseScheduleCalendarPage from "./pages/NurseScheduleCalendarPage";
+import SupervisorList from "./pages/SupervisorList";
 import ProtectedRoute from "./components/common/ProtectedRoute";
 import PublicRoute from "./components/common/PublicRoute";
 
@@ -42,6 +43,7 @@ export default function App() {
           <Route path="/providers" element={<ProviderList />} />
           <Route path="/schedule/:requestId" element={<NurseScheduleCalendarPage />} />
           <Route path="/schedule" element={<NurseScheduleList />} />
+          <Route path="/supervisors" element={<SupervisorList />} />
           <Route path="/users" element={<UserList />} />
           <Route path="/consultation-types" element={<ConsultationTypeTree />} />
           <Route path="/consultation-types/config/:id" element={<ConsultationTypeConfig />} />

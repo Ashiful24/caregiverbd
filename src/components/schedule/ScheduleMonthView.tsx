@@ -18,6 +18,8 @@ const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 type Props = {
   visibleMonth: Date;
   events: ScheduleEventRecord[];
+  dayInRange: (day: Date) => boolean;
+  onSelectDay: (day: Date) => void;
 };
 
 function eventsForDay(events: ScheduleEventRecord[], day: Date): ScheduleEventRecord[] {
@@ -27,7 +29,7 @@ function eventsForDay(events: ScheduleEventRecord[], day: Date): ScheduleEventRe
   });
 }
 
-export function ScheduleMonthView({ visibleMonth, events }: Props) {
+export function ScheduleMonthView({ visibleMonth, events, dayInRange, onSelectDay }: Props) {
   const monthStart = startOfMonth(visibleMonth);
   const monthEnd = endOfMonth(visibleMonth);
   const gridStart = startOfWeek(monthStart, { weekStartsOn: 1 });
@@ -37,11 +39,11 @@ export function ScheduleMonthView({ visibleMonth, events }: Props) {
   return (
     <div className="overflow-x-auto">
       <div className="min-w-[720px]">
-        <div className="grid grid-cols-7 border-b border-gray-200 dark:border-gray-800">
+        <div className="grid grid-cols-7 border-b-2 border-gray-300 dark:border-gray-600">
           {WEEKDAYS.map((d) => (
             <div
               key={d}
-              className="border-r border-gray-100 py-2 text-center text-xs font-semibold uppercase tracking-wide text-gray-500 last:border-r-0 dark:border-gray-800 dark:text-gray-400"
+              className="border-r border-gray-300 py-2 text-center text-xs font-semibold uppercase tracking-wide text-gray-500 last:border-r-0 dark:border-gray-600 dark:text-gray-400"
             >
               {d}
             </div>
@@ -55,12 +57,24 @@ export function ScheduleMonthView({ visibleMonth, events }: Props) {
             const show = dayEvents.slice(0, 3);
             const more = dayEvents.length - show.length;
 
+            const selectable = dayInRange(day);
+
             return (
               <div
                 key={day.toISOString()}
-                className={`min-h-[100px] border-b border-r border-gray-100 p-1.5 last:border-r-0 dark:border-gray-800 sm:min-h-[120px] sm:p-2 ${
+                role="button"
+                tabIndex={selectable ? 0 : -1}
+                onClick={() => selectable && onSelectDay(day)}
+                onKeyDown={(ev) => {
+                  if (!selectable) return;
+                  if (ev.key === "Enter" || ev.key === " ") {
+                    ev.preventDefault();
+                    onSelectDay(day);
+                  }
+                }}
+                className={`min-h-[100px] border-b border-r border-gray-300 p-1.5 last:border-r-0 dark:border-gray-600 sm:min-h-[120px] sm:p-2 ${
                   !inMonth ? "bg-gray-50/80 dark:bg-gray-900/40" : ""
-                }`}
+                } ${selectable ? "cursor-pointer hover:bg-brand-50/40 dark:hover:bg-brand-950/15" : "cursor-default opacity-70"}`}
               >
                 <div className="flex items-center justify-between gap-1">
                   <span
@@ -79,6 +93,7 @@ export function ScheduleMonthView({ visibleMonth, events }: Props) {
                   {show.map((e) => (
                     <div
                       key={e.id}
+                      onClick={(ev) => ev.stopPropagation()}
                       title={`${e.title} (${format(parseEventRange(e).start, "HH:mm")}–${format(parseEventRange(e).end, "HH:mm")})`}
                       className={`truncate rounded px-1.5 py-0.5 text-[10px] font-medium leading-tight sm:text-xs ${eventTypeClasses(e.type)}`}
                     >

@@ -57,7 +57,6 @@ export default function NurseScheduleCalendarPage() {
           subtitle={subtitle}
           requestStartDate={request.startDate}
           requestEndDate={request.endDate}
-          requestedSlotHours={request.requestedSlotHours}
         />
       </div>
     </>
