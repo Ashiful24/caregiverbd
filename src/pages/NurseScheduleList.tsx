@@ -111,9 +111,9 @@ export default function NurseScheduleList() {
     return () => controller.abort();
   }, [fetchList]);
 
-  const goToCalendar = (requestId: number) => {
+  const goToCalendar = (request: LongTermOpportunityListItem) => {
     setOpenActionsId(null);
-    navigate(`/schedule/${requestId}`);
+    navigate(`/schedule/${request.id}`, { state: { request } });
   };
 
   const from = total === 0 ? 0 : (page - 1) * limit + 1;
@@ -209,7 +209,7 @@ export default function NurseScheduleList() {
                           onMouseDown={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            goToCalendar(request.id);
+                            goToCalendar(request);
                           }}
                           className="dark:hover:bg-gray-700 dark:text-gray-200"
                         >
@@ -283,12 +283,12 @@ export default function NurseScheduleList() {
                       >
                         Assigned nurses
                       </TableCell>
-                      <TableCell
+                      {/* <TableCell
                         isHeader
                         className="w-[120px] py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
                       >
                         Actions
-                      </TableCell>
+                      </TableCell> */}
                     </TableRow>
                   </TableHeader>
                   <TableBody className="divide-y divide-gray-100 dark:divide-gray-800">
@@ -315,7 +315,7 @@ export default function NurseScheduleList() {
                         <TableCell className="py-3 text-theme-sm text-gray-600 dark:text-gray-400">
                           {request.assignedNursesLabel ?? "—"}
                         </TableCell>
-                        <TableCell className="py-3 text-right">
+                        {/* <TableCell className="py-3 text-right">
                           <ActionsMenu
                             isOpen={openActionsId === request.id}
                             onClose={() => setOpenActionsId(null)}
@@ -328,14 +328,14 @@ export default function NurseScheduleList() {
                               onMouseDown={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                goToCalendar(request.id);
+                                goToCalendar(request);
                               }}
                               className="dark:hover:bg-gray-700 dark:text-gray-200"
                             >
                               View calendar
                             </DropdownItem>
                           </ActionsMenu>
-                        </TableCell>
+                        </TableCell> */}
                       </TableRow>
                     ))}
                   </TableBody>

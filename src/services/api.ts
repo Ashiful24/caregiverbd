@@ -1977,6 +1977,13 @@ export const adminLongTermOpportunitiesApi = {
       signal: config?.signal,
     });
   },
+
+  /** GET /v1/admin/long-term-opportunities/:id — single service request/opportunity details. */
+  getById: async (id: string | number, config?: { signal?: AbortSignal }) => {
+    return httpService.get<unknown>(`/admin/long-term-opportunities/${id}`, {
+      signal: config?.signal,
+    });
+  },
 };
 
 // ============== Dashboard API (admin summary) ==============
