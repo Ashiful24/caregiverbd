@@ -1284,6 +1284,7 @@ export const providersApi = {
       status?: ProviderListStatusFilter;
       documentType?: string;
       availableType?: ProviderListAvailableTypeFilter;
+      supervisorId?: number;
       /** Inclusive date range filter (ISO strings). */
       startDate?: string;
       endDate?: string;
@@ -1312,6 +1313,9 @@ export const providersApi = {
     if (params?.endDate != null && String(params.endDate).trim() !== "") {
       query.endDate = String(params.endDate).trim();
     }
+    if (params?.supervisorId != null && Number.isFinite(params.supervisorId) && params.supervisorId > 0) {
+      query.supervisorId = params.supervisorId;
+    }
     return httpService.get<AdminProviderListResponse>("/admin/providers", {
       params: query,
       signal: config?.signal,
@@ -1320,16 +1324,17 @@ export const providersApi = {
 
   /**
    * GET /v1/providers/all — paginated providers (e.g. for supervisor nurse assignment).
-   * Query: page, limit.
+   * Query: page, limit. Backend requires consultationTypeCode when isSupervised is sent.
    */
   getAllPublic: async (
-    params?: { page?: number; limit?: number },
+    params?: { page?: number; limit?: number; consultationTypeCode?: string },
     config?: { signal?: AbortSignal }
   ) => {
     const query: Record<string, string | number | boolean> = {
       page: params?.page ?? 1,
       limit: params?.limit ?? 10,
       isSupervised: false,
+      consultationTypeCode: params?.consultationTypeCode ?? "NURSING_CARE",
     };
     return httpService.get<unknown>("/providers/all", {
       params: query,
@@ -1802,6 +1807,178 @@ export const adminServiceRequestsApi = {
   },
 };
 
+// ============== Admin long-term opportunities (service requests — nursing schedule pipeline) ==============
+
+/** Status filter for GET /v1/admin/long-term-opportunities (omit for “all”). */
+export type LongTermOpportunityStatusFilter =
+  | "REQUESTED"
+  | "SCHEDULE_PROPOSED"
+  | "CHANGE_REQUESTED"
+  | "SCHEDULE_CONFIRMED"
+  | "PAYMENT_COMPLETED"
+  | "IN_PROGRESS";
+
+export interface LongTermOpportunityListItem {
+  id: number;
+  status: string;
+  requestNo?: string | null;
+  patientName?: string | null;
+  location?: string | null;
+  amount?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  assignedNursesLabel?: string | null;
+  createdAt?: string | null;
+}
+
+function strOpt(v: unknown): string | null {
+  if (v === null || v === undefined) return null;
+  const s = String(v).trim();
+  return s || null;
+}
+
+/** Map one row from GET /admin/long-term-opportunities (handles nested patient/user and snake_case). */
+export function normalizeLongTermOpportunityRow(raw: unknown): LongTermOpportunityListItem {
+  if (!raw || typeof raw !== "object") {
+    return { id: 0, status: "" };
+  }
+  const o = raw as Record<string, unknown>;
+  const patient =
+    o.patient && typeof o.patient === "object" ? (o.patient as Record<string, unknown>) : null;
+  const id = Number(o.id ?? o.serviceRequestId ?? o.service_request_id);
+  const status = String(o.status ?? "").toUpperCase();
+
+  const patientName =
+    strOpt(o.patientName) ??
+    strOpt(o.patient_name) ??
+    (patient
+      ? [strOpt(patient.firstName), strOpt(patient.lastName)].filter(Boolean).join(" ").trim() || null
+      : null) ??
+    strOpt(patient?.name);
+
+  const requestNo =
+    strOpt(o.requestNo) ??
+    strOpt(o.request_no) ??
+    strOpt(o.referenceNo) ??
+    strOpt(o.code) ??
+    (Number.isFinite(id) && id > 0 ? `SR-${id}` : null);
+
+  const location =
+    strOpt(o.serviceAddressText) ??
+    strOpt(o.service_address_text) ??
+    strOpt(o.location) ??
+    strOpt(o.address) ??
+    strOpt(o.serviceAddress) ??
+    strOpt(o.service_address);
+
+  const startDate = strOpt(o.startDate ?? o.start_date ?? o.requestedStartDate ?? o.windowStart);
+  const endDate = strOpt(o.endDate ?? o.end_date ?? o.requestedEndDate ?? o.windowEnd);
+
+  let assignedNursesLabel: string | null = null;
+  const an = o.assignedNurses ?? o.assigned_nurses;
+  if (Array.isArray(an)) {
+    const names = an
+      .map((r) => {
+        if (!r || typeof r !== "object") return "";
+        const x = r as Record<string, unknown>;
+        const u = x.user && typeof x.user === "object" ? (x.user as Record<string, unknown>) : null;
+        const n =
+          [strOpt(x.firstName), strOpt(x.lastName)].filter(Boolean).join(" ").trim() ||
+          strOpt(x.name) ||
+          (u
+            ? [strOpt(u.firstName), strOpt(u.lastName)].filter(Boolean).join(" ").trim() ||
+              strOpt(u.name)
+            : "");
+        return n;
+      })
+      .filter(Boolean);
+    if (names.length) assignedNursesLabel = names.join(", ");
+  } else if (typeof an === "string" && an.trim()) {
+    assignedNursesLabel = an.trim();
+  }
+
+  return {
+    id: Number.isFinite(id) && id > 0 ? id : 0,
+    status,
+    requestNo,
+    patientName,
+    location,
+    amount: strOpt(o.fee ?? o.amount ?? o.totalFee ?? o.total_fee),
+    startDate,
+    endDate,
+    assignedNursesLabel,
+    createdAt: strOpt(o.createdAt ?? o.created_at),
+  };
+}
+
+export function normalizeLongTermOpportunitiesListResponse(data: unknown): {
+  items: LongTermOpportunityListItem[];
+  total: number;
+  page: number;
+  limit: number;
+} {
+  const unwrapRows = (value: unknown): unknown[] => {
+    if (Array.isArray(value)) return value;
+    if (value && typeof value === "object") {
+      const o = value as Record<string, unknown>;
+      for (const key of ["data", "items", "results", "opportunities", "longTermOpportunities"] as const) {
+        if (Array.isArray(o[key])) return o[key] as unknown[];
+      }
+    }
+    return [];
+  };
+
+  const top =
+    data && typeof data === "object" && !Array.isArray(data)
+      ? (data as Record<string, unknown>)
+      : null;
+  const rows = Array.isArray(data) ? data : unwrapRows(data);
+  const items = rows.map((row) => normalizeLongTermOpportunityRow(row));
+
+  const page = Number(top?.page ?? top?.currentPage ?? 1);
+  const limit = Number(top?.limit ?? top?.pageSize ?? 10);
+  const total =
+    typeof top?.total === "number"
+      ? top.total
+      : typeof top?.totalCount === "number"
+        ? top.totalCount
+        : typeof top?.total_count === "number"
+          ? top.total_count
+          : items.length;
+
+  return {
+    items,
+    total: Number.isFinite(total) && total >= 0 ? total : 0,
+    page: Number.isFinite(page) && page > 0 ? page : 1,
+    limit: Number.isFinite(limit) && limit > 0 ? limit : 10,
+  };
+}
+
+export const adminLongTermOpportunitiesApi = {
+  /**
+   * GET /v1/admin/long-term-opportunities — Paginated long-term service requests.
+   * Query: page, limit; optional status (omit for all).
+   */
+  getList: async (
+    params?: {
+      page?: number;
+      limit?: number;
+      status?: LongTermOpportunityStatusFilter;
+    },
+    config?: { signal?: AbortSignal }
+  ) => {
+    const query: Record<string, string | number> = {
+      page: params?.page ?? 1,
+      limit: params?.limit ?? 10,
+    };
+    if (params?.status) query.status = params.status;
+    return httpService.get<unknown>("/admin/long-term-opportunities", {
+      params: query,
+      signal: config?.signal,
+    });
+  },
+};
+
 // ============== Dashboard API (admin summary) ==============
 
 /** Service request counts by status for dashboard chart. */
@@ -1834,6 +2011,25 @@ export interface DashboardSummaryDto {
   serviceRequests?: DashboardServiceRequestsSummary;
   pendingCertifications?: number;
   recentServiceRequests?: DashboardRecentServiceRequest[];
+}
+
+type StoredAuthUser = {
+  id?: number | string;
+  role?: string;
+};
+
+function getStoredAuthUser(): StoredAuthUser | null {
+  // Prefer localStorage (remember me), then fallback to sessionStorage.
+  const raw =
+    localStorage.getItem("auth_user") ??
+    sessionStorage.getItem("auth_user");
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as StoredAuthUser;
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Normalize backend response (handles wrapped body and snake_case). */
@@ -1876,8 +2072,17 @@ function normalizeDashboardSummary(raw: unknown): DashboardSummaryDto {
 export const dashboardApi = {
   /** GET /admin/dashboard/summary — single call for dashboard. Returns all KPIs, chart data, and recent activity. */
   getSummary: async (config?: { signal?: AbortSignal }) => {
+    const authUser = getStoredAuthUser();
+    const role = String(authUser?.role ?? "").toUpperCase();
+    const supervisorId = Number(authUser?.id);
+    const params =
+      role === "SUPERVISOR" && Number.isFinite(supervisorId) && supervisorId > 0
+        ? { supervisorId }
+        : undefined;
+
     const res = await httpService.get<unknown>("/admin/dashboard/summary", {
       signal: config?.signal,
+      params,
     });
     return { ...res, data: normalizeDashboardSummary(res.data) };
   },
@@ -1929,19 +2134,21 @@ export interface AssignedProviderRow {
   [key: string]: unknown;
 }
 
+/** Raw rows from GET /v1/admin/:supervisorId/providers (array or wrapped envelope). */
+export function assignedProvidersRowsFromResponse(data: unknown): unknown[] {
+  if (Array.isArray(data)) return data;
+  if (data && typeof data === "object") {
+    const o = data as Record<string, unknown>;
+    for (const key of ["providers", "assignedProviders", "data", "items", "results"] as const) {
+      if (Array.isArray(o[key])) return o[key] as unknown[];
+    }
+  }
+  return [];
+}
+
 /** Extract assigned provider IDs from common response envelopes and key names. */
 export function normalizeAssignedProviderIdsResponse(data: unknown): number[] {
-  const rowsFrom = (value: unknown): unknown[] => {
-    if (Array.isArray(value)) return value;
-    if (value && typeof value === "object") {
-      const o = value as Record<string, unknown>;
-      for (const key of ["providers", "assignedProviders", "data", "items", "results"] as const) {
-        if (Array.isArray(o[key])) return o[key] as unknown[];
-      }
-    }
-    return [];
-  };
-  const rows = rowsFrom(data);
+  const rows = assignedProvidersRowsFromResponse(data);
   const ids = rows
     .map((row) => {
       if (!row || typeof row !== "object") return NaN;
@@ -1952,6 +2159,11 @@ export function normalizeAssignedProviderIdsResponse(data: unknown): number[] {
     })
     .filter((id) => Number.isFinite(id)) as number[];
   return Array.from(new Set(ids));
+}
+
+/** Full rows as list items (for UI merge with GET /providers/all). */
+export function normalizeAssignedProvidersToListItems(data: unknown): ProviderListItem[] {
+  return assignedProvidersRowsFromResponse(data).map((row) => normalizeProviderListItem(row));
 }
 
 export const adminSupervisorsApi = {

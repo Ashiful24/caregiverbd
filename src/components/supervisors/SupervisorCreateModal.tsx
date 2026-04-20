@@ -93,7 +93,9 @@ function supervisorFromRegister(
 
 function mergeLocalEdit(
   form: FormState,
-  base: SupervisorFullDetails
+  base: SupervisorFullDetails,
+  /** When true, keep existing username (edit flow does not change username). */
+  preserveUsername: boolean
 ): SupervisorFullDetails {
   const first = form.firstName.trim();
   const last = form.lastName.trim();
@@ -103,7 +105,7 @@ function mergeLocalEdit(
     lastName: last,
     name: [first, last].filter(Boolean).join(" ") || base.name,
     email: form.email.trim(),
-    username: form.username.trim(),
+    username: preserveUsername ? (base.username ?? "").trim() : form.username.trim(),
   };
 }
 
@@ -218,8 +220,12 @@ export function SupervisorCreateModal({
     const lastName = form.lastName.trim();
     const email = form.email.trim();
     const username = form.username.trim();
-    if (!firstName || !lastName || !email || !username) {
-      setError("First name, last name, email, and username are required.");
+    if (!firstName || !lastName || !email) {
+      setError("First name, last name, and email are required.");
+      return;
+    }
+    if (!editing && !username) {
+      setError("Username is required for new supervisors.");
       return;
     }
     if (!editing && !pwd) {
@@ -252,19 +258,22 @@ export function SupervisorCreateModal({
           firstName,
           lastName,
           email,
-          username,
         });
         if (pwd) {
           await adminUsersApi.updatePassword(uid, { newPassword: pwd });
         }
         onUpdated(
-          mergeLocalEdit(form, {
-            ...editSupervisor,
-            userId: editSupervisor.userId,
-          })
+          mergeLocalEdit(
+            form,
+            {
+              ...editSupervisor,
+              userId: editSupervisor.userId,
+            },
+            true
+          )
         );
       } else {
-        onUpdated(mergeLocalEdit(form, editSupervisor));
+        onUpdated(mergeLocalEdit(form, editSupervisor, true));
       }
       handleClose();
     } catch (err: unknown) {
@@ -292,11 +301,11 @@ export function SupervisorCreateModal({
           <h3 className="pr-10 text-xl font-semibold text-gray-900 dark:text-white/90">
             {isEdit ? "Edit supervisor" : "Create supervisor"}
           </h3>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          {/* <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
             {isEdit
               ? "Prefilled from GET /users/:id when available. Update fields and optionally password."
               : "Registers via POST /users/register with role SUPERVISOR."}
-          </p>
+          </p> */}
         </div>
 
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
@@ -354,20 +363,21 @@ export function SupervisorCreateModal({
                   disabled={isEdit && prefillLoading}
                 />
               </div>
-              <div>
-                <Label htmlFor="sup-username">Username</Label>
-                <input
-                  id="sup-username"
-                  type="text"
-                  value={form.username}
-                  onChange={(e) => patch({ username: e.target.value })}
-                  className={inputClass}
-                  placeholder="john_doe"
-                  autoComplete="username"
-                  required
-                  disabled={isEdit && prefillLoading}
-                />
-              </div>
+              {!isEdit ? (
+                <div>
+                  <Label htmlFor="sup-username">Username</Label>
+                  <input
+                    id="sup-username"
+                    type="text"
+                    value={form.username}
+                    onChange={(e) => patch({ username: e.target.value })}
+                    className={inputClass}
+                    placeholder="john_doe"
+                    autoComplete="username"
+                    required
+                  />
+                </div>
+              ) : null}
               <div>
                 <Label htmlFor="sup-password">Password</Label>
                 <input

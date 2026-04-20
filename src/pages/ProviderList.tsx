@@ -30,6 +30,7 @@ import {
   type VerificationDocumentTypeItem,
 } from "../services/api";
 import { formatDate } from "../utils/format";
+import { useAuth } from "../context/AuthContext";
 
 const LIMIT_OPTIONS = [10, 20, 50];
 
@@ -102,6 +103,13 @@ function providerStatusBadgeColor(status: string): "success" | "warning" | "erro
 }
 
 export default function ProviderList() {
+  const { user } = useAuth();
+  const currentRole = String(user?.role ?? "").toUpperCase();
+  const supervisorId =
+    currentRole === "SUPERVISOR" && Number.isFinite(Number(user?.id)) && Number(user?.id) > 0
+      ? Number(user?.id)
+      : undefined;
+
   const [providers, setProviders] = useState<ProviderListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -196,6 +204,7 @@ export default function ProviderList() {
           ...(dateBounds
             ? { startDate: dateBounds.startDate, endDate: dateBounds.endDate }
             : {}),
+          ...(supervisorId != null ? { supervisorId } : {}),
         },
         { signal }
       );

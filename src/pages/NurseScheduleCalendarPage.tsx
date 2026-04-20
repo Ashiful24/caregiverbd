@@ -15,8 +15,8 @@ export default function NurseScheduleCalendarPage() {
   if (!requestId || !request) {
     return (
       <>
-        <PageMeta title="Schedule not found | Hope - BMQAS" description="Service request schedule" />
-        <PageBreadcrumb pageTitle="Schedule" />
+        <PageMeta title="Service request not found | Hope - BMQAS" description="Service request" />
+        <PageBreadcrumb pageTitle="Service request" />
         <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center dark:border-gray-800 dark:bg-white/[0.03]">
           <p className="text-gray-600 dark:text-gray-400">
             This service request was not found in the demo list.
@@ -38,10 +38,10 @@ export default function NurseScheduleCalendarPage() {
   return (
     <>
       <PageMeta
-        title={`${request.requestNo} — Schedule | Hope - BMQAS`}
-        description={`Schedule calendar for ${request.patientName}`}
+        title={`${request.requestNo} — Service request | Hope - BMQAS`}
+        description={`Calendar for ${request.patientName}`}
       />
-      <PageBreadcrumb pageTitle="Schedule" />
+      <PageBreadcrumb pageTitle="Service request" />
       <div className="mb-4">
         <Link
           to="/schedule"

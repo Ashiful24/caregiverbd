@@ -17,6 +17,7 @@ import {
   UserIcon,
 } from "../icons";
 import { useSidebar } from "../context/SidebarContext";
+import { useAuth } from "../context/AuthContext";
 import SidebarWidget from "./SidebarWidget";
 
 type NavItem = {
@@ -24,6 +25,7 @@ type NavItem = {
   icon: React.ReactNode;
   path?: string;
   subItems?: { name: string; path: string; pro?: boolean; new?: boolean }[];
+  allowedRoles?: string[];
 };
 
 type NavSection = {
@@ -32,49 +34,75 @@ type NavSection = {
 };
 
 const navSections: NavSection[] = [
-  { items: [{ icon: <GridIcon />, name: "Dashboard", path: "/" }] },
+  {
+    items: [
+      { icon: <GridIcon />, name: "Dashboard", path: "/", allowedRoles: ["ADMIN", "SUPERVISOR"] },
+    ],
+  },
   {
     title: "App Users",
-    items: [{ icon: <UserCircleIcon />, name: "All Users", path: "/users" }],
+    items: [{ icon: <UserCircleIcon />, name: "All Users", path: "/users", allowedRoles: ["ADMIN"] }],
   },
   {
     title: "Profile",
     items: [
-      { icon: <GroupIcon />, name: "Providers", path: "/providers" },
-      { icon: <UserIcon />, name: "Patients", path: "/patients" },
-      { icon: <CalenderIcon />, name: "Schedule", path: "/schedule" },
-      { icon: <TaskIcon />, name: "Supervisor", path: "/supervisors" },
+      {
+        icon: <GroupIcon />,
+        name: "Providers",
+        path: "/providers",
+        allowedRoles: ["ADMIN", "SUPERVISOR"],
+      },
+      { icon: <UserIcon />, name: "Patients", path: "/patients", allowedRoles: ["ADMIN"] },
+      {
+        icon: <CalenderIcon />,
+        name: "Service request",
+        path: "/schedule",
+        allowedRoles: ["ADMIN", "SUPERVISOR"],
+      },
+      { icon: <TaskIcon />, name: "Supervisor", path: "/supervisors", allowedRoles: ["ADMIN"] },
     ],
   },
   {
     title: "Configuration",
     items: [
-      { icon: <FolderIcon />, name: "Consultation Types", path: "/consultation-types" },
-      { icon: <PageIcon />, name: "Document Types", path: "/verification-document-types" },
-      { icon: <BoltIcon />, name: "System Config", path: "/system-config" },
+      {
+        icon: <FolderIcon />,
+        name: "Consultation Types",
+        path: "/consultation-types",
+        allowedRoles: ["ADMIN"],
+      },
+      {
+        icon: <PageIcon />,
+        name: "Document Types",
+        path: "/verification-document-types",
+        allowedRoles: ["ADMIN"],
+      },
+      { icon: <BoltIcon />, name: "System Config", path: "/system-config", allowedRoles: ["ADMIN"] },
     ],
   },
   {
     title: "Operations",
     items: [
-      { icon: <ListIcon />, name: "Appointments", path: "/appointments" },
-      { icon: <PageIcon />, name: "Upgrade Requests", path: "/upgrade-requests" },
+      { icon: <ListIcon />, name: "Appointments", path: "/appointments", allowedRoles: ["ADMIN"] },
+      { icon: <PageIcon />, name: "Upgrade Requests", path: "/upgrade-requests", allowedRoles: ["ADMIN"] },
     ],
   },
   {
     title: "Reports",
     items: [
-      { icon: <GridIcon />, name: "Financial Reports", path: "/financial-reports" },
+      { icon: <GridIcon />, name: "Financial Reports", path: "/financial-reports", allowedRoles: ["ADMIN"] },
     ],
   },
   {
-    items: [{ icon: <MailIcon />, name: "Notifications", path: "/notifications" }],
+    items: [{ icon: <MailIcon />, name: "Notifications", path: "/notifications", allowedRoles: ["ADMIN"] }],
   },
 ];
 
 const AppSidebar: React.FC = () => {
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
+  const { user } = useAuth();
   const location = useLocation();
+  const currentRole = String(user?.role ?? "").toUpperCase();
 
   const [openSubmenu, setOpenSubmenu] = useState<{
     type: "main" | "reference";
@@ -262,6 +290,16 @@ const AppSidebar: React.FC = () => {
     </ul>
   );
 
+  const sectionsForRole = navSections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => {
+        if (!item.allowedRoles?.length) return true;
+        return item.allowedRoles.map((r) => r.toUpperCase()).includes(currentRole);
+      }),
+    }))
+    .filter((section) => section.items.length > 0);
+
   return (
     <aside
       className={`fixed mt-16 flex flex-col lg:mt-0 top-0 px-5 left-0 bg-white dark:bg-gray-900 dark:border-gray-800 text-gray-900 h-screen transition-all duration-300 ease-in-out z-50 border-r border-gray-200 
@@ -328,7 +366,7 @@ const AppSidebar: React.FC = () => {
                 )}
               </h2>
               <div className="flex flex-col gap-6">
-                {navSections.map((section, sectionIndex) => (
+                {sectionsForRole.map((section, sectionIndex) => (
                   <div key={section.title ?? sectionIndex}>
                     {section.title && (isExpanded || isHovered || isMobileOpen) && (
                       <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">

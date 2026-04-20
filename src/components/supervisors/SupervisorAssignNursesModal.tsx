@@ -5,6 +5,7 @@ import type { SupervisorFullDetails } from "../../data/supervisorSeed";
 import {
   adminSupervisorsApi,
   normalizeAssignedProviderIdsResponse,
+  normalizeAssignedProvidersToListItems,
   normalizeProvidersAllResponse,
   providersApi,
   type ProviderListItem,
@@ -76,6 +77,7 @@ const PAGE_SIZE = 10;
 
 export function SupervisorAssignNursesModal({ isOpen, onClose, supervisor, onAssigned }: Props) {
   const [providers, setProviders] = useState<ProviderListItem[]>([]);
+  /** Total rows in the unsupervised pool (GET /providers/all), not including assigned-only rows. */
   const [total, setTotal] = useState(0);
   /** Row count returned in the last GET /providers/all response (for “full page ⇒ more may exist”). */
   const [lastBatchSize, setLastBatchSize] = useState(0);
@@ -85,10 +87,78 @@ export function SupervisorAssignNursesModal({ isOpen, onClose, supervisor, onAss
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Nurses already assigned to this supervisor (prepended to the list; excluded from pool total math). */
+  const [assignedPrefixCount, setAssignedPrefixCount] = useState(0);
 
-  const fetchPage = useCallback(async (nextPage: number, append: boolean) => {
-    if (append) setListLoadingMore(true);
-    else setListLoading(true);
+  const loadInitial = useCallback(async () => {
+    if (!supervisor) return;
+    const supervisorId = Number(supervisor.id);
+    if (!Number.isFinite(supervisorId) || supervisorId <= 0) return;
+
+    setListLoading(true);
+    setError(null);
+    setAssignedPrefixCount(0);
+    try {
+      let assignedList: ProviderListItem[] = [];
+      let selectedIds: number[] = [];
+      try {
+        const assignedRes = await adminSupervisorsApi.getAssignedProviders(supervisorId);
+        assignedList = normalizeAssignedProvidersToListItems(assignedRes.data);
+        selectedIds = normalizeAssignedProviderIdsResponse(assignedRes.data);
+      } catch {
+        // Modal still works with pool-only if this fails.
+      }
+
+      const assignedIdSet = new Set(
+        assignedList.map((p) => p.id).filter((id) => Number.isFinite(id) && id > 0)
+      );
+      setAssignedPrefixCount(assignedList.length);
+
+      let norm: ReturnType<typeof normalizeProvidersAllResponse>;
+      try {
+        const poolRes = await providersApi.getAllPublic({ page: 1, limit: PAGE_SIZE });
+        norm = normalizeProvidersAllResponse(poolRes.data);
+      } catch (poolErr: unknown) {
+        if (assignedList.length > 0) {
+          const message =
+            poolErr && typeof poolErr === "object" && "message" in poolErr
+              ? String((poolErr as { message: string }).message)
+              : "Failed to load available nurses.";
+          setError(`${message} Showing assigned nurses only.`);
+          setTotal(0);
+          setPage(1);
+          setLastBatchSize(0);
+          setSelected(new Set(selectedIds));
+          setProviders(assignedList);
+          return;
+        }
+        throw poolErr;
+      }
+
+      const poolDeduped = norm.providers.filter((p) => !assignedIdSet.has(p.id));
+
+      setTotal(norm.total);
+      setPage(1);
+      setLastBatchSize(norm.providers.length);
+      setSelected(new Set(selectedIds));
+      setProviders([...assignedList, ...poolDeduped]);
+    } catch (err: unknown) {
+      const message =
+        err && typeof err === "object" && "message" in err
+          ? String((err as { message: string }).message)
+          : "Failed to load providers.";
+      setError(message);
+      setProviders([]);
+      setTotal(0);
+      setLastBatchSize(0);
+      setAssignedPrefixCount(0);
+    } finally {
+      setListLoading(false);
+    }
+  }, [supervisor]);
+
+  const fetchPoolPageAppend = useCallback(async (nextPage: number) => {
+    setListLoadingMore(true);
     setError(null);
     try {
       const res = await providersApi.getAllPublic({ page: nextPage, limit: PAGE_SIZE });
@@ -96,16 +166,18 @@ export function SupervisorAssignNursesModal({ isOpen, onClose, supervisor, onAss
       setTotal(norm.total);
       setPage(nextPage);
       setLastBatchSize(norm.providers.length);
-      setProviders((prev) => (append ? [...prev, ...norm.providers] : norm.providers));
+      setProviders((prev) => {
+        const existing = new Set(prev.map((p) => p.id));
+        const extra = norm.providers.filter((p) => !existing.has(p.id));
+        return [...prev, ...extra];
+      });
     } catch (err: unknown) {
       const message =
         err && typeof err === "object" && "message" in err
           ? String((err as { message: string }).message)
           : "Failed to load providers.";
       setError(message);
-      if (!append) setProviders([]);
     } finally {
-      setListLoading(false);
       setListLoadingMore(false);
     }
   }, []);
@@ -114,20 +186,8 @@ export function SupervisorAssignNursesModal({ isOpen, onClose, supervisor, onAss
     if (!isOpen || !supervisor) return;
     setSelected(new Set());
     setError(null);
-    const supervisorId = Number(supervisor.id);
-    if (Number.isFinite(supervisorId) && supervisorId > 0) {
-      void adminSupervisorsApi
-        .getAssignedProviders(supervisorId)
-        .then((res) => {
-          const assignedIds = normalizeAssignedProviderIdsResponse(res.data);
-          setSelected(new Set(assignedIds));
-        })
-        .catch(() => {
-          // Keep modal usable even if assigned-list endpoint fails.
-        });
-    }
-    void fetchPage(1, false);
-  }, [isOpen, supervisor?.id, fetchPage]);
+    void loadInitial();
+  }, [isOpen, supervisor?.id, loadInitial]);
 
   const toggle = (providerId: number) => {
     setSelected((prev) => {
@@ -140,21 +200,24 @@ export function SupervisorAssignNursesModal({ isOpen, onClose, supervisor, onAss
   };
 
   const lastPageFull = lastBatchSize >= PAGE_SIZE;
+  /** Rows loaded from GET /providers/all only (assigned prefix is excluded from the pool total). */
+  const poolRowsInList = Math.max(0, providers.length - assignedPrefixCount);
   /** Prefer server `total`; if missing (0), treat a full page of 10 as “more may exist”. */
   const canLoadMore =
     lastBatchSize > 0 &&
     lastPageFull &&
-    (total <= 0 || providers.length < total);
+    (total <= 0 || poolRowsInList < total);
 
   const handleLoadMore = () => {
     if (listLoadingMore || !canLoadMore) return;
-    void fetchPage(page + 1, true);
+    void fetchPoolPageAppend(page + 1);
   };
 
   const handleClose = () => {
     setProviders([]);
     setTotal(0);
     setLastBatchSize(0);
+    setAssignedPrefixCount(0);
     setPage(1);
     setSelected(new Set());
     setError(null);
@@ -208,7 +271,7 @@ export function SupervisorAssignNursesModal({ isOpen, onClose, supervisor, onAss
           {listLoading ? (
             <p className="text-sm text-gray-500 dark:text-gray-400">Loading providers…</p>
           ) : providers.length === 0 ? (
-            <p className="text-sm text-gray-500 dark:text-gray-400">No providers returned for this page.</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">No nurses to show.</p>
           ) : (
             <ul className="space-y-2">
               {providers.map((p) => {
@@ -267,10 +330,17 @@ export function SupervisorAssignNursesModal({ isOpen, onClose, supervisor, onAss
             <p className="mb-3 text-center text-xs text-gray-500 dark:text-gray-400">
               {total > 0 ? (
                 <>
-                  Showing {providers.length} of {total} providers
+                  Showing {poolRowsInList} of {total} available nurses
+                  {assignedPrefixCount > 0 ? (
+                    <span> ({assignedPrefixCount} already assigned)</span>
+                  ) : null}
                 </>
               ) : (
-                <>Loaded {providers.length} providers — more may be available</>
+                <>
+                  Loaded {poolRowsInList} from available pool
+                  {assignedPrefixCount > 0 ? <span> + {assignedPrefixCount} assigned</span> : null}{" "}
+                  — more may be available
+                </>
               )}
             </p>
             <Button
