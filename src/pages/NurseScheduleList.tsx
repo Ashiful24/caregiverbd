@@ -283,12 +283,12 @@ export default function NurseScheduleList() {
                       >
                         Assigned nurses
                       </TableCell>
-                      {/* <TableCell
+                      <TableCell
                         isHeader
                         className="w-[120px] py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
                       >
                         Actions
-                      </TableCell> */}
+                      </TableCell>
                     </TableRow>
                   </TableHeader>
                   <TableBody className="divide-y divide-gray-100 dark:divide-gray-800">
@@ -315,7 +315,7 @@ export default function NurseScheduleList() {
                         <TableCell className="py-3 text-theme-sm text-gray-600 dark:text-gray-400">
                           {request.assignedNursesLabel ?? "—"}
                         </TableCell>
-                        {/* <TableCell className="py-3 text-right">
+                        <TableCell className="py-3 text-right">
                           <ActionsMenu
                             isOpen={openActionsId === request.id}
                             onClose={() => setOpenActionsId(null)}
@@ -335,7 +335,7 @@ export default function NurseScheduleList() {
                               View calendar
                             </DropdownItem>
                           </ActionsMenu>
-                        </TableCell> */}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

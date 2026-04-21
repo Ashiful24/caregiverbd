@@ -81,7 +81,7 @@ export function ScheduleDayView({ day, events, dayInRange, onSelectHour }: Props
                   className={`box-border border-b border-gray-300 text-left transition-colors dark:border-gray-600 ${
                     inRange
                       ? "cursor-pointer bg-white hover:bg-brand-50/50 dark:bg-gray-900/40 dark:hover:bg-brand-950/20"
-                      : "cursor-not-allowed bg-gray-50/80 opacity-50 dark:bg-gray-900/60"
+                      : "cursor-not-allowed border-dashed border-gray-400 bg-gray-200/90 opacity-100 dark:border-gray-500 dark:bg-gray-800/90"
                   }`}
                   style={{ height: PX_PER_HOUR, minHeight: PX_PER_HOUR }}
                 />

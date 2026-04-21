@@ -64,6 +64,9 @@ const HOUR_OPTIONS = Array.from({ length: 24 }, (_, hour) => ({
   label: format(new Date(2000, 0, 1, hour, 0, 0, 0), "h:mm a"),
 }));
 
+const modalTimeInputClass =
+  "rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-white disabled:cursor-not-allowed disabled:border-dashed disabled:border-gray-400 disabled:bg-gray-200/90 disabled:text-gray-500 disabled:opacity-100 dark:disabled:border-gray-500 dark:disabled:bg-gray-800/90 dark:disabled:text-gray-400";
+
 function eventOverlapsNurse(
   events: ScheduleEventRecord[],
   nurseId: string,
@@ -322,7 +325,7 @@ export function ScheduleCalendar({ requestId, title, subtitle, requestStartDate,
         </div>
       </div>
 
-      <div className="rounded-xl border-2 border-gray-300 bg-white p-3 shadow-sm dark:border-gray-600 dark:bg-gray-900/30 sm:p-4">
+      <div className="rounded-xl border-2 border-gray-300 bg-white pt-3 shadow-sm dark:border-gray-600 dark:bg-gray-900/30 sm:pt-4">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-gray-300 pb-3 dark:border-gray-600">
           <p className="text-base font-semibold text-gray-900 dark:text-white">{rangeTitle}</p>
           <p className="text-xs text-gray-500 dark:text-gray-400">Click any hour to schedule (minimum 1 hour, full-hour times only)</p>
@@ -358,13 +361,13 @@ export function ScheduleCalendar({ requestId, title, subtitle, requestStartDate,
                   value={modalDraft.startDateStr}
                   disabled={modalDraft.allDay}
                   onChange={(e) => patchDraft({ startDateStr: e.target.value })}
-                  className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                  className={modalTimeInputClass}
                 />
                 <select
                   value={modalDraft.startHour}
                   disabled={modalDraft.allDay}
                   onChange={(e) => patchDraft({ startHour: Number(e.target.value) })}
-                  className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                  className={modalTimeInputClass}
                 >
                   {HOUR_OPTIONS.map((o) => (
                     <option key={o.value} value={o.value}>
@@ -378,13 +381,13 @@ export function ScheduleCalendar({ requestId, title, subtitle, requestStartDate,
                   value={modalDraft.endDateStr}
                   disabled={modalDraft.allDay}
                   onChange={(e) => patchDraft({ endDateStr: e.target.value })}
-                  className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                  className={modalTimeInputClass}
                 />
                 <select
                   value={modalDraft.endHour}
                   disabled={modalDraft.allDay}
                   onChange={(e) => patchDraft({ endHour: Number(e.target.value) })}
-                  className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                  className={modalTimeInputClass}
                 >
                   {HOUR_OPTIONS.map((o) => (
                     <option key={o.value} value={o.value}>

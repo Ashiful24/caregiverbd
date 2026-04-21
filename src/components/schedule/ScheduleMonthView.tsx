@@ -74,7 +74,11 @@ export function ScheduleMonthView({ visibleMonth, events, dayInRange, onSelectDa
                 }}
                 className={`min-h-[100px] border-b border-r border-gray-300 p-1.5 last:border-r-0 dark:border-gray-600 sm:min-h-[120px] sm:p-2 ${
                   !inMonth ? "bg-gray-50/80 dark:bg-gray-900/40" : ""
-                } ${selectable ? "cursor-pointer hover:bg-brand-50/40 dark:hover:bg-brand-950/15" : "cursor-default opacity-70"}`}
+                } ${
+                  selectable
+                    ? "cursor-pointer hover:bg-brand-50/40 dark:hover:bg-brand-950/15"
+                    : "cursor-not-allowed border-dashed border-gray-400 bg-gray-200/80 opacity-100 dark:border-gray-500 dark:bg-gray-800/85"
+                }`}
               >
                 <div className="flex items-center justify-between gap-1">
                   <span
