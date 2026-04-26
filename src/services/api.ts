@@ -82,6 +82,30 @@ export interface RegisterPatientRequest {
   nidNumber: string;
 }
 
+/** POST /v1/users/register — public; creates user with fixed role (e.g. supervisor). */
+export interface RegisterSupervisorRequest {
+  email: string;
+  username: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+  role: "SUPERVISOR";
+}
+
+/** Typical user payload returned after registration (shape may vary by backend). */
+export type RegisterSupervisorUserFields = {
+  id?: number;
+  email?: string;
+  username?: string;
+  firstName?: string;
+  lastName?: string;
+  role?: string;
+};
+
+export type RegisterSupervisorResponse = RegisterSupervisorUserFields & {
+  user?: RegisterSupervisorUserFields;
+};
+
 // ============== Forgot Password ==============
 
 export interface PasswordResetRequestRequest {
@@ -115,6 +139,8 @@ export interface ConsultationType {
   employmentType?: string | null;
   /** Optional platform commission percent (0–100) configured for this type. */
   platformCommissionPercent?: number | null;
+  /** JSON string of the file upload API response (image), if stored by backend. */
+  imageUrl?: string | null;
   createdBy?: number | null;
   updatedBy?: number | null;
   deletedBy?: number | null;
@@ -401,6 +427,11 @@ export const authApi = {
     );
   },
 
+  /** POST /users/register — email/username/password + names + role (e.g. SUPERVISOR). No auth. */
+  registerSupervisor: async (data: RegisterSupervisorRequest) => {
+    return httpService.requestWithoutAuth<RegisterSupervisorResponse>("POST", "/users/register", data);
+  },
+
   /** POST /auth/password-reset/request */
   passwordResetRequest: async (data: PasswordResetRequestRequest) => {
     return httpService.requestWithoutAuth<{ message: string }>(
@@ -440,6 +471,8 @@ export interface CreateConsultationTypeRequest {
   parentId?: number;
   /** Optional platform commission percent (0–100) for this type. */
   platformCommissionPercent?: number;
+  /** JSON.stringify of POST /files/upload response body (backend field name). */
+  imageUrl?: string;
 }
 
 /** Payload for updating a consultation type (admin). */
@@ -452,6 +485,53 @@ export interface UpdateConsultationTypeRequest {
   priority?: number;
   /** Optional platform commission percent (0–100) for this type. */
   platformCommissionPercent?: number | null;
+  /** JSON.stringify of POST /files/upload response body. Omit to leave existing value. */
+  imageUrl?: string;
+}
+
+/** Multipart upload to external file service. Override with `VITE_FILE_UPLOAD_URL` (no trailing slash). */
+const FILE_UPLOAD_BASE_URL =
+  (import.meta.env.VITE_FILE_UPLOAD_URL as string | undefined)?.replace(/\/$/, "") ||
+  "http://116.68.207.105:3085";
+
+/** Required by the file service (401 if missing/wrong). Override via `VITE_FILE_UPLOAD_API_KEY`. */
+const FILE_UPLOAD_API_KEY =
+  (import.meta.env.VITE_FILE_UPLOAD_API_KEY as string | undefined)?.trim() ||
+  "hope-project-key-123";
+
+/**
+ * POST /files/upload — returns parsed JSON (or raw text if not JSON).
+ * Sends only `x-api-key` (required). Do not send `Authorization: Bearer` here: this service
+ * treats Authorization as the project API key and rejects JWTs with "Invalid API key".
+ */
+export async function uploadFileToStorage(file: File): Promise<unknown> {
+  const url = `${FILE_UPLOAD_BASE_URL}/files/upload`;
+  const formData = new FormData();
+  formData.append("file", file);
+  const headers: Record<string, string> = {
+    accept: "*/*",
+    "x-api-key": FILE_UPLOAD_API_KEY,
+  };
+  const res = await fetch(url, { method: "POST", headers, body: formData });
+  const text = await res.text();
+  if (!res.ok) {
+    let message = text?.trim() || `Upload failed (${res.status})`;
+    try {
+      const errJson = JSON.parse(text) as { message?: string };
+      if (errJson?.message && typeof errJson.message === "string") {
+        message = errJson.message;
+      }
+    } catch {
+      /* keep message */
+    }
+    throw new Error(message);
+  }
+  if (!text) return null;
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return text;
+  }
 }
 
 /** Payload for reordering consultation types (siblings under same parent). */
@@ -676,6 +756,32 @@ export const upgradeRequestsApi = {
   },
 };
 
+// ============== Admin service request schedule (nurse assignment) ==============
+
+/** Nurse row returned by GET .../available-nurses (camelCase). */
+export interface ServiceRequestAvailableNurseDto {
+  id: string;
+  name: string;
+  unit?: string;
+}
+
+export const serviceRequestScheduleApi = {
+  /**
+   * GET /admin/service-requests/:requestId/available-nurses
+   * Query: startDate, endDate (ISO 8601). Backend may not exist yet — UI uses local mock on failure.
+   */
+  getAvailableNurses: async (
+    requestId: string,
+    params: { startDate: string; endDate: string },
+    signal?: AbortSignal
+  ) => {
+    return httpService.get<ServiceRequestAvailableNurseDto[] | { nurses: ServiceRequestAvailableNurseDto[] }>(
+      `/admin/service-requests/${encodeURIComponent(requestId)}/available-nurses`,
+      { params: { startDate: params.startDate, endDate: params.endDate }, signal }
+    );
+  },
+};
+
 // ============== Providers API ==============
 
 /**
@@ -683,7 +789,7 @@ export const upgradeRequestsApi = {
  * GET /v1/admin/providers — providers table + users + consultation_types.
  * Status replaces previous isVerified: PENDING | ACTIVE | REJECTED | ARCHIVED.
  */
-export type ProviderStatus = "PENDING" | "ACTIVE" | "REJECTED" | "ARCHIVED";
+export type ProviderStatus = "PENDING" | "ACTIVE" | "AVAILABLE" | "REJECTED" | "ARCHIVED";
 
 export interface ProviderListItem {
   id: number;
@@ -691,8 +797,15 @@ export interface ProviderListItem {
   email?: string;
   firstName?: string;
   lastName?: string;
+  /** Some list endpoints send a single display name instead of first/last. */
+  name?: string | null;
+  fullName?: string | null;
+  providerName?: string | null;
   username?: string;
   bmdcNumber?: string;
+  /** Profile photo URL or path (relative paths via `getAssetUrl`). */
+  profilePicture?: string | null;
+  profile_picture?: string | null;
   /** Backend may return string (e.g. "5 years") or number */
   experience?: number | string | null;
   /** Provider status (replaces isVerified). */
@@ -701,6 +814,12 @@ export interface ProviderListItem {
   consultationTypeName?: string | null;
   createdAt: string;
   updatedAt?: string;
+  /** Availability window when listing AVAILABLE providers (admin list). */
+  startDate?: string | null;
+  endDate?: string | null;
+  /** Same as startDate/endDate if API returns snake_case. */
+  start_date?: string | null;
+  end_date?: string | null;
 }
 
 /** Single document item (for provider documents block). */
@@ -722,8 +841,166 @@ export interface AdminProviderListResponse {
   limit: number;
 }
 
-/** UI status filter for provider list. Sent to API as uppercase (PENDING, ACTIVE, REJECTED, DEACTIVATED, ARCHIVED). */
-export type ProviderListStatusFilter = "all" | "pending" | "active" | "rejected" | "deactivated" | "archived";
+/** Flatten nested `user`, snake_case, and single `name` fields into a list row. */
+export function normalizeProviderListItem(raw: unknown): ProviderListItem {
+  if (raw == null || typeof raw !== "object") {
+    return {
+      id: 0,
+      userId: 0,
+      status: "ACTIVE",
+      createdAt: new Date().toISOString(),
+    };
+  }
+  const o = raw as Record<string, unknown>;
+  const user = o.user && typeof o.user === "object" ? (o.user as Record<string, unknown>) : null;
+
+  const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : "");
+  let firstName = str(o.firstName) || str(o.first_name) || str(user?.firstName) || str(user?.first_name);
+  let lastName = str(o.lastName) || str(o.last_name) || str(user?.lastName) || str(user?.last_name);
+
+  const singleName =
+    str(o.name) ||
+    str(o.fullName) ||
+    str(o.full_name) ||
+    str(o.providerName) ||
+    str(o.provider_name);
+  if ((!firstName || !lastName) && singleName) {
+    const parts = singleName.split(/\s+/).filter(Boolean);
+    if (!firstName && parts[0]) firstName = parts[0];
+    if (!lastName && parts.length > 1) lastName = parts.slice(1).join(" ");
+    if (!firstName && parts.length === 1) firstName = parts[0];
+  }
+
+  const email = str(o.email) || str(user?.email) || undefined;
+  const username = str(o.username) || str(user?.username) || undefined;
+  const profilePicture =
+    str(o.profilePicture) ||
+    str(o.profile_picture) ||
+    str(user?.profilePicture) ||
+    str(user?.profile_picture) ||
+    undefined;
+
+  const id = Number(o.id);
+  const userId = Number(o.userId ?? user?.id ?? o.id);
+
+  const statusRaw = String(o.status || "ACTIVE").toUpperCase();
+  const status = (
+    ["PENDING", "ACTIVE", "AVAILABLE", "REJECTED", "ARCHIVED"].includes(statusRaw)
+      ? statusRaw
+      : "ACTIVE"
+  ) as ProviderListItem["status"];
+
+  const bmdcNumber = str(o.bmdcNumber) || str(o.bmdc_number) || undefined;
+  const consultationTypeId = Number(o.consultationTypeId ?? o.consultation_type_id);
+  const consultationTypeName =
+    str(o.consultationTypeName) || str(o.consultation_type_name) || undefined;
+  const updatedAt = str(o.updatedAt) || undefined;
+  const startDate = str(o.startDate) || str(o.start_date) || undefined;
+  const endDate = str(o.endDate) || str(o.end_date) || undefined;
+  const experienceRaw = o.experience;
+  const experience =
+    typeof experienceRaw === "number" || typeof experienceRaw === "string" ? experienceRaw : null;
+
+  return {
+    id: Number.isFinite(id) ? id : 0,
+    userId: Number.isFinite(userId) ? userId : 0,
+    email,
+    firstName: firstName || undefined,
+    lastName: lastName || undefined,
+    name: singleName || undefined,
+    fullName: str(o.fullName) || str(o.full_name) || undefined,
+    providerName: str(o.providerName) || str(o.provider_name) || undefined,
+    username,
+    bmdcNumber,
+    profilePicture,
+    profile_picture: str(o.profile_picture) || undefined,
+    experience,
+    status,
+    consultationTypeId: Number.isFinite(consultationTypeId) ? consultationTypeId : undefined,
+    consultationTypeName,
+    createdAt: str(o.createdAt) || new Date().toISOString(),
+    updatedAt,
+    startDate,
+    endDate,
+    start_date: str(o.start_date) || undefined,
+    end_date: str(o.end_date) || undefined,
+  };
+}
+
+/** Read total record count from common pagination field names; avoid using page size as total. */
+function pickProvidersListTotal(o: Record<string, unknown>): number | undefined {
+  const read = (obj: Record<string, unknown>, keys: string[]): number | undefined => {
+    for (const k of keys) {
+      const v = obj[k];
+      if (v === undefined || v === null) continue;
+      const n = typeof v === "number" ? v : Number(v);
+      if (Number.isFinite(n) && n >= 0) return n;
+    }
+    return undefined;
+  };
+  const top = read(o, [
+    "total",
+    "totalCount",
+    "total_count",
+    "totalRecords",
+    "total_records",
+    "itemCount",
+    "item_count",
+  ]);
+  if (top !== undefined) return top;
+  if (o.meta && typeof o.meta === "object") {
+    const nested = read(o.meta as Record<string, unknown>, ["total", "totalCount", "total_count"]);
+    if (nested !== undefined) return nested;
+  }
+  return undefined;
+}
+
+/** Unwrap GET /v1/providers/all (same general shape as admin provider list). */
+export function normalizeProvidersAllResponse(data: unknown): AdminProviderListResponse {
+  const mapRows = (rows: unknown[]): ProviderListItem[] =>
+    rows.map((row) => normalizeProviderListItem(row));
+
+  if (Array.isArray(data)) {
+    const providers = mapRows(data);
+    return {
+      providers,
+      total: data.length,
+      page: 1,
+      limit: data.length || 10,
+    };
+  }
+  if (data && typeof data === "object") {
+    const o = data as Record<string, unknown>;
+    const raw = o.providers ?? o.data ?? o.items ?? o.results;
+    if (Array.isArray(raw)) {
+      const explicitTotal = pickProvidersListTotal(o);
+      const limit = Number(o.limit) || Number(o.pageSize) || Number(o.per_page) || 10;
+      const page = Number(o.page) || Number(o.currentPage) || 1;
+      /** 0 = total not provided; callers should use “full last page ⇒ may have more”. */
+      const total = explicitTotal ?? 0;
+      return {
+        providers: mapRows(raw),
+        total,
+        page: Number.isFinite(page) ? page : 1,
+        limit: Number.isFinite(limit) ? limit : 10,
+      };
+    }
+  }
+  return { providers: [], total: 0, page: 1, limit: 10 };
+}
+
+/** UI status filter for provider list. Sent to API as uppercase (PENDING, ACTIVE, AVAILABLE, REJECTED, DEACTIVATED, ARCHIVED). */
+export type ProviderListStatusFilter =
+  | "all"
+  | "pending"
+  | "active"
+  | "available"
+  | "rejected"
+  | "deactivated"
+  | "archived";
+
+/** Availability window type for admin provider list when status=AVAILABLE. Sent as DAILY | WEEKLY | MONTHLY. */
+export type ProviderListAvailableTypeFilter = "daily" | "weekly" | "monthly";
 
 // ============== Admin Full Details DTOs (GET .../details) ==============
 
@@ -922,10 +1199,21 @@ export interface ProviderConsultationTypeServiceItemDto {
   offered: boolean;
 }
 
+/** One profile onboarding checklist row (GET .../details `profileCheacklists`). */
+export interface ProviderProfileChecklistItemDto {
+  id: number;
+  key: string;
+  label: string;
+  displayOrder: number;
+  checked: boolean;
+}
+
 /** Full provider details: GET /v1/admin/providers/:providerId/details. Wallet fields per api_business_flow §11. */
 export interface ProviderFullDetailsDto {
   user: AdminUserDetailUserDto;
   provider: ProviderFullProfileDto;
+  /** Profile onboarding checklist (API property name includes the historical typo `cheacklists`). */
+  profileCheacklists?: ProviderProfileChecklistItemDto[];
   /** Checklist services for this provider's consultation type; offered = true means provider offers it. */
   consultationTypeServices?: ProviderConsultationTypeServiceItemDto[];
   serviceRequestsByStatus: ServiceRequestsByStatusDto;
@@ -984,7 +1272,9 @@ export interface PatientFullDetailsDto {
 export const providersApi = {
   /**
    * GET /v1/admin/providers — List all provider profiles (providers table).
-   * Role: ADMIN. Query: page, limit, consultationTypeId, status (PENDING | ACTIVE | REJECTED | DEACTIVATED | ARCHIVED).
+   * Role: ADMIN. Query: page, limit, consultationTypeId, status (PENDING | ACTIVE | AVAILABLE | REJECTED | DEACTIVATED | ARCHIVED).
+   * When status=AVAILABLE: optional availableType (DAILY|WEEKLY|MONTHLY) and startDate/endDate (ISO).
+   * Optional startDate/endDate (ISO): inclusive filter; single-day selection uses equal start/end.
    */
   getList: async (
     params?: {
@@ -993,6 +1283,11 @@ export const providersApi = {
       consultationTypeId?: number;
       status?: ProviderListStatusFilter;
       documentType?: string;
+      availableType?: ProviderListAvailableTypeFilter;
+      supervisorId?: number;
+      /** Inclusive date range filter (ISO strings). */
+      startDate?: string;
+      endDate?: string;
     },
     config?: { signal?: AbortSignal }
   ) => {
@@ -1009,7 +1304,39 @@ export const providersApi = {
     if (params?.documentType != null && params.documentType !== "") {
       query.documentType = params.documentType;
     }
+    if (params?.availableType) {
+      query.availableType = params.availableType.toUpperCase();
+    }
+    if (params?.startDate != null && String(params.startDate).trim() !== "") {
+      query.startDate = String(params.startDate).trim();
+    }
+    if (params?.endDate != null && String(params.endDate).trim() !== "") {
+      query.endDate = String(params.endDate).trim();
+    }
+    if (params?.supervisorId != null && Number.isFinite(params.supervisorId) && params.supervisorId > 0) {
+      query.supervisorId = params.supervisorId;
+    }
     return httpService.get<AdminProviderListResponse>("/admin/providers", {
+      params: query,
+      signal: config?.signal,
+    });
+  },
+
+  /**
+   * GET /v1/providers/all — paginated providers (e.g. for supervisor nurse assignment).
+   * Query: page, limit. Backend requires consultationTypeCode when isSupervised is sent.
+   */
+  getAllPublic: async (
+    params?: { page?: number; limit?: number; consultationTypeCode?: string },
+    config?: { signal?: AbortSignal }
+  ) => {
+    const query: Record<string, string | number | boolean> = {
+      page: params?.page ?? 1,
+      limit: params?.limit ?? 10,
+      isSupervised: false,
+      consultationTypeCode: params?.consultationTypeCode ?? "NURSING_CARE",
+    };
+    return httpService.get<unknown>("/providers/all", {
       params: query,
       signal: config?.signal,
     });
@@ -1021,6 +1348,21 @@ export const providersApi = {
       signal: config?.signal,
     });
   },
+  /** GET /v1/providers/:providerId/availability?date=YYYY-MM-DD[&time=HH:mm&shiftDuration=n] */
+  getAvailability: async (
+    providerId: number,
+    date: string,
+    options?: { time?: string; shiftDuration?: number },
+    config?: { signal?: AbortSignal }
+  ) => {
+    const params: Record<string, string | number> = { date };
+    if (options?.time) params.time = options.time;
+    if (options?.shiftDuration != null) params.shiftDuration = options.shiftDuration;
+    return httpService.get<unknown>(`/providers/${providerId}/availability`, {
+      params,
+      signal: config?.signal,
+    });
+  },
   /** PATCH /v1/admin/providers/:providerId/consultation-services - Update which services this provider offers (excludedServiceIds = not offered). */
   updateConsultationServices: async (
     providerId: number,
@@ -1028,6 +1370,16 @@ export const providersApi = {
   ) => {
     return httpService.patch<ProviderConsultationTypeServiceItemDto[]>(
       `/admin/providers/${providerId}/consultation-services`,
+      body
+    );
+  },
+  /** PATCH /v1/admin/providers/:providerId/cheaklist — Set completed checklist items (IDs that are checked). */
+  updateProfileChecklist: async (
+    providerId: number,
+    body: { checklistItemIds: number[] }
+  ) => {
+    return httpService.patch<ProviderProfileChecklistItemDto[]>(
+      `/admin/providers/${providerId}/cheaklist`,
       body
     );
   },
@@ -1470,6 +1822,273 @@ export const adminServiceRequestsApi = {
   },
 };
 
+// ============== Admin long-term opportunities (service requests — nursing schedule pipeline) ==============
+
+/** Status filter for GET /v1/admin/long-term-opportunities (omit for “all”). */
+export type LongTermOpportunityStatusFilter =
+  | "REQUESTED"
+  | "SCHEDULE_PROPOSED"
+  | "CHANGE_REQUESTED"
+  | "SCHEDULE_CONFIRMED"
+  | "PAYMENT_COMPLETED"
+  | "IN_PROGRESS";
+
+export interface LongTermOpportunityListItem {
+  id: number;
+  status: string;
+  requestNo?: string | null;
+  patientName?: string | null;
+  location?: string | null;
+  amount?: string | null;
+  preferredStartTime?: string | null;
+  shiftDurationHours?: number | null;
+  timeRange?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  assignedNursesLabel?: string | null;
+  createdAt?: string | null;
+}
+
+function strOpt(v: unknown): string | null {
+  if (v === null || v === undefined) return null;
+  const s = String(v).trim();
+  return s || null;
+}
+
+function computeTimeRange(preferredStartTime: string | null, shiftDurationHours: number | null): string | null {
+  if (!preferredStartTime || !Number.isFinite(shiftDurationHours) || (shiftDurationHours ?? 0) <= 0) {
+    return null;
+  }
+  const durationHours = Number(shiftDurationHours);
+  const normalized = preferredStartTime.trim().toUpperCase();
+  const m = normalized.match(/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)$/);
+  if (!m) return null;
+  let hour = Number(m[1]);
+  const minute = Number(m[2] ?? "0");
+  const meridiem = m[3];
+  if (!Number.isFinite(hour) || hour < 1 || hour > 12 || minute < 0 || minute > 59) return null;
+  if (meridiem === "AM") {
+    if (hour === 12) hour = 0;
+  } else if (hour !== 12) {
+    hour += 12;
+  }
+  const startMinutes = hour * 60 + minute;
+  const endMinutes = (startMinutes + Math.round(durationHours * 60)) % (24 * 60);
+  const fmt = (mins: number) => {
+    const h24 = Math.floor(mins / 60);
+    const mm = mins % 60;
+    const isPm = h24 >= 12;
+    const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+    return `${h12}:${String(mm).padStart(2, "0")} ${isPm ? "PM" : "AM"}`;
+  };
+  return `${fmt(startMinutes)} - ${fmt(endMinutes)}`;
+}
+
+/** Map one row from GET /admin/long-term-opportunities (handles nested patient/user and snake_case). */
+export function normalizeLongTermOpportunityRow(raw: unknown): LongTermOpportunityListItem {
+  if (!raw || typeof raw !== "object") {
+    return { id: 0, status: "" };
+  }
+  const o = raw as Record<string, unknown>;
+  const patient =
+    o.patient && typeof o.patient === "object" ? (o.patient as Record<string, unknown>) : null;
+  const id = Number(o.id ?? o.serviceRequestId ?? o.service_request_id);
+  const status = String(o.status ?? "").toUpperCase();
+
+  const patientName =
+    strOpt(o.patientName) ??
+    strOpt(o.patient_name) ??
+    (patient
+      ? [strOpt(patient.firstName), strOpt(patient.lastName)].filter(Boolean).join(" ").trim() || null
+      : null) ??
+    strOpt(patient?.name);
+
+  const requestNo =
+    strOpt(o.requestNo) ??
+    strOpt(o.request_no) ??
+    strOpt(o.referenceNo) ??
+    strOpt(o.code) ??
+    (Number.isFinite(id) && id > 0 ? `SR-${id}` : null);
+
+  const location =
+    strOpt(o.serviceAddressText) ??
+    strOpt(o.service_address_text) ??
+    strOpt(o.location) ??
+    strOpt(o.address) ??
+    strOpt(o.serviceAddress) ??
+    strOpt(o.service_address);
+
+  const startDate = strOpt(o.startDate ?? o.start_date ?? o.requestedStartDate ?? o.windowStart);
+  const endDate = strOpt(o.endDate ?? o.end_date ?? o.requestedEndDate ?? o.windowEnd);
+  const preferredStartTime = strOpt(o.preferredStartTime ?? o.preferred_start_time);
+  const shiftDurationHoursRaw = o.shiftDurationHours ?? o.shift_duration_hours;
+  const shiftDurationHours =
+    shiftDurationHoursRaw == null ? null : Number.isFinite(Number(shiftDurationHoursRaw)) ? Number(shiftDurationHoursRaw) : null;
+  const timeRange = computeTimeRange(preferredStartTime, shiftDurationHours);
+
+  let assignedNursesLabel: string | null = null;
+  const an = o.assignedNurses ?? o.assigned_nurses;
+  if (Array.isArray(an)) {
+    const names = an
+      .map((r) => {
+        if (!r || typeof r !== "object") return "";
+        const x = r as Record<string, unknown>;
+        const u = x.user && typeof x.user === "object" ? (x.user as Record<string, unknown>) : null;
+        const n =
+          [strOpt(x.firstName), strOpt(x.lastName)].filter(Boolean).join(" ").trim() ||
+          strOpt(x.name) ||
+          (u
+            ? [strOpt(u.firstName), strOpt(u.lastName)].filter(Boolean).join(" ").trim() ||
+              strOpt(u.name)
+            : "");
+        return n;
+      })
+      .filter(Boolean);
+    if (names.length) assignedNursesLabel = names.join(", ");
+  } else if (typeof an === "string" && an.trim()) {
+    assignedNursesLabel = an.trim();
+  }
+
+  return {
+    id: Number.isFinite(id) && id > 0 ? id : 0,
+    status,
+    requestNo,
+    patientName,
+    location,
+    amount: strOpt(o.fee ?? o.amount ?? o.totalFee ?? o.total_fee),
+    preferredStartTime,
+    shiftDurationHours,
+    timeRange,
+    startDate,
+    endDate,
+    assignedNursesLabel,
+    createdAt: strOpt(o.createdAt ?? o.created_at),
+  };
+}
+
+export function normalizeLongTermOpportunitiesListResponse(data: unknown): {
+  items: LongTermOpportunityListItem[];
+  total: number;
+  page: number;
+  limit: number;
+} {
+  const unwrapRows = (value: unknown): unknown[] => {
+    if (Array.isArray(value)) return value;
+    if (value && typeof value === "object") {
+      const o = value as Record<string, unknown>;
+      for (const key of ["data", "items", "results", "opportunities", "longTermOpportunities"] as const) {
+        if (Array.isArray(o[key])) return o[key] as unknown[];
+      }
+    }
+    return [];
+  };
+
+  const top =
+    data && typeof data === "object" && !Array.isArray(data)
+      ? (data as Record<string, unknown>)
+      : null;
+  const rows = Array.isArray(data) ? data : unwrapRows(data);
+  const items = rows.map((row) => normalizeLongTermOpportunityRow(row));
+
+  const page = Number(top?.page ?? top?.currentPage ?? 1);
+  const limit = Number(top?.limit ?? top?.pageSize ?? 10);
+  const total =
+    typeof top?.total === "number"
+      ? top.total
+      : typeof top?.totalCount === "number"
+        ? top.totalCount
+        : typeof top?.total_count === "number"
+          ? top.total_count
+          : items.length;
+
+  return {
+    items,
+    total: Number.isFinite(total) && total >= 0 ? total : 0,
+    page: Number.isFinite(page) && page > 0 ? page : 1,
+    limit: Number.isFinite(limit) && limit > 0 ? limit : 10,
+  };
+}
+
+export const adminLongTermOpportunitiesApi = {
+  /**
+   * GET /v1/admin/long-term-opportunities — Paginated long-term service requests.
+   * Query: page, limit; optional status (omit for all).
+   */
+  getList: async (
+    params?: {
+      page?: number;
+      limit?: number;
+      status?: LongTermOpportunityStatusFilter;
+    },
+    config?: { signal?: AbortSignal }
+  ) => {
+    const query: Record<string, string | number> = {
+      page: params?.page ?? 1,
+      limit: params?.limit ?? 10,
+    };
+    if (params?.status) query.status = params.status;
+    return httpService.get<unknown>("/admin/long-term-opportunities", {
+      params: query,
+      signal: config?.signal,
+    });
+  },
+
+  /** GET /v1/admin/long-term-opportunities/:id — single service request/opportunity details. */
+  getById: async (id: string | number, config?: { signal?: AbortSignal }) => {
+    return httpService.get<unknown>(`/admin/long-term-opportunities/${id}`, {
+      signal: config?.signal,
+    });
+  },
+
+  /** GET /v1/long-term-opportunities/schedule-details/:id — opportunity + schedule detail payload. */
+  getScheduleDetails: async (id: string | number, config?: { signal?: AbortSignal }) => {
+    return httpService.get<unknown>(`/long-term-opportunities/schedule-details/${id}`, {
+      signal: config?.signal,
+    });
+  },
+
+  /**
+   * POST /v1/long-term-opportunities/:id/provider-schedule
+   * Create provider schedule slot(s) for a long-term opportunity.
+   */
+  createProviderSchedule: async (
+    id: string | number,
+    body: {
+      slots: Array<{
+        providerId: number;
+        date: string; // YYYY-MM-DD
+        startTime: string; // HH:mm
+        endTime: string; // HH:mm
+      }>;
+    }
+  ) => {
+    return httpService.post<unknown>(`/long-term-opportunities/${id}/provider-schedule`, body);
+  },
+
+  /**
+   * PATCH /v1/long-term-opportunities/:id/schedule-reject/:scheduleSlotId
+   * Remove/reject a scheduled slot from long-term opportunity calendar.
+   */
+  rejectScheduleSlot: async (
+    id: string | number,
+    scheduleSlotId: string | number,
+    body: { reason: string }
+  ) => {
+    return httpService.patch<unknown>(
+      `/long-term-opportunities/${id}/schedule-reject/${scheduleSlotId}`,
+      body
+    );
+  },
+
+  /** PATCH /v1/long-term-opportunities/:id — Update long-term opportunity. */
+  updateOpportunity: async (
+    id: string | number,
+    body: Record<string, unknown>
+  ) => {
+    return httpService.patch<unknown>(`/long-term-opportunities/${id}`, body);
+  },
+};
+
 // ============== Dashboard API (admin summary) ==============
 
 /** Service request counts by status for dashboard chart. */
@@ -1502,6 +2121,25 @@ export interface DashboardSummaryDto {
   serviceRequests?: DashboardServiceRequestsSummary;
   pendingCertifications?: number;
   recentServiceRequests?: DashboardRecentServiceRequest[];
+}
+
+type StoredAuthUser = {
+  id?: number | string;
+  role?: string;
+};
+
+function getStoredAuthUser(): StoredAuthUser | null {
+  // Prefer localStorage (remember me), then fallback to sessionStorage.
+  const raw =
+    localStorage.getItem("auth_user") ??
+    sessionStorage.getItem("auth_user");
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as StoredAuthUser;
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Normalize backend response (handles wrapped body and snake_case). */
@@ -1544,10 +2182,119 @@ function normalizeDashboardSummary(raw: unknown): DashboardSummaryDto {
 export const dashboardApi = {
   /** GET /admin/dashboard/summary — single call for dashboard. Returns all KPIs, chart data, and recent activity. */
   getSummary: async (config?: { signal?: AbortSignal }) => {
+    const authUser = getStoredAuthUser();
+    const role = String(authUser?.role ?? "").toUpperCase();
+    const supervisorId = Number(authUser?.id);
+    const params =
+      role === "SUPERVISOR" && Number.isFinite(supervisorId) && supervisorId > 0
+        ? { supervisorId }
+        : undefined;
+
     const res = await httpService.get<unknown>("/admin/dashboard/summary", {
       signal: config?.signal,
+      params,
     });
     return { ...res, data: normalizeDashboardSummary(res.data) };
+  },
+};
+
+// ============== Admin Supervisors API ==============
+
+/** One row from GET /v1/admin/supervisors (field names may vary slightly by backend). */
+export interface AdminSupervisorDto {
+  id: number;
+  userId?: number;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  username?: string;
+  phone?: string | null;
+  region?: string | null;
+  teamSize?: number | null;
+  status?: string | null;
+  joinedAt?: string | null;
+  createdAt?: string | null;
+  isActive?: boolean;
+}
+
+/** Unwrap array from common response shapes. */
+export function normalizeAdminSupervisorsResponse(data: unknown): AdminSupervisorDto[] {
+  if (Array.isArray(data)) return data as AdminSupervisorDto[];
+  if (data && typeof data === "object") {
+    const o = data as Record<string, unknown>;
+    for (const key of ["supervisors", "data", "items", "results"] as const) {
+      const arr = o[key];
+      if (Array.isArray(arr)) return arr as AdminSupervisorDto[];
+    }
+  }
+  return [];
+}
+
+/** Payload used by assign/reassign supervisor-provider endpoints. */
+export interface AssignProvidersToSupervisorRequest {
+  supervisorId: number;
+  providerIds: number[];
+}
+
+/** One row from GET /v1/admin/:supervisorId/providers (shape can vary by backend). */
+export interface AssignedProviderRow {
+  id?: number;
+  providerId?: number;
+  provider_id?: number;
+  [key: string]: unknown;
+}
+
+/** Raw rows from GET /v1/admin/:supervisorId/providers (array or wrapped envelope). */
+export function assignedProvidersRowsFromResponse(data: unknown): unknown[] {
+  if (Array.isArray(data)) return data;
+  if (data && typeof data === "object") {
+    const o = data as Record<string, unknown>;
+    for (const key of ["providers", "assignedProviders", "data", "items", "results"] as const) {
+      if (Array.isArray(o[key])) return o[key] as unknown[];
+    }
+  }
+  return [];
+}
+
+/** Extract assigned provider IDs from common response envelopes and key names. */
+export function normalizeAssignedProviderIdsResponse(data: unknown): number[] {
+  const rows = assignedProvidersRowsFromResponse(data);
+  const ids = rows
+    .map((row) => {
+      if (!row || typeof row !== "object") return NaN;
+      const o = row as AssignedProviderRow;
+      const rawId = o.providerId ?? o.provider_id ?? o.id;
+      const id = Number(rawId);
+      return Number.isFinite(id) && id > 0 ? id : NaN;
+    })
+    .filter((id) => Number.isFinite(id)) as number[];
+  return Array.from(new Set(ids));
+}
+
+/** Full rows as list items (for UI merge with GET /providers/all). */
+export function normalizeAssignedProvidersToListItems(data: unknown): ProviderListItem[] {
+  return assignedProvidersRowsFromResponse(data).map((row) => normalizeProviderListItem(row));
+}
+
+export const adminSupervisorsApi = {
+  /** GET /v1/admin/supervisors — list supervisors (admin). */
+  getAll: async (config?: { signal?: AbortSignal }) => {
+    return httpService.get<unknown>("/admin/supervisors", { signal: config?.signal });
+  },
+
+  /** GET /v1/admin/:supervisorId/providers — already assigned providers under a supervisor. */
+  getAssignedProviders: async (supervisorId: number, config?: { signal?: AbortSignal }) => {
+    return httpService.get<unknown>(`/admin/${supervisorId}/providers`, { signal: config?.signal });
+  },
+
+  /** POST /v1/admin/assign-providers */
+  assignProviders: async (data: AssignProvidersToSupervisorRequest) => {
+    return httpService.post<{ message?: string }>("/admin/assign-providers", data);
+  },
+
+  /** PUT /v1/admin/reassign-providers — replace supervisor's assigned providers list. */
+  reassignProviders: async (data: AssignProvidersToSupervisorRequest) => {
+    return httpService.put<{ message?: string }>("/admin/reassign-providers", data);
   },
 };
 
@@ -1898,9 +2645,35 @@ export const adminCertificationsApi = {
 
 // ============== User API (legacy / profile) ==============
 
+/** GET /v1/users/:id — single user (camelCase or snake_case from backend). */
+export interface UserByIdDto {
+  id: number;
+  email?: string;
+  username?: string;
+  firstName?: string;
+  lastName?: string;
+  first_name?: string;
+  last_name?: string;
+  role?: string;
+  isActive?: boolean;
+  phone?: string | null;
+  mobileNumber?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export function normalizeUserByIdResponse(data: unknown): UserByIdDto | null {
+  if (data == null || typeof data !== "object") return null;
+  const o = data as Record<string, unknown>;
+  if (o.user && typeof o.user === "object") return normalizeUserByIdResponse(o.user);
+  if (o.data && typeof o.data === "object") return normalizeUserByIdResponse(o.data);
+  return data as UserByIdDto;
+}
+
 export const userApi = {
-  getProfile: async (userId: string) => {
-    return httpService.get(`/users/${userId}`);
+  /** GET /v1/users/:userId */
+  getProfile: async (userId: string, config?: { signal?: AbortSignal }) => {
+    return httpService.get<unknown>(`/users/${userId}`, { signal: config?.signal });
   },
   updateProfile: async (userId: string, data: Record<string, unknown>) => {
     return httpService.put(`/users/${userId}`, data);

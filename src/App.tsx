@@ -19,6 +19,9 @@ import UpgradeRequests from "./pages/UpgradeRequests";
 import UpgradeRequestDetail from "./pages/UpgradeRequestDetail";
 import Notifications from "./pages/Notifications";
 import FinancialReports from "./pages/FinancialReports";
+import NurseScheduleList from "./pages/NurseScheduleList";
+import NurseScheduleCalendarPage from "./pages/NurseScheduleCalendarPage";
+import SupervisorList from "./pages/SupervisorList";
 import ProtectedRoute from "./components/common/ProtectedRoute";
 import PublicRoute from "./components/common/PublicRoute";
 
@@ -35,21 +38,151 @@ export default function App() {
             </ProtectedRoute>
           }
         >
-          <Route index path="/" element={<Home />} />
-          <Route path="/patients" element={<PatientList />} />
-          <Route path="/providers" element={<ProviderList />} />
-          <Route path="/users" element={<UserList />} />
-          <Route path="/consultation-types" element={<ConsultationTypeTree />} />
-          <Route path="/consultation-types/config/:id" element={<ConsultationTypeConfig />} />
-          <Route path="/appointments" element={<ServiceRequestList />} />
-          <Route path="/upgrade-requests" element={<UpgradeRequests />} />
-          <Route path="/upgrade-requests/:id" element={<UpgradeRequestDetail />} />
-          <Route path="/financial-reports" element={<FinancialReports />} />
-          <Route path="/profile" element={<UserProfiles />} />
-          <Route path="/verification-documents" element={<VerificationDocuments />} />
-          <Route path="/verification-document-types" element={<VerificationDocumentTypes />} />
-          <Route path="/system-config" element={<SystemConfig />} />
-          <Route path="/notifications" element={<Notifications />} />
+          <Route
+            index
+            path="/"
+            element={
+              <ProtectedRoute allowedRoles={["ADMIN", "SUPERVISOR"]}>
+                <Home />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/patients"
+            element={
+              <ProtectedRoute allowedRoles={["ADMIN"]}>
+                <PatientList />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/providers"
+            element={
+              <ProtectedRoute allowedRoles={["ADMIN", "SUPERVISOR"]}>
+                <ProviderList />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/schedule/:requestId"
+            element={
+              <ProtectedRoute allowedRoles={["ADMIN", "SUPERVISOR"]}>
+                <NurseScheduleCalendarPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/schedule"
+            element={
+              <ProtectedRoute allowedRoles={["ADMIN", "SUPERVISOR"]}>
+                <NurseScheduleList />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/supervisors"
+            element={
+              <ProtectedRoute allowedRoles={["ADMIN"]}>
+                <SupervisorList />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/users"
+            element={
+              <ProtectedRoute allowedRoles={["ADMIN"]}>
+                <UserList />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/consultation-types"
+            element={
+              <ProtectedRoute allowedRoles={["ADMIN"]}>
+                <ConsultationTypeTree />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/consultation-types/config/:id"
+            element={
+              <ProtectedRoute allowedRoles={["ADMIN"]}>
+                <ConsultationTypeConfig />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/appointments"
+            element={
+              <ProtectedRoute allowedRoles={["ADMIN"]}>
+                <ServiceRequestList />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/upgrade-requests"
+            element={
+              <ProtectedRoute allowedRoles={["ADMIN"]}>
+                <UpgradeRequests />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/upgrade-requests/:id"
+            element={
+              <ProtectedRoute allowedRoles={["ADMIN"]}>
+                <UpgradeRequestDetail />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/financial-reports"
+            element={
+              <ProtectedRoute allowedRoles={["ADMIN"]}>
+                <FinancialReports />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute allowedRoles={["ADMIN", "SUPERVISOR"]}>
+                <UserProfiles />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/verification-documents"
+            element={
+              <ProtectedRoute allowedRoles={["ADMIN"]}>
+                <VerificationDocuments />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/verification-document-types"
+            element={
+              <ProtectedRoute allowedRoles={["ADMIN"]}>
+                <VerificationDocumentTypes />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/system-config"
+            element={
+              <ProtectedRoute allowedRoles={["ADMIN"]}>
+                <SystemConfig />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/notifications"
+            element={
+              <ProtectedRoute allowedRoles={["ADMIN"]}>
+                <Notifications />
+              </ProtectedRoute>
+            }
+          />
         </Route>
 
         {/* Public Auth Routes */}

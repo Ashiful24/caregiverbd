@@ -24,6 +24,7 @@ import {
   type VerificationDocumentTypeItem,
 } from "../services/api";
 import { formatDate } from "../utils/format";
+import { useAuth } from "../context/AuthContext";
 
 const LIMIT_OPTIONS = [10, 20, 50];
 
@@ -62,6 +63,7 @@ function flattenConsultationTypes(
 function providerStatusBadgeColor(status: string): "success" | "warning" | "error" | "light" {
   switch (String(status).toUpperCase()) {
     case "ACTIVE":
+    case "AVAILABLE":
       return "success";
     case "PENDING":
       return "warning";
@@ -76,6 +78,13 @@ function providerStatusBadgeColor(status: string): "success" | "warning" | "erro
 }
 
 export default function ProviderList() {
+  const { user } = useAuth();
+  const currentRole = String(user?.role ?? "").toUpperCase();
+  const supervisorId =
+    currentRole === "SUPERVISOR" && Number.isFinite(Number(user?.id)) && Number(user?.id) > 0
+      ? Number(user?.id)
+      : undefined;
+
   const [providers, setProviders] = useState<ProviderListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -151,6 +160,7 @@ export default function ProviderList() {
           status: statusTab === "all" ? undefined : statusTab,
           documentType:
             documentTypeFilterCode === "" ? undefined : documentTypeFilterCode,
+          ...(supervisorId != null ? { supervisorId } : {}),
         },
         { signal }
       );
@@ -190,7 +200,13 @@ export default function ProviderList() {
     const controller = new AbortController();
     fetchProviders(controller.signal);
     return () => controller.abort();
-  }, [page, limit, consultationTypeFilterId, documentTypeFilterCode, statusTab]);
+  }, [
+    page,
+    limit,
+    consultationTypeFilterId,
+    documentTypeFilterCode,
+    statusTab,
+  ]);
 
   const loadProviderDetail = useCallback(async (providerId: number) => {
     setDetailLoading(true);
@@ -328,6 +344,7 @@ export default function ProviderList() {
               {statusTab === "pending" && "No pending providers found."}
               {statusTab === "active" && "No active providers found."}
               {statusTab === "rejected" && "No rejected providers found."}
+              {statusTab === "deactivated" && "No deactivated providers found."}
               {statusTab === "archived" && "No archived providers found."}
             </div>
           ) : (

@@ -3,10 +3,11 @@ import { useAuth } from "../../context/AuthContext";
 
 type ProtectedRouteProps = {
   children: React.ReactNode;
+  allowedRoles?: string[];
 };
 
-export default function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { isAuthenticated, isLoading } = useAuth();
+export default function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
+  const { isAuthenticated, isLoading, user } = useAuth();
   const location = useLocation();
 
   // Show loading state while checking authentication
@@ -25,6 +26,14 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   if (!isAuthenticated) {
     // Save the attempted location to redirect back after login
     return <Navigate to="/signin" state={{ from: location }} replace />;
+  }
+
+  if (allowedRoles?.length) {
+    const currentRole = String(user?.role ?? "").toUpperCase();
+    const isAllowed = allowedRoles.map((r) => r.toUpperCase()).includes(currentRole);
+    if (!isAllowed) {
+      return <Navigate to="/" replace />;
+    }
   }
 
   return <>{children}</>;
