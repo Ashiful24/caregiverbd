@@ -6,6 +6,8 @@ import Badge from "../ui/badge/Badge";
 import { ServiceRequestsListModal } from "./ServiceRequestsListModal";
 import { ConfirmModal } from "../ui/confirm-modal";
 import { UserCircleIcon, EyeIcon, DownloadIcon } from "../../icons";
+import { Calendar } from "../ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { providersApi, adminCertificationsApi, patientsApi, adminUsersApi, adminDocumentsApi, adminProvidersApi } from "../../services/api";
 import type {
   AdminCertificationDto,
@@ -115,6 +117,13 @@ function statusBadgeColor(status: string): "success" | "warning" | "error" | "li
     default:
       return "light";
   }
+}
+
+function toYmd(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }
 
 const SERVICE_REQUEST_STATUSES: AdminServiceRequestStatus[] = [
@@ -728,6 +737,13 @@ export function ProviderFullDetailsView({
   const [showUserStatusConfirm, setShowUserStatusConfirm] = useState(false);
   const [checklistUpdating, setChecklistUpdating] = useState(false);
   const [checklistError, setChecklistError] = useState<string | null>(null);
+  const [availabilityDate, setAvailabilityDate] = useState<Date | undefined>(new Date());
+  const [availabilityTime, setAvailabilityTime] = useState("09:00");
+  const [availabilityShiftDuration, setAvailabilityShiftDuration] = useState("8");
+  const [availabilityDatePickerOpen, setAvailabilityDatePickerOpen] = useState(false);
+  const [availabilityLoading, setAvailabilityLoading] = useState(false);
+  const [availabilityError, setAvailabilityError] = useState<string | null>(null);
+  const [availabilitySlots, setAvailabilitySlots] = useState<string[]>([]);
   const isProviderPending = currentStatus === "PENDING";
   const canChangeStatus = allowedNextStatuses.length > 0;
 
@@ -1008,6 +1024,57 @@ export function ProviderFullDetailsView({
     }
   };
 
+  const handleCheckAvailability = async () => {
+    if (!provider.id || !availabilityDate) return;
+    const parsedShiftDuration = Number(availabilityShiftDuration);
+    if (!Number.isFinite(parsedShiftDuration) || parsedShiftDuration <= 0) {
+      setAvailabilityError("Shift duration must be a positive number.");
+      setAvailabilitySlots([]);
+      return;
+    }
+    setAvailabilityLoading(true);
+    setAvailabilityError(null);
+    setAvailabilitySlots([]);
+    try {
+      const res = await providersApi.getAvailability(provider.id, toYmd(availabilityDate), {
+        time: availabilityTime || undefined,
+        shiftDuration: parsedShiftDuration,
+      });
+      const data = res.data as unknown;
+      const slotsRaw =
+        Array.isArray(data)
+          ? data
+          : data && typeof data === "object"
+            ? ((data as Record<string, unknown>).slots ??
+              (data as Record<string, unknown>).availableSlots ??
+              (data as Record<string, unknown>).data)
+            : null;
+      const parsedSlots = Array.isArray(slotsRaw)
+        ? slotsRaw
+            .map((x) => {
+              if (x && typeof x === "object") {
+                const o = x as Record<string, unknown>;
+                const from = String(o.from ?? "").trim();
+                const to = String(o.to ?? "").trim();
+                if (from && to) return `${from} - ${to}`;
+                return from || to;
+              }
+              return String(x ?? "").trim();
+            })
+            .filter(Boolean)
+        : [];
+      setAvailabilitySlots(parsedSlots);
+      if (parsedSlots.length === 0) {
+        setAvailabilityError("No available slots found for this selection.");
+      }
+    } catch {
+      setAvailabilityError("Failed to load provider availability.");
+      setAvailabilitySlots([]);
+    } finally {
+      setAvailabilityLoading(false);
+    }
+  };
+
   const handleSetProviderStatus = async () => {
     setStatusUpdating(true);
     try {
@@ -1033,6 +1100,7 @@ export function ProviderFullDetailsView({
     (serviceRequestsByStatus.CANCELLED?.length ?? 0);
 
   const providerDisplayName = [user.firstName, user.lastName].filter(Boolean).join(" ") || "Provider";
+  /* Hardcoded reference check preview — disabled until API exists.
   const referenceChecks = [
     {
       id: 1,
@@ -1051,6 +1119,7 @@ export function ProviderFullDetailsView({
       note: "Pending outbound verification call.",
     },
   ];
+  */
   const checklistTotal = profileChecklistItems.length;
   const completedSteps = profileChecklistItems.filter((i) => i.checked).length;
   const completionPercent =
@@ -1285,6 +1354,95 @@ export function ProviderFullDetailsView({
       />
 
       <div className="w-full min-w-0 sm:col-span-2">
+        <DetailBlock title="Provider availability">
+          <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
+            Select a single date, time, and shift duration to check availability.
+          </p>
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <label className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                Date
+                <Popover
+                  open={availabilityDatePickerOpen}
+                  onOpenChange={setAvailabilityDatePickerOpen}
+                >
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      className="mt-1 w-full rounded border border-gray-300 bg-white px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                    >
+                      {availabilityDate ? toYmd(availabilityDate) : "Select a date"}
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="z-[100120] w-auto p-2" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={availabilityDate}
+                      onSelect={(date) => {
+                        setAvailabilityDate(date);
+                        setAvailabilityDatePickerOpen(false);
+                      }}
+                      numberOfMonths={1}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </label>
+                <label className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                  Time
+                  <input
+                    type="time"
+                    value={availabilityTime}
+                    onChange={(e) => setAvailabilityTime(e.target.value)}
+                    className="mt-1 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                  />
+                </label>
+                <label className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                  Shift duration (hours)
+                  <input
+                    type="number"
+                    min={1}
+                    step={1}
+                    value={availabilityShiftDuration}
+                    onChange={(e) => setAvailabilityShiftDuration(e.target.value)}
+                    className="mt-1 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                  />
+                </label>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => void handleCheckAvailability()}
+                disabled={availabilityLoading || !availabilityDate}
+                className="rounded bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 dark:bg-brand-700 dark:hover:bg-brand-800"
+              >
+                {availabilityLoading ? "Checking..." : "Check availability"}
+              </button>
+            </div>
+            {availabilityError ? (
+              <p className="text-sm text-red-600 dark:text-red-400">{availabilityError}</p>
+            ) : null}
+            {availabilitySlots.length > 0 ? (
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 dark:border-emerald-800/40 dark:bg-emerald-900/20">
+                <p className="text-xs font-medium uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
+                  Available slots
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {availabilitySlots.map((slot) => (
+                    <span
+                      key={slot}
+                      className="rounded-full border border-emerald-300 bg-white px-2.5 py-1 text-xs text-emerald-700 dark:border-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200"
+                    >
+                      {slot}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </DetailBlock>
+      </div>
+
+      <div className="w-full min-w-0 sm:col-span-2">
         <DetailBlock title="Consultation type services">
           <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
             Checklist of services for this provider&apos;s consultation type. &quot;Offered&quot; = provider offers this; &quot;Excluded&quot; = provider does not offer it.
@@ -1505,6 +1663,7 @@ export function ProviderFullDetailsView({
         </DetailBlock>
       </div>
 
+      {/*
       <div className="w-full min-w-0 sm:col-span-2">
         <DetailBlock title="Reference Check - Minimum 2 references">
           <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
@@ -1540,6 +1699,7 @@ export function ProviderFullDetailsView({
           </div>
         </DetailBlock>
       </div>
+      */}
 
       <div className="w-full min-w-0 sm:col-span-2">
         <DetailBlock title="User documents">

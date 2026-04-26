@@ -1,9 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import PageMeta from "../components/common/PageMeta";
-import { ActionsMenu } from "../components/common/ActionsMenu";
-import { DropdownItem } from "../components/ui/dropdown/DropdownItem";
 import {
   Table,
   TableBody,
@@ -11,14 +9,16 @@ import {
   TableHeader,
   TableRow,
 } from "../components/ui/table";
-import { CalenderIcon } from "../icons";
+import { CalenderIcon, PencilIcon, ViewIcon } from "../icons";
 import {
   adminLongTermOpportunitiesApi,
   normalizeLongTermOpportunitiesListResponse,
+  normalizeLongTermOpportunityRow,
   type LongTermOpportunityListItem,
   type LongTermOpportunityStatusFilter,
 } from "../services/api";
 import { formatDate } from "../utils/format";
+import { Modal } from "../components/ui/modal";
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50];
 
@@ -57,6 +57,47 @@ function formatAmount(row: LongTermOpportunityListItem): string {
   return raw;
 }
 
+function formatTimeRange(row: LongTermOpportunityListItem): string {
+  return row.timeRange?.trim() || "—";
+}
+
+function resolveOpportunityFromScheduleDetails(data: unknown): LongTermOpportunityListItem {
+  const candidates: unknown[] = [];
+  if (data && typeof data === "object") {
+    const o = data as Record<string, unknown>;
+    candidates.push(
+      o,
+      o.data,
+      o.opportunity,
+      o.longTermOpportunity,
+      o.serviceRequest,
+      o.request,
+      o.scheduleDetails
+    );
+  } else {
+    candidates.push(data);
+  }
+  for (const candidate of candidates) {
+    const normalized = normalizeLongTermOpportunityRow(candidate);
+    if (normalized.id > 0) return normalized;
+  }
+  return { id: 0, status: "" };
+}
+
+function extractOpportunityPayload(data: unknown): Record<string, unknown> | null {
+  if (!data || typeof data !== "object") return null;
+  const o = data as Record<string, unknown>;
+  const nestedData = o.data && typeof o.data === "object" ? (o.data as Record<string, unknown>) : null;
+  const candidates: unknown[] = [o.opportunity, nestedData?.opportunity, o.longTermOpportunity, o.serviceRequest, o.request, o];
+  for (const candidate of candidates) {
+    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) continue;
+    const co = candidate as Record<string, unknown>;
+    const idVal = Number(co.id ?? co.serviceRequestId ?? co.service_request_id);
+    if (Number.isFinite(idVal) && idVal > 0) return { ...co };
+  }
+  return null;
+}
+
 export default function NurseScheduleList() {
   const navigate = useNavigate();
   const [items, setItems] = useState<LongTermOpportunityListItem[]>([]);
@@ -67,8 +108,17 @@ export default function NurseScheduleList() {
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [statusTab, setStatusTab] = useState<"all" | LongTermOpportunityStatusFilter>("all");
-  const [openActionsId, setOpenActionsId] = useState<number | null>(null);
-  const actionsButtonRef = useRef<HTMLButtonElement>(null);
+  const [detailsItem, setDetailsItem] = useState<LongTermOpportunityListItem | null>(null);
+  const [updateItem, setUpdateItem] = useState<LongTermOpportunityListItem | null>(null);
+  const [updateStatus, setUpdateStatus] = useState("");
+  const [updateAmount, setUpdateAmount] = useState("");
+  const [updatePreferredStartTime, setUpdatePreferredStartTime] = useState("");
+  const [updateShiftDurationHours, setUpdateShiftDurationHours] = useState("");
+  const [updateStartDate, setUpdateStartDate] = useState("");
+  const [updateEndDate, setUpdateEndDate] = useState("");
+  const [updateSaving, setUpdateSaving] = useState(false);
+  const [updateError, setUpdateError] = useState("");
+  const [actionLoadingId, setActionLoadingId] = useState<number | null>(null);
 
   const fetchList = useCallback(
     async (signal?: AbortSignal) => {
@@ -111,9 +161,102 @@ export default function NurseScheduleList() {
     return () => controller.abort();
   }, [fetchList]);
 
-  const goToCalendar = (request: LongTermOpportunityListItem) => {
-    setOpenActionsId(null);
-    navigate(`/schedule/${request.id}`, { state: { request } });
+  const fetchScheduleDetailsOpportunity = async (requestId: number) => {
+    const res = await adminLongTermOpportunitiesApi.getScheduleDetails(requestId);
+    const normalized = resolveOpportunityFromScheduleDetails(res.data);
+    return { normalized, raw: res.data };
+  };
+
+  const goToCalendar = async (request: LongTermOpportunityListItem) => {
+    setActionLoadingId(request.id);
+    try {
+      const { normalized, raw } = await fetchScheduleDetailsOpportunity(request.id);
+      const routeRequest = normalized.id > 0 ? normalized : request;
+      navigate(`/schedule/${request.id}`, { state: { request: routeRequest, scheduleDetails: raw } });
+    } catch {
+      navigate(`/schedule/${request.id}`, { state: { request } });
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const openDetails = async (request: LongTermOpportunityListItem) => {
+    setActionLoadingId(request.id);
+    try {
+      const { normalized } = await fetchScheduleDetailsOpportunity(request.id);
+      setDetailsItem(normalized.id > 0 ? normalized : request);
+    } catch {
+      setDetailsItem(request);
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const openUpdate = async (request: LongTermOpportunityListItem) => {
+    setActionLoadingId(request.id);
+    let source = request;
+    try {
+      const { normalized, raw } = await fetchScheduleDetailsOpportunity(request.id);
+      if (normalized.id > 0) source = normalized;
+      void extractOpportunityPayload(raw);
+    } catch {
+      // fall back to list row values
+    } finally {
+      setActionLoadingId(null);
+    }
+    setUpdateItem(source);
+    setUpdateStatus(source.status || "");
+    setUpdateAmount(source.amount?.trim() || "");
+    setUpdatePreferredStartTime(source.preferredStartTime?.trim() || "");
+    setUpdateShiftDurationHours(
+      source.shiftDurationHours != null ? String(source.shiftDurationHours) : ""
+    );
+    setUpdateStartDate(source.startDate?.slice(0, 10) || "");
+    setUpdateEndDate(source.endDate?.slice(0, 10) || "");
+    setUpdateError("");
+  };
+
+  const closeUpdate = () => {
+    setUpdateItem(null);
+    setUpdateStatus("");
+    setUpdateAmount("");
+    setUpdatePreferredStartTime("");
+    setUpdateShiftDurationHours("");
+    setUpdateStartDate("");
+    setUpdateEndDate("");
+    setUpdateSaving(false);
+    setUpdateError("");
+  };
+
+  const handleSaveUpdate = async () => {
+    if (!updateItem) return;
+    setUpdateSaving(true);
+    setUpdateError("");
+    const payload: Record<string, unknown> = {
+      status: updateStatus.trim() || updateItem.status,
+    };
+    try {
+      const res = await adminLongTermOpportunitiesApi.updateOpportunity(updateItem.id, payload);
+      const fromApi = resolveOpportunityFromScheduleDetails(res.data);
+      const updated: LongTermOpportunityListItem =
+        fromApi.id > 0
+          ? fromApi
+          : {
+              ...updateItem,
+              status: updateStatus.trim() || updateItem.status,
+            };
+      setItems((prev) => prev.map((row) => (row.id === updateItem.id ? updated : row)));
+      setDetailsItem((prev) => (prev?.id === updateItem.id ? updated : prev));
+      closeUpdate();
+    } catch (err: unknown) {
+      const message =
+        err && typeof err === "object" && "message" in err
+          ? String((err as { message: string }).message)
+          : "Failed to update service request.";
+      setUpdateError(message);
+    } finally {
+      setUpdateSaving(false);
+    }
   };
 
   const from = total === 0 ? 0 : (page - 1) * limit + 1;
@@ -197,30 +340,47 @@ export default function NurseScheduleList() {
                           <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">{request.location}</p>
                         ) : null}
                       </div>
-                      <ActionsMenu
-                        isOpen={openActionsId === request.id}
-                        onClose={() => setOpenActionsId(null)}
-                        onButtonClick={() =>
-                          setOpenActionsId(openActionsId === request.id ? null : request.id)
-                        }
-                        buttonRef={openActionsId === request.id ? actionsButtonRef : undefined}
-                      >
-                        <DropdownItem
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            goToCalendar(request);
-                          }}
-                          className="dark:hover:bg-gray-700 dark:text-gray-200"
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          title="View calendar"
+                          aria-label="View calendar"
+                          disabled={actionLoadingId === request.id}
+                          onClick={() => void goToCalendar(request)}
+                          className="rounded-md border border-gray-200 bg-white p-2 text-gray-600 hover:bg-gray-100 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
                         >
-                          View calendar
-                        </DropdownItem>
-                      </ActionsMenu>
+                          <CalenderIcon className="size-4" />
+                        </button>
+                        <button
+                          type="button"
+                          title="Details"
+                          aria-label="Details"
+                          disabled={actionLoadingId === request.id}
+                          onClick={() => void openDetails(request)}
+                          className="rounded-md border border-gray-200 bg-white p-2 text-gray-600 hover:bg-gray-100 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
+                        >
+                          <ViewIcon className="size-4" />
+                        </button>
+                        <button
+                          type="button"
+                          title="Update"
+                          aria-label="Update"
+                          disabled={actionLoadingId === request.id}
+                          onClick={() => void openUpdate(request)}
+                          className="rounded-md border border-gray-200 bg-white p-2 text-gray-600 hover:bg-gray-100 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
+                        >
+                          <PencilIcon className="size-4" />
+                        </button>
+                      </div>
                     </div>
                     <dl className="mt-3 grid grid-cols-1 gap-2 text-sm">
                       <div className="flex justify-between gap-2">
                         <dt className="text-gray-500 dark:text-gray-400">Amount</dt>
                         <dd className="text-gray-800 dark:text-gray-200">{formatAmount(request)}</dd>
+                      </div>
+                      <div className="flex justify-between gap-2">
+                        <dt className="text-gray-500 dark:text-gray-400">Time range</dt>
+                        <dd className="text-gray-800 dark:text-gray-200">{formatTimeRange(request)}</dd>
                       </div>
                       <div className="flex justify-between gap-2">
                         <dt className="text-gray-500 dark:text-gray-400">Requested window</dt>
@@ -261,15 +421,21 @@ export default function NurseScheduleList() {
                       </TableCell>
                       <TableCell
                         isHeader
-                        className="py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
+                        className="w-[140px] py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
                       >
                         Status
                       </TableCell>
                       <TableCell
                         isHeader
-                        className="py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
+                        className="w-[120px] py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
                       >
                         Amount
+                      </TableCell>
+                      <TableCell
+                        isHeader
+                        className="py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
+                      >
+                        Time range
                       </TableCell>
                       <TableCell
                         isHeader
@@ -303,11 +469,14 @@ export default function NurseScheduleList() {
                         <TableCell className="py-3 text-theme-sm text-gray-600 dark:text-gray-400">
                           {request.location?.trim() || "—"}
                         </TableCell>
-                        <TableCell className="py-3 text-theme-sm text-gray-600 dark:text-gray-400">
+                        <TableCell className="py-3 text-theme-sm leading-snug text-gray-600 dark:text-gray-400">
                           {request.status || "—"}
                         </TableCell>
-                        <TableCell className="py-3 text-theme-sm text-gray-600 dark:text-gray-400">
+                        <TableCell className="py-3 text-right text-theme-sm whitespace-nowrap text-gray-600 dark:text-gray-400">
                           {formatAmount(request)}
+                        </TableCell>
+                        <TableCell className="py-3 text-theme-sm text-gray-600 dark:text-gray-400">
+                          {formatTimeRange(request)}
                         </TableCell>
                         <TableCell className="py-3 text-theme-sm text-gray-600 dark:text-gray-400">
                           {formatRequestWindow(request)}
@@ -316,25 +485,38 @@ export default function NurseScheduleList() {
                           {request.assignedNursesLabel ?? "—"}
                         </TableCell>
                         <TableCell className="py-3 text-right">
-                          <ActionsMenu
-                            isOpen={openActionsId === request.id}
-                            onClose={() => setOpenActionsId(null)}
-                            onButtonClick={() =>
-                              setOpenActionsId(openActionsId === request.id ? null : request.id)
-                            }
-                            buttonRef={openActionsId === request.id ? actionsButtonRef : undefined}
-                          >
-                            <DropdownItem
-                              onMouseDown={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                goToCalendar(request);
-                              }}
-                              className="dark:hover:bg-gray-700 dark:text-gray-200"
+                          <div className="inline-flex items-center gap-1">
+                            <button
+                              type="button"
+                              title="View calendar"
+                              aria-label="View calendar"
+                              disabled={actionLoadingId === request.id}
+                              onClick={() => void goToCalendar(request)}
+                              className="rounded-md border border-gray-200 bg-white p-2 text-gray-600 hover:bg-gray-100 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
                             >
-                              View calendar
-                            </DropdownItem>
-                          </ActionsMenu>
+                              <CalenderIcon className="size-4" />
+                            </button>
+                            <button
+                              type="button"
+                              title="Details"
+                              aria-label="Details"
+                              disabled={actionLoadingId === request.id}
+                              onClick={() => void openDetails(request)}
+                              className="rounded-md border border-gray-200 bg-white p-2 text-gray-600 hover:bg-gray-100 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
+                            >
+                              <ViewIcon className="size-4" />
+                            </button>
+                            <button
+                              type="button"
+                              title="Update"
+                              aria-label="Update"
+                              disabled={actionLoadingId === request.id}
+                              onClick={() => void openUpdate(request)}
+                              className="rounded-md border border-gray-200 bg-white p-2 text-gray-600 hover:bg-gray-100 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
+                            >
+                              <PencilIcon className="size-4" />
+                            </button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -394,6 +576,177 @@ export default function NurseScheduleList() {
           </div>
         ) : null}
       </div>
+
+      <Modal
+        isOpen={detailsItem !== null}
+        onClose={() => setDetailsItem(null)}
+        title="Long-term opportunity details"
+        className="max-h-[90vh] max-w-3xl overflow-y-auto p-0"
+      >
+        {detailsItem ? (
+          <div className="space-y-4 pt-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-800/40">
+                <p className="text-xs text-gray-500 dark:text-gray-400">Request no</p>
+                <p className="mt-1 text-sm font-semibold text-gray-800 dark:text-white/90">
+                  {detailsItem.requestNo?.trim() || `SR-${detailsItem.id}`}
+                </p>
+              </div>
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-800/40">
+                <p className="text-xs text-gray-500 dark:text-gray-400">Status</p>
+                <p className="mt-1 text-sm font-medium text-gray-800 dark:text-gray-200">
+                  {detailsItem.status || "—"}
+                </p>
+              </div>
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-800/40">
+                <p className="text-xs text-gray-500 dark:text-gray-400">Patient</p>
+                <p className="mt-1 text-sm font-medium text-gray-800 dark:text-gray-200">
+                  {detailsItem.patientName?.trim() || "—"}
+                </p>
+              </div>
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-800/40">
+                <p className="text-xs text-gray-500 dark:text-gray-400">Location</p>
+                <p className="mt-1 text-sm font-medium text-gray-800 dark:text-gray-200">
+                  {detailsItem.location?.trim() || "—"}
+                </p>
+              </div>
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-800/40">
+                <p className="text-xs text-gray-500 dark:text-gray-400">Amount</p>
+                <p className="mt-1 text-sm font-medium text-gray-800 dark:text-gray-200">
+                  {formatAmount(detailsItem)}
+                </p>
+              </div>
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-800/40">
+                <p className="text-xs text-gray-500 dark:text-gray-400">Time range</p>
+                <p className="mt-1 text-sm font-medium text-gray-800 dark:text-gray-200">
+                  {formatTimeRange(detailsItem)}
+                </p>
+              </div>
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-800/40">
+                <p className="text-xs text-gray-500 dark:text-gray-400">Requested window</p>
+                <p className="mt-1 text-sm font-medium text-gray-800 dark:text-gray-200">
+                  {formatRequestWindow(detailsItem)}
+                </p>
+              </div>
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-800/40">
+                <p className="text-xs text-gray-500 dark:text-gray-400">Assigned nurses</p>
+                <p className="mt-1 text-sm font-medium text-gray-800 dark:text-gray-200">
+                  {detailsItem.assignedNursesLabel ?? "—"}
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </Modal>
+
+      <Modal
+        isOpen={updateItem !== null}
+        onClose={closeUpdate}
+        title="Update long-term opportunity"
+        className="max-h-[90vh] max-w-2xl overflow-y-auto p-0"
+      >
+        {updateItem ? (
+          <form
+            className="space-y-4 pt-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void handleSaveUpdate();
+            }}
+          >
+            <div className="rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-xs text-brand-800 dark:border-brand-800/40 dark:bg-brand-900/20 dark:text-brand-200">
+              Save will update this long-term opportunity via API.
+            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <label className="text-sm text-gray-700 dark:text-gray-300">
+                Status
+                <select
+                  value={updateStatus}
+                  onChange={(e) => setUpdateStatus(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                >
+                  {[
+                    "REQUESTED",
+                    "SCHEDULE_PROPOSED",
+                    "CHANGE_REQUESTED",
+                    "SCHEDULE_CONFIRMED",
+                    "PAYMENT_COMPLETED",
+                    "IN_PROGRESS",
+                  ].map((status) => (
+                    <option key={status} value={status}>
+                      {status}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-sm text-gray-700 dark:text-gray-300">
+                Amount
+                <input
+                  type="text"
+                  value={updateAmount}
+                  readOnly
+                  className="mt-1 w-full rounded-lg border border-gray-300 bg-gray-100 px-3 py-2 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-800/70 dark:text-gray-300"
+                />
+              </label>
+              <label className="text-sm text-gray-700 dark:text-gray-300">
+                Preferred start time
+                <input
+                  type="text"
+                  value={updatePreferredStartTime}
+                  readOnly
+                  className="mt-1 w-full rounded-lg border border-gray-300 bg-gray-100 px-3 py-2 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-800/70 dark:text-gray-300"
+                />
+              </label>
+              <label className="text-sm text-gray-700 dark:text-gray-300">
+                Shift duration (hours)
+                <input
+                  type="number"
+                  value={updateShiftDurationHours}
+                  readOnly
+                  className="mt-1 w-full rounded-lg border border-gray-300 bg-gray-100 px-3 py-2 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-800/70 dark:text-gray-300"
+                />
+              </label>
+              <label className="text-sm text-gray-700 dark:text-gray-300">
+                Start date
+                <input
+                  type="date"
+                  value={updateStartDate}
+                  readOnly
+                  className="mt-1 w-full rounded-lg border border-gray-300 bg-gray-100 px-3 py-2 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-800/70 dark:text-gray-300"
+                />
+              </label>
+              <label className="text-sm text-gray-700 dark:text-gray-300">
+                End date
+                <input
+                  type="date"
+                  value={updateEndDate}
+                  readOnly
+                  className="mt-1 w-full rounded-lg border border-gray-300 bg-gray-100 px-3 py-2 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-800/70 dark:text-gray-300"
+                />
+              </label>
+            </div>
+            {updateError ? (
+              <p className="text-sm text-red-600 dark:text-red-400">{updateError}</p>
+            ) : null}
+            <div className="flex items-center justify-end gap-2 border-t border-gray-200 pt-3 dark:border-gray-800">
+              <button
+                type="button"
+                onClick={closeUpdate}
+                disabled={updateSaving}
+                className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={updateSaving}
+                className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+              >
+                {updateSaving ? "Saving..." : "Save"}
+              </button>
+            </div>
+          </form>
+        ) : null}
+      </Modal>
     </>
   );
 }

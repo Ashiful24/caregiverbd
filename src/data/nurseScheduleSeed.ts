@@ -29,6 +29,7 @@ export type ScheduleEventRecord = {
   start: string;
   end: string;
   type: ScheduleEventType;
+  scheduleSlotId?: number;
 };
 
 const NURSES: NurseRecord[] = [

@@ -15,6 +15,7 @@ type Props = {
   events: ScheduleEventRecord[];
   dayInRange: (day: Date) => boolean;
   onSelectHour: (day: Date, hour24: number) => void;
+  onEventClick: (event: ScheduleEventRecord) => void;
 };
 
 function eventsForDay(events: ScheduleEventRecord[], d: Date): ScheduleEventRecord[] {
@@ -47,7 +48,13 @@ function layoutEvent(day: Date, e: ScheduleEventRecord) {
 const cellBorder = "border-b border-r border-gray-300 dark:border-gray-600";
 const timeCellClass = `${cellBorder} box-border flex items-start justify-end bg-white pr-2 pt-0.5 text-right text-[11px] text-gray-400 dark:bg-gray-900/40 dark:text-gray-500`;
 
-export function ScheduleDayView({ day, events, dayInRange, onSelectHour }: Props) {
+export function ScheduleDayView({
+  day,
+  events,
+  dayInRange,
+  onSelectHour,
+  onEventClick,
+}: Props) {
   const hours = Array.from({ length: HOUR_COUNT }, (_, i) => START_HOUR + i);
   const dayEvents = eventsForDay(events, day);
   const inRange = dayInRange(day);
@@ -102,8 +109,17 @@ export function ScheduleDayView({ day, events, dayInRange, onSelectHour }: Props
                   end.getHours() === 0 && end > start ? new Date(end.getTime() - 60_000) : end;
                 return (
                   <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => onEventClick(e)}
+                    onKeyDown={(ev) => {
+                      if (ev.key === "Enter" || ev.key === " ") {
+                        ev.preventDefault();
+                        onEventClick(e);
+                      }
+                    }}
                     key={e.id}
-                    className={`absolute left-2 right-3 overflow-hidden rounded-lg border px-2 py-1.5 shadow-sm sm:left-3 sm:right-4 ${eventTypeClasses(e.type)}`}
+                    className={`pointer-events-auto absolute left-2 right-3 overflow-hidden rounded-lg border px-2 py-1.5 shadow-sm sm:left-3 sm:right-4 cursor-pointer ${eventTypeClasses(e.type)}`}
                     style={{
                       top: `${layout.topPct}%`,
                       height: `${layout.heightPct}%`,

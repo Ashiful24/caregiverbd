@@ -22,6 +22,7 @@ type Props = {
   events: ScheduleEventRecord[];
   dayInRange: (day: Date) => boolean;
   onSelectHour: (day: Date, hour24: number) => void;
+  onEventClick: (event: ScheduleEventRecord) => void;
 };
 
 function eventsForDay(events: ScheduleEventRecord[], day: Date): ScheduleEventRecord[] {
@@ -54,7 +55,13 @@ function layoutEvent(day: Date, e: ScheduleEventRecord) {
 const cellBorder = "border-b border-r border-gray-300 dark:border-gray-600";
 const timeCellClass = `${cellBorder} box-border flex items-start justify-end bg-white pr-2 pt-0.5 text-right text-[10px] text-gray-400 dark:bg-gray-900/40 dark:text-gray-500`;
 
-export function ScheduleWeekView({ weekAnchor, events, dayInRange, onSelectHour }: Props) {
+export function ScheduleWeekView({
+  weekAnchor,
+  events,
+  dayInRange,
+  onSelectHour,
+  onEventClick,
+}: Props) {
   const ws = startOfWeek(weekAnchor, { weekStartsOn: 1 });
   const we = endOfWeek(weekAnchor, { weekStartsOn: 1 });
   const days = eachDayOfInterval({ start: ws, end: we });
@@ -145,8 +152,17 @@ export function ScheduleWeekView({ weekAnchor, events, dayInRange, onSelectHour 
                       end.getHours() === 0 && end > start ? new Date(end.getTime() - 60_000) : end;
                     return (
                       <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => onEventClick(e)}
+                        onKeyDown={(ev) => {
+                          if (ev.key === "Enter" || ev.key === " ") {
+                            ev.preventDefault();
+                            onEventClick(e);
+                          }
+                        }}
                         key={e.id}
-                        className={`absolute left-0.5 right-0.5 overflow-hidden rounded-md border px-1 py-0.5 text-[10px] leading-tight shadow-sm sm:left-1 sm:right-1 sm:text-xs ${eventTypeClasses(e.type)}`}
+                        className={`pointer-events-auto absolute left-0.5 right-0.5 overflow-hidden rounded-md border px-1 py-0.5 text-[10px] leading-tight shadow-sm sm:left-1 sm:right-1 sm:text-xs cursor-pointer ${eventTypeClasses(e.type)}`}
                         style={{
                           top: `${layout.topPct}%`,
                           height: `${layout.heightPct}%`,

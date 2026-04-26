@@ -20,6 +20,7 @@ type Props = {
   events: ScheduleEventRecord[];
   dayInRange: (day: Date) => boolean;
   onSelectDay: (day: Date) => void;
+  onEventClick: (event: ScheduleEventRecord) => void;
 };
 
 function eventsForDay(events: ScheduleEventRecord[], day: Date): ScheduleEventRecord[] {
@@ -29,7 +30,13 @@ function eventsForDay(events: ScheduleEventRecord[], day: Date): ScheduleEventRe
   });
 }
 
-export function ScheduleMonthView({ visibleMonth, events, dayInRange, onSelectDay }: Props) {
+export function ScheduleMonthView({
+  visibleMonth,
+  events,
+  dayInRange,
+  onSelectDay,
+  onEventClick,
+}: Props) {
   const monthStart = startOfMonth(visibleMonth);
   const monthEnd = endOfMonth(visibleMonth);
   const gridStart = startOfWeek(monthStart, { weekStartsOn: 1 });
@@ -97,9 +104,21 @@ export function ScheduleMonthView({ visibleMonth, events, dayInRange, onSelectDa
                   {show.map((e) => (
                     <div
                       key={e.id}
-                      onClick={(ev) => ev.stopPropagation()}
+                      role="button"
+                      tabIndex={0}
+                      onClick={(ev) => {
+                        ev.stopPropagation();
+                        onEventClick(e);
+                      }}
+                      onKeyDown={(ev) => {
+                        if (ev.key === "Enter" || ev.key === " ") {
+                          ev.preventDefault();
+                          ev.stopPropagation();
+                          onEventClick(e);
+                        }
+                      }}
                       title={`${e.title} (${format(parseEventRange(e).start, "HH:mm")}–${format(parseEventRange(e).end, "HH:mm")})`}
-                      className={`truncate rounded px-1.5 py-0.5 text-[10px] font-medium leading-tight sm:text-xs ${eventTypeClasses(e.type)}`}
+                      className={`truncate rounded px-1.5 py-0.5 text-[10px] font-medium leading-tight sm:text-xs cursor-pointer ${eventTypeClasses(e.type)}`}
                     >
                       <span className={`mr-1 inline-block size-1.5 rounded-full align-middle ${eventTypeDotClass(e.type)}`} />
                       {e.title}

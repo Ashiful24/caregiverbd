@@ -1348,6 +1348,21 @@ export const providersApi = {
       signal: config?.signal,
     });
   },
+  /** GET /v1/providers/:providerId/availability?date=YYYY-MM-DD[&time=HH:mm&shiftDuration=n] */
+  getAvailability: async (
+    providerId: number,
+    date: string,
+    options?: { time?: string; shiftDuration?: number },
+    config?: { signal?: AbortSignal }
+  ) => {
+    const params: Record<string, string | number> = { date };
+    if (options?.time) params.time = options.time;
+    if (options?.shiftDuration != null) params.shiftDuration = options.shiftDuration;
+    return httpService.get<unknown>(`/providers/${providerId}/availability`, {
+      params,
+      signal: config?.signal,
+    });
+  },
   /** PATCH /v1/admin/providers/:providerId/consultation-services - Update which services this provider offers (excludedServiceIds = not offered). */
   updateConsultationServices: async (
     providerId: number,
@@ -1825,6 +1840,9 @@ export interface LongTermOpportunityListItem {
   patientName?: string | null;
   location?: string | null;
   amount?: string | null;
+  preferredStartTime?: string | null;
+  shiftDurationHours?: number | null;
+  timeRange?: string | null;
   startDate?: string | null;
   endDate?: string | null;
   assignedNursesLabel?: string | null;
@@ -1835,6 +1853,35 @@ function strOpt(v: unknown): string | null {
   if (v === null || v === undefined) return null;
   const s = String(v).trim();
   return s || null;
+}
+
+function computeTimeRange(preferredStartTime: string | null, shiftDurationHours: number | null): string | null {
+  if (!preferredStartTime || !Number.isFinite(shiftDurationHours) || (shiftDurationHours ?? 0) <= 0) {
+    return null;
+  }
+  const durationHours = Number(shiftDurationHours);
+  const normalized = preferredStartTime.trim().toUpperCase();
+  const m = normalized.match(/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)$/);
+  if (!m) return null;
+  let hour = Number(m[1]);
+  const minute = Number(m[2] ?? "0");
+  const meridiem = m[3];
+  if (!Number.isFinite(hour) || hour < 1 || hour > 12 || minute < 0 || minute > 59) return null;
+  if (meridiem === "AM") {
+    if (hour === 12) hour = 0;
+  } else if (hour !== 12) {
+    hour += 12;
+  }
+  const startMinutes = hour * 60 + minute;
+  const endMinutes = (startMinutes + Math.round(durationHours * 60)) % (24 * 60);
+  const fmt = (mins: number) => {
+    const h24 = Math.floor(mins / 60);
+    const mm = mins % 60;
+    const isPm = h24 >= 12;
+    const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+    return `${h12}:${String(mm).padStart(2, "0")} ${isPm ? "PM" : "AM"}`;
+  };
+  return `${fmt(startMinutes)} - ${fmt(endMinutes)}`;
 }
 
 /** Map one row from GET /admin/long-term-opportunities (handles nested patient/user and snake_case). */
@@ -1873,6 +1920,11 @@ export function normalizeLongTermOpportunityRow(raw: unknown): LongTermOpportuni
 
   const startDate = strOpt(o.startDate ?? o.start_date ?? o.requestedStartDate ?? o.windowStart);
   const endDate = strOpt(o.endDate ?? o.end_date ?? o.requestedEndDate ?? o.windowEnd);
+  const preferredStartTime = strOpt(o.preferredStartTime ?? o.preferred_start_time);
+  const shiftDurationHoursRaw = o.shiftDurationHours ?? o.shift_duration_hours;
+  const shiftDurationHours =
+    shiftDurationHoursRaw == null ? null : Number.isFinite(Number(shiftDurationHoursRaw)) ? Number(shiftDurationHoursRaw) : null;
+  const timeRange = computeTimeRange(preferredStartTime, shiftDurationHours);
 
   let assignedNursesLabel: string | null = null;
   const an = o.assignedNurses ?? o.assigned_nurses;
@@ -1904,6 +1956,9 @@ export function normalizeLongTermOpportunityRow(raw: unknown): LongTermOpportuni
     patientName,
     location,
     amount: strOpt(o.fee ?? o.amount ?? o.totalFee ?? o.total_fee),
+    preferredStartTime,
+    shiftDurationHours,
+    timeRange,
     startDate,
     endDate,
     assignedNursesLabel,
@@ -1983,6 +2038,54 @@ export const adminLongTermOpportunitiesApi = {
     return httpService.get<unknown>(`/admin/long-term-opportunities/${id}`, {
       signal: config?.signal,
     });
+  },
+
+  /** GET /v1/long-term-opportunities/schedule-details/:id — opportunity + schedule detail payload. */
+  getScheduleDetails: async (id: string | number, config?: { signal?: AbortSignal }) => {
+    return httpService.get<unknown>(`/long-term-opportunities/schedule-details/${id}`, {
+      signal: config?.signal,
+    });
+  },
+
+  /**
+   * POST /v1/long-term-opportunities/:id/provider-schedule
+   * Create provider schedule slot(s) for a long-term opportunity.
+   */
+  createProviderSchedule: async (
+    id: string | number,
+    body: {
+      slots: Array<{
+        providerId: number;
+        date: string; // YYYY-MM-DD
+        startTime: string; // HH:mm
+        endTime: string; // HH:mm
+      }>;
+    }
+  ) => {
+    return httpService.post<unknown>(`/long-term-opportunities/${id}/provider-schedule`, body);
+  },
+
+  /**
+   * PATCH /v1/long-term-opportunities/:id/schedule-reject/:scheduleSlotId
+   * Remove/reject a scheduled slot from long-term opportunity calendar.
+   */
+  rejectScheduleSlot: async (
+    id: string | number,
+    scheduleSlotId: string | number,
+    body: { reason: string }
+  ) => {
+    return httpService.patch<unknown>(
+      `/long-term-opportunities/${id}/schedule-reject/${scheduleSlotId}`,
+      body
+    );
+  },
+
+  /** PATCH /v1/long-term-opportunities/:id — Update long-term opportunity. */
+  updateOpportunity: async (
+    id: string | number,
+    body: Record<string, unknown>
+  ) => {
+    return httpService.patch<unknown>(`/long-term-opportunities/${id}`, body);
   },
 };
 
