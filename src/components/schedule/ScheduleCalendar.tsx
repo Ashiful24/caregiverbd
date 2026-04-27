@@ -97,6 +97,58 @@ function eventOverlapsNurse(
   });
 }
 
+function extractCreatedScheduleMeta(data: unknown): {
+  scheduleSlotId?: number;
+  longTermCalendarSlotId?: string;
+} {
+  if (!data || typeof data !== "object") return {};
+  const root = data as Record<string, unknown>;
+  const candidates: unknown[] = [];
+  const pushArray = (v: unknown) => {
+    if (Array.isArray(v)) candidates.push(...v);
+  };
+  pushArray(root.schedule);
+  pushArray(root.slots);
+  pushArray(root.data);
+  if (root.data && typeof root.data === "object") {
+    const d = root.data as Record<string, unknown>;
+    pushArray(d.schedule);
+    pushArray(d.slots);
+  }
+  if (candidates.length === 0) candidates.push(root);
+
+  for (const c of candidates) {
+    if (!c || typeof c !== "object") continue;
+    const o = c as Record<string, unknown>;
+    const providerSchedule =
+      o.providerSchedule && typeof o.providerSchedule === "object"
+        ? (o.providerSchedule as Record<string, unknown>)
+        : null;
+    const serviceRequest =
+      o.serviceRequest && typeof o.serviceRequest === "object"
+        ? (o.serviceRequest as Record<string, unknown>)
+        : null;
+    const scheduleSlotIdRaw =
+      serviceRequest?.scheduleSlotId ??
+      serviceRequest?.schedule_slot_id ??
+      providerSchedule?.id ??
+      o.scheduleSlotId ??
+      o.id;
+    const scheduleSlotId = Number(scheduleSlotIdRaw);
+    const longTermCalendarSlotId = String(
+      serviceRequest?.longTermCalendarSlotId ?? serviceRequest?.long_term_calendar_slot_id ?? ""
+    ).trim();
+    if ((Number.isFinite(scheduleSlotId) && scheduleSlotId > 0) || longTermCalendarSlotId) {
+      return {
+        scheduleSlotId:
+          Number.isFinite(scheduleSlotId) && scheduleSlotId > 0 ? scheduleSlotId : undefined,
+        longTermCalendarSlotId: longTermCalendarSlotId || undefined,
+      };
+    }
+  }
+  return {};
+}
+
 export function ScheduleCalendar({
   requestId,
   title,
@@ -374,7 +426,7 @@ export function ScheduleCalendar({
     setSavingEvent(true);
     setFormError(null);
     try {
-      await adminLongTermOpportunitiesApi.createProviderSchedule(requestId, {
+      const createRes = await adminLongTermOpportunitiesApi.createProviderSchedule(requestId, {
         slots: [
           {
             providerId: nurse.id,
@@ -384,9 +436,10 @@ export function ScheduleCalendar({
           },
         ],
       });
+      const created = extractCreatedScheduleMeta(createRes.data);
 
       const newEvent: ScheduleEventRecord = {
-        id: `evt-${requestId}-${Date.now()}`,
+        id: created.longTermCalendarSlotId ?? `evt-${requestId}-${Date.now()}`,
         requestId,
         nurseId,
         nurseName: providerLabel(nurse),
@@ -394,6 +447,7 @@ export function ScheduleCalendar({
         start: start.toISOString(),
         end: end.toISOString(),
         type: "visit",
+        scheduleSlotId: created.scheduleSlotId,
       };
       setEvents((prev) => [...prev, newEvent]);
       closeModal();
