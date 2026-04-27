@@ -671,6 +671,10 @@ export default function NurseScheduleList() {
                     "SCHEDULE_CONFIRMED",
                     "PAYMENT_COMPLETED",
                     "IN_PROGRESS",
+                    "COMPLETED",
+                    "CANCELLED",
+                    "EXPIRED",
+                    "PAYMENT_PENDING",
                   ].map((status) => (
                     <option key={status} value={status}>
                       {status}

@@ -49,6 +49,17 @@ type ModalDraft = {
   endHour: number;
 };
 
+function parseRequestBoundary(value: string, mode: "start" | "end"): Date {
+  const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value.trim());
+  const d = new Date(value);
+  if (!Number.isFinite(d.getTime())) return new Date();
+  if (dateOnly) {
+    if (mode === "start") d.setHours(0, 0, 0, 0);
+    else d.setHours(23, 59, 59, 999);
+  }
+  return d;
+}
+
 function combineDateHour(dateStr: string, hour: number): Date {
   const [y, m, d] = dateStr.split("-").map(Number);
   return new Date(y, m - 1, d, hour, 0, 0, 0);
@@ -121,8 +132,14 @@ export function ScheduleCalendar({
   const [removeError, setRemoveError] = useState<string | null>(null);
   const isScheduleModalOpen = modalDraft != null;
 
-  const requestStart = useMemo(() => new Date(requestStartDate), [requestStartDate]);
-  const requestEnd = useMemo(() => new Date(requestEndDate), [requestEndDate]);
+  const requestStart = useMemo(
+    () => parseRequestBoundary(requestStartDate, "start"),
+    [requestStartDate]
+  );
+  const requestEnd = useMemo(
+    () => parseRequestBoundary(requestEndDate, "end"),
+    [requestEndDate]
+  );
 
   useEffect(() => {
     setEvents(initialEvents);
