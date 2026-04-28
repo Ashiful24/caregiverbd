@@ -98,6 +98,33 @@ function extractOpportunityPayload(data: unknown): Record<string, unknown> | nul
   return null;
 }
 
+function extractAssignedProviderNames(data: unknown): string | null {
+  if (!data || typeof data !== "object") return null;
+  const o = data as Record<string, unknown>;
+  const candidates: unknown[] = [];
+  const pushArray = (v: unknown) => {
+    if (Array.isArray(v)) candidates.push(...v);
+  };
+  pushArray(o.schedule);
+  if (o.data && typeof o.data === "object") {
+    const d = o.data as Record<string, unknown>;
+    pushArray(d.schedule);
+  }
+  const names = new Set<string>();
+  for (const row of candidates) {
+    if (!row || typeof row !== "object") continue;
+    const r = row as Record<string, unknown>;
+    const ps =
+      r.providerSchedule && typeof r.providerSchedule === "object"
+        ? (r.providerSchedule as Record<string, unknown>)
+        : null;
+    const providerName = String(ps?.providerName ?? ps?.provider_name ?? "").trim();
+    if (providerName) names.add(providerName);
+  }
+  if (names.size === 0) return null;
+  return Array.from(names).join(", ");
+}
+
 export default function NurseScheduleList() {
   const navigate = useNavigate();
   const [items, setItems] = useState<LongTermOpportunityListItem[]>([]);
@@ -183,8 +210,13 @@ export default function NurseScheduleList() {
   const openDetails = async (request: LongTermOpportunityListItem) => {
     setActionLoadingId(request.id);
     try {
-      const { normalized } = await fetchScheduleDetailsOpportunity(request.id);
-      setDetailsItem(normalized.id > 0 ? normalized : request);
+      const { normalized, raw } = await fetchScheduleDetailsOpportunity(request.id);
+      const base = normalized.id > 0 ? normalized : request;
+      const assignedFromSchedule = extractAssignedProviderNames(raw);
+      setDetailsItem({
+        ...base,
+        assignedNursesLabel: assignedFromSchedule ?? base.assignedNursesLabel ?? null,
+      });
     } catch {
       setDetailsItem(request);
     } finally {
@@ -386,12 +418,6 @@ export default function NurseScheduleList() {
                         <dt className="text-gray-500 dark:text-gray-400">Requested window</dt>
                         <dd className="text-gray-800 dark:text-gray-200">{formatRequestWindow(request)}</dd>
                       </div>
-                      <div className="flex justify-between gap-2">
-                        <dt className="text-gray-500 dark:text-gray-400">Assigned nurses</dt>
-                        <dd className="text-right text-gray-800 dark:text-gray-200">
-                          {request.assignedNursesLabel ?? "—"}
-                        </dd>
-                      </div>
                     </dl>
                   </div>
                 ))}
@@ -445,12 +471,6 @@ export default function NurseScheduleList() {
                       </TableCell>
                       <TableCell
                         isHeader
-                        className="py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
-                      >
-                        Assigned nurses
-                      </TableCell>
-                      <TableCell
-                        isHeader
                         className="w-[120px] py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
                       >
                         Actions
@@ -480,9 +500,6 @@ export default function NurseScheduleList() {
                         </TableCell>
                         <TableCell className="py-3 text-theme-sm text-gray-600 dark:text-gray-400">
                           {formatRequestWindow(request)}
-                        </TableCell>
-                        <TableCell className="py-3 text-theme-sm text-gray-600 dark:text-gray-400">
-                          {request.assignedNursesLabel ?? "—"}
                         </TableCell>
                         <TableCell className="py-3 text-right">
                           <div className="inline-flex items-center gap-1">
@@ -671,6 +688,10 @@ export default function NurseScheduleList() {
                     "SCHEDULE_CONFIRMED",
                     "PAYMENT_COMPLETED",
                     "IN_PROGRESS",
+                    "COMPLETED",
+                    "CANCELLED",
+                    "EXPIRED",
+                    "PAYMENT_PENDING",
                   ].map((status) => (
                     <option key={status} value={status}>
                       {status}

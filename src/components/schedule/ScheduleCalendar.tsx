@@ -49,6 +49,17 @@ type ModalDraft = {
   endHour: number;
 };
 
+function parseRequestBoundary(value: string, mode: "start" | "end"): Date {
+  const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value.trim());
+  const d = new Date(value);
+  if (!Number.isFinite(d.getTime())) return new Date();
+  if (dateOnly) {
+    if (mode === "start") d.setHours(0, 0, 0, 0);
+    else d.setHours(23, 59, 59, 999);
+  }
+  return d;
+}
+
 function combineDateHour(dateStr: string, hour: number): Date {
   const [y, m, d] = dateStr.split("-").map(Number);
   return new Date(y, m - 1, d, hour, 0, 0, 0);
@@ -86,6 +97,58 @@ function eventOverlapsNurse(
   });
 }
 
+function extractCreatedScheduleMeta(data: unknown): {
+  scheduleSlotId?: number;
+  longTermCalendarSlotId?: string;
+} {
+  if (!data || typeof data !== "object") return {};
+  const root = data as Record<string, unknown>;
+  const candidates: unknown[] = [];
+  const pushArray = (v: unknown) => {
+    if (Array.isArray(v)) candidates.push(...v);
+  };
+  pushArray(root.schedule);
+  pushArray(root.slots);
+  pushArray(root.data);
+  if (root.data && typeof root.data === "object") {
+    const d = root.data as Record<string, unknown>;
+    pushArray(d.schedule);
+    pushArray(d.slots);
+  }
+  if (candidates.length === 0) candidates.push(root);
+
+  for (const c of candidates) {
+    if (!c || typeof c !== "object") continue;
+    const o = c as Record<string, unknown>;
+    const providerSchedule =
+      o.providerSchedule && typeof o.providerSchedule === "object"
+        ? (o.providerSchedule as Record<string, unknown>)
+        : null;
+    const serviceRequest =
+      o.serviceRequest && typeof o.serviceRequest === "object"
+        ? (o.serviceRequest as Record<string, unknown>)
+        : null;
+    const scheduleSlotIdRaw =
+      serviceRequest?.scheduleSlotId ??
+      serviceRequest?.schedule_slot_id ??
+      providerSchedule?.id ??
+      o.scheduleSlotId ??
+      o.id;
+    const scheduleSlotId = Number(scheduleSlotIdRaw);
+    const longTermCalendarSlotId = String(
+      serviceRequest?.longTermCalendarSlotId ?? serviceRequest?.long_term_calendar_slot_id ?? ""
+    ).trim();
+    if ((Number.isFinite(scheduleSlotId) && scheduleSlotId > 0) || longTermCalendarSlotId) {
+      return {
+        scheduleSlotId:
+          Number.isFinite(scheduleSlotId) && scheduleSlotId > 0 ? scheduleSlotId : undefined,
+        longTermCalendarSlotId: longTermCalendarSlotId || undefined,
+      };
+    }
+  }
+  return {};
+}
+
 export function ScheduleCalendar({
   requestId,
   title,
@@ -121,8 +184,14 @@ export function ScheduleCalendar({
   const [removeError, setRemoveError] = useState<string | null>(null);
   const isScheduleModalOpen = modalDraft != null;
 
-  const requestStart = useMemo(() => new Date(requestStartDate), [requestStartDate]);
-  const requestEnd = useMemo(() => new Date(requestEndDate), [requestEndDate]);
+  const requestStart = useMemo(
+    () => parseRequestBoundary(requestStartDate, "start"),
+    [requestStartDate]
+  );
+  const requestEnd = useMemo(
+    () => parseRequestBoundary(requestEndDate, "end"),
+    [requestEndDate]
+  );
 
   useEffect(() => {
     setEvents(initialEvents);
@@ -357,7 +426,7 @@ export function ScheduleCalendar({
     setSavingEvent(true);
     setFormError(null);
     try {
-      await adminLongTermOpportunitiesApi.createProviderSchedule(requestId, {
+      const createRes = await adminLongTermOpportunitiesApi.createProviderSchedule(requestId, {
         slots: [
           {
             providerId: nurse.id,
@@ -367,9 +436,10 @@ export function ScheduleCalendar({
           },
         ],
       });
+      const created = extractCreatedScheduleMeta(createRes.data);
 
       const newEvent: ScheduleEventRecord = {
-        id: `evt-${requestId}-${Date.now()}`,
+        id: created.longTermCalendarSlotId ?? `evt-${requestId}-${Date.now()}`,
         requestId,
         nurseId,
         nurseName: providerLabel(nurse),
@@ -377,6 +447,7 @@ export function ScheduleCalendar({
         start: start.toISOString(),
         end: end.toISOString(),
         type: "visit",
+        scheduleSlotId: created.scheduleSlotId,
       };
       setEvents((prev) => [...prev, newEvent]);
       closeModal();
