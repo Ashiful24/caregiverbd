@@ -13,7 +13,7 @@ services:
         VITE_FIREBASE_MESSAGING_SENDER_ID: ${VITE_FIREBASE_MESSAGING_SENDER_ID:-}
         VITE_FIREBASE_APP_ID: ${VITE_FIREBASE_APP_ID:-}
         VITE_FIREBASE_VAPID_KEY: ${VITE_FIREBASE_VAPID_KEY:-}
-    container_name: hope-frontend
+    container_name: hope-frontend-dev
     ports:
       - "${APP_PORT:-8085}:80"
     restart: unless-stopped
