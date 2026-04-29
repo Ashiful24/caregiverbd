@@ -26,6 +26,7 @@ export type ScheduleEventRecord = {
   nurseId: string;
   nurseName: string;
   title: string;
+  feeLabel?: string;
   start: string;
   end: string;
   type: ScheduleEventType;

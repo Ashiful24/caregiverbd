@@ -117,11 +117,14 @@ export function ScheduleMonthView({
                           onEventClick(e);
                         }
                       }}
-                      title={`${e.title} (${format(parseEventRange(e).start, "HH:mm")}–${format(parseEventRange(e).end, "HH:mm")})`}
-                      className={`truncate rounded px-1.5 py-0.5 text-[10px] font-medium leading-tight sm:text-xs cursor-pointer ${eventTypeClasses(e.type)}`}
+                      title={`${e.title}${e.feeLabel ? ` | Fee: ${e.feeLabel}` : ""} (${format(parseEventRange(e).start, "HH:mm")}–${format(parseEventRange(e).end, "HH:mm")})`}
+                      className={`rounded px-1.5 py-0.5 text-[10px] font-medium leading-tight sm:text-xs cursor-pointer ${eventTypeClasses(e.type)}`}
                     >
-                      <span className={`mr-1 inline-block size-1.5 rounded-full align-middle ${eventTypeDotClass(e.type)}`} />
-                      {e.title}
+                      <div className="truncate">
+                        <span className={`mr-1 inline-block size-1.5 rounded-full align-middle ${eventTypeDotClass(e.type)}`} />
+                        {e.title}
+                      </div>
+                      {e.feeLabel ? <div className="truncate">Fee: {e.feeLabel}</div> : null}
                     </div>
                   ))}
                   {more > 0 && (

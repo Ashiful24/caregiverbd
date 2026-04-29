@@ -12,8 +12,8 @@ import { isValidEmail, validateBangladeshiPhone } from "../../utils/phoneValidat
 export default function SignInForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [isChecked, setIsChecked] = useState(false);
-  const [emailOrPhone, setEmailOrPhone] = useState("admin@hope.com");
-  const [password, setPassword] = useState("password123");
+  const [emailOrPhone, setEmailOrPhone] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);

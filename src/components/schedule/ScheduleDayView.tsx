@@ -127,6 +127,9 @@ export function ScheduleDayView({
                     }}
                   >
                     <p className="font-semibold text-gray-900 dark:text-gray-100">{e.title}</p>
+                    {e.feeLabel ? (
+                      <p className="text-xs text-gray-600 dark:text-gray-300">Fee: {e.feeLabel}</p>
+                    ) : null}
                     <p className="text-xs text-gray-600 dark:text-gray-300">
                       {format(start, "h a")} – {format(endDisplay, "h a")}
                     </p>

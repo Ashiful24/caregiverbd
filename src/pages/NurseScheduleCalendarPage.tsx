@@ -78,6 +78,20 @@ function buildEventsFromScheduleDetails(
     return `${date}T${hhmm}:00`;
   };
 
+  const formatFee = (feeRaw: unknown): string | null => {
+    const raw = String(feeRaw ?? "").trim();
+    if (!raw) return null;
+    const amount = Number(raw);
+    if (Number.isFinite(amount)) {
+      const formatted = amount.toLocaleString(undefined, {
+        minimumFractionDigits: amount % 1 === 0 ? 0 : 2,
+        maximumFractionDigits: 2,
+      });
+      return `${formatted} ৳`;
+    }
+    return `${raw} ৳`;
+  };
+
   const slotsRaw = collectSlots(root);
   if (!slotsRaw.length) return [];
   const events = slotsRaw
@@ -152,6 +166,7 @@ function buildEventsFromScheduleDetails(
             s.name ??
             "Nurse"
         ).trim() || "Nurse";
+      const feeLabel = formatFee(serviceRequest?.fee ?? raw.fee);
       const event: ScheduleEventRecord = {
         id: String(
           serviceRequest?.longTermCalendarSlotId ??
@@ -163,6 +178,7 @@ function buildEventsFromScheduleDetails(
         nurseId: providerId,
         nurseName: providerName,
         title: `${providerName.split(" ")[0]} - Visit`,
+        feeLabel: feeLabel ?? undefined,
         start: startIso,
         end: endIso,
         type: "visit",
