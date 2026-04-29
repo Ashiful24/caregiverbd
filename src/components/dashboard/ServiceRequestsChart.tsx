@@ -1,16 +1,9 @@
 import Chart from "react-apexcharts";
+import { useTranslation } from "react-i18next";
 import { ApexOptions } from "apexcharts";
 import type { DashboardServiceRequestsSummary } from "../../services/api";
 
 const STATUS_ORDER = ["PENDING", "ACCEPTED", "IN_PROGRESS", "COMPLETED", "CANCELLED", "REJECTED"] as const;
-const STATUS_LABELS: Record<string, string> = {
-  PENDING: "Pending",
-  ACCEPTED: "Accepted",
-  IN_PROGRESS: "In progress",
-  COMPLETED: "Completed",
-  CANCELLED: "Cancelled",
-  REJECTED: "Rejected",
-};
 const STATUS_COLORS = [
   "#f59e0b", // amber - PENDING
   "#10b981", // emerald - ACCEPTED
@@ -26,8 +19,26 @@ export interface ServiceRequestsChartProps {
 }
 
 export function ServiceRequestsChart({ summary, loading }: ServiceRequestsChartProps) {
+  const { t } = useTranslation();
   const series = STATUS_ORDER.map((s) => summary?.[s] ?? 0);
-  const labels = STATUS_ORDER.map((s) => STATUS_LABELS[s] ?? s);
+  const labels = STATUS_ORDER.map((s) => {
+    switch (s) {
+      case "PENDING":
+        return t("common.status.pending");
+      case "ACCEPTED":
+        return t("common.status.accepted");
+      case "IN_PROGRESS":
+        return t("common.status.inProgress");
+      case "COMPLETED":
+        return t("common.status.completed");
+      case "CANCELLED":
+        return t("common.status.cancelled");
+      case "REJECTED":
+        return t("common.status.rejected");
+      default:
+        return s;
+    }
+  });
   const total = series.reduce((a, b) => a + b, 0);
 
   const options: ApexOptions = {
@@ -51,7 +62,7 @@ export function ServiceRequestsChart({ summary, loading }: ServiceRequestsChartP
             show: true,
             name: { show: true },
             value: { show: true, fontSize: "1.5rem" },
-            total: { show: true, label: "Total", formatter: () => total.toString() },
+            total: { show: true, label: t("dashboard.total"), formatter: () => total.toString() },
           },
         },
       },
@@ -65,7 +76,7 @@ export function ServiceRequestsChart({ summary, loading }: ServiceRequestsChartP
     return (
       <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800/50 md:p-6">
         <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-          Service requests by status
+          {t("dashboard.serviceRequestsByStatus")}
         </h3>
         <div className="mt-4 flex h-64 items-center justify-center rounded-lg bg-gray-100 dark:bg-gray-700/50 animate-pulse" />
       </div>
@@ -75,11 +86,11 @@ export function ServiceRequestsChart({ summary, loading }: ServiceRequestsChartP
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800/50 md:p-6">
       <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-        Service requests by status
+        {t("dashboard.serviceRequestsByStatus")}
       </h3>
       {total === 0 ? (
         <div className="mt-4 flex h-64 items-center justify-center rounded-lg border border-dashed border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 text-sm">
-          No service request data yet
+          {t("dashboard.noServiceRequestData")}
         </div>
       ) : (
         <div className="mt-4">

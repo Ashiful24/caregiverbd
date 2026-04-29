@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { format, isValid, parseISO } from "date-fns";
+import { useTranslation } from "react-i18next";
 import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import PageMeta from "../components/common/PageMeta";
 import { ActionsMenu } from "../components/common/ActionsMenu";
@@ -115,13 +116,12 @@ function mergeUserByIdIntoSupervisor(
   };
 }
 
-function statusBadge(status: SupervisorFullDetails["status"]) {
+function statusBadge(status: SupervisorFullDetails["status"], label: string) {
   const map = {
     ACTIVE: "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300",
     ON_LEAVE: "bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300",
     INACTIVE: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
   };
-  const label = status.replace("_", " ");
   return (
     <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${map[status]}`}>
       {label}
@@ -130,6 +130,7 @@ function statusBadge(status: SupervisorFullDetails["status"]) {
 }
 
 export default function SupervisorList() {
+  const { t } = useTranslation();
   const [supervisors, setSupervisors] = useState<SupervisorFullDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -155,13 +156,20 @@ export default function SupervisorList() {
       const message =
         err && typeof err === "object" && "message" in err
           ? String((err as { message: string }).message)
-          : "Failed to load supervisors.";
+          : t("supervisor.failedToLoad");
       setLoadError(message);
       setSupervisors([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
+
+  const statusText = (status: SupervisorFullDetails["status"]) => {
+    if (status === "ACTIVE") return t("common.status.active");
+    if (status === "ON_LEAVE") return t("common.status.onLeave");
+    if (status === "INACTIVE") return t("common.status.inactive");
+    return String(status).replace("_", " ");
+  };
 
   useEffect(() => {
     void fetchSupervisors();
@@ -227,8 +235,8 @@ export default function SupervisorList() {
 
   return (
     <>
-      <PageMeta title="Supervisors | Hope - BMQAS" description="Supervisor directory" />
-      <PageBreadcrumb pageTitle="Supervisors" />
+      <PageMeta title={t("supervisor.metaTitle")} description={t("supervisor.metaDescription")} />
+      <PageBreadcrumb pageTitle={t("supervisor.pageTitle")} />
       <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
         <div className="flex flex-col gap-4 border-b border-gray-200 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-6 dark:border-gray-800">
           <div className="flex items-start gap-3">
@@ -236,9 +244,9 @@ export default function SupervisorList() {
               <TaskIcon className="size-5" />
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">Supervisors</h3>
+              <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">{t("supervisor.heading")}</h3>
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                Field and regional supervisors .
+                {t("supervisor.subheading")}
               </p>
             </div>
           </div>
@@ -248,7 +256,7 @@ export default function SupervisorList() {
             className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 dark:bg-brand-600 dark:hover:bg-brand-500"
           >
             <PlusIcon className="size-4" />
-            Create supervisor
+            {t("supervisor.createSupervisor")}
           </button>
         </div>
 
@@ -259,11 +267,11 @@ export default function SupervisorList() {
             </div>
           )}
           {loading ? (
-            <div className="py-12 text-center text-sm text-gray-500 dark:text-gray-400">Loading supervisors…</div>
+            <div className="py-12 text-center text-sm text-gray-500 dark:text-gray-400">{t("supervisor.loadingSupervisors")}</div>
           ) : null}
           {!loading && supervisors.length === 0 && !loadError ? (
             <div className="py-12 text-center text-sm text-gray-500 dark:text-gray-400">
-              No supervisors found.
+              {t("supervisor.noSupervisorsFound")}
             </div>
           ) : null}
           {!loading && supervisors.length > 0 ? (
@@ -280,7 +288,7 @@ export default function SupervisorList() {
                     <p className="mt-0.5 break-words text-sm text-gray-500 dark:text-gray-400">{s.email}</p>
                   </div>
                   <div className="flex shrink-0 items-start gap-2">
-                    {statusBadge(s.status)}
+                    {statusBadge(s.status, statusText(s.status))}
                     <ActionsMenu
                       isOpen={openActionsId === s.id}
                       onClose={() => setOpenActionsId(null)}
@@ -297,7 +305,7 @@ export default function SupervisorList() {
                         }}
                         className="dark:hover:bg-gray-700 dark:text-gray-200"
                       >
-                        View
+                        {t("common.actions.view")}
                       </DropdownItem>
                       <DropdownItem
                         onMouseDown={(e) => {
@@ -307,7 +315,7 @@ export default function SupervisorList() {
                         }}
                         className="dark:hover:bg-gray-700 dark:text-gray-200"
                       >
-                        Edit
+                        {t("common.actions.edit")}
                       </DropdownItem>
                       <DropdownItem
                         onMouseDown={(e) => {
@@ -317,26 +325,26 @@ export default function SupervisorList() {
                         }}
                         className="dark:hover:bg-gray-700 dark:text-gray-200"
                       >
-                        Assign nurse
+                        {t("supervisor.assignNurse")}
                       </DropdownItem>
                     </ActionsMenu>
                   </div>
                 </div>
                 <dl className="mt-3 grid grid-cols-1 gap-2 text-sm">
                   <div className="flex justify-between gap-3">
-                    <dt className="shrink-0 text-gray-500 dark:text-gray-400">Phone</dt>
+                    <dt className="shrink-0 text-gray-500 dark:text-gray-400">{t("supervisor.phone")}</dt>
                     <dd className="min-w-0 break-words text-right text-gray-800 dark:text-gray-200">{s.phone}</dd>
                   </div>
                   <div className="flex justify-between gap-2">
-                    <dt className="text-gray-500 dark:text-gray-400">Region</dt>
+                    <dt className="text-gray-500 dark:text-gray-400">{t("supervisor.region")}</dt>
                     <dd className="text-gray-800 dark:text-gray-200">{s.region}</dd>
                   </div>
                   <div className="flex justify-between gap-2">
-                    <dt className="text-gray-500 dark:text-gray-400">Team size</dt>
+                    <dt className="text-gray-500 dark:text-gray-400">{t("supervisor.teamSize")}</dt>
                     <dd className="text-gray-800 dark:text-gray-200">{s.teamSize}</dd>
                   </div>
                   <div className="flex justify-between gap-2">
-                    <dt className="text-gray-500 dark:text-gray-400">Joined</dt>
+                    <dt className="text-gray-500 dark:text-gray-400">{t("supervisor.joined")}</dt>
                     <dd className="text-gray-800 dark:text-gray-200">{formatJoinedDate(s.joinedAt)}</dd>
                   </div>
                 </dl>
@@ -362,49 +370,49 @@ export default function SupervisorList() {
                     isHeader
                     className="py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
                   >
-                    Name
+                    {t("supervisor.name")}
                   </TableCell>
                   <TableCell
                     isHeader
                     className="py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
                   >
-                    Email
+                    {t("supervisor.email")}
                   </TableCell>
                   <TableCell
                     isHeader
                     className="py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
                   >
-                    Phone
+                    {t("supervisor.phone")}
                   </TableCell>
                   <TableCell
                     isHeader
                     className="py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
                   >
-                    Region
+                    {t("supervisor.region")}
                   </TableCell>
                   <TableCell
                     isHeader
                     className="py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
                   >
-                    Status
+                    {t("dashboard.status")}
                   </TableCell>
                   <TableCell
                     isHeader
                     className="py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
                   >
-                    Team
+                    {t("supervisor.team")}
                   </TableCell>
                   <TableCell
                     isHeader
                     className="py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
                   >
-                    Joined
+                    {t("supervisor.joined")}
                   </TableCell>
                   <TableCell
                     isHeader
                     className="w-[120px] py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
                   >
-                    Actions
+                    {t("supervisor.actions")}
                   </TableCell>
                 </TableRow>
               </TableHeader>
@@ -429,7 +437,7 @@ export default function SupervisorList() {
                     <TableCell className="min-w-0 py-3 align-top text-theme-sm text-gray-600 dark:text-gray-400">
                       {s.region}
                     </TableCell>
-                    <TableCell className="min-w-0 py-3 align-top">{statusBadge(s.status)}</TableCell>
+                    <TableCell className="min-w-0 py-3 align-top">{statusBadge(s.status, statusText(s.status))}</TableCell>
                     <TableCell className="min-w-0 py-3 align-top text-theme-sm text-gray-600 dark:text-gray-400">
                       {s.teamSize}
                     </TableCell>
@@ -453,7 +461,7 @@ export default function SupervisorList() {
                           }}
                           className="dark:hover:bg-gray-700 dark:text-gray-200"
                         >
-                          View
+                          {t("common.actions.view")}
                         </DropdownItem>
                         <DropdownItem
                           onMouseDown={(e) => {
@@ -463,7 +471,7 @@ export default function SupervisorList() {
                           }}
                           className="dark:hover:bg-gray-700 dark:text-gray-200"
                         >
-                          Edit
+                          {t("common.actions.edit")}
                         </DropdownItem>
                         <DropdownItem
                           onMouseDown={(e) => {
@@ -473,7 +481,7 @@ export default function SupervisorList() {
                           }}
                           className="dark:hover:bg-gray-700 dark:text-gray-200"
                         >
-                          Assign nurse
+                          {t("supervisor.assignNurse")}
                         </DropdownItem>
                       </ActionsMenu>
                     </TableCell>

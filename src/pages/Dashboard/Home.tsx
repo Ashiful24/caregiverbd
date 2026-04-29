@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import PageMeta from "../../components/common/PageMeta";
 import {
   DashboardKpiCards,
@@ -21,6 +22,7 @@ interface DashboardData {
 }
 
 export default function Home() {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<DashboardData>({
@@ -60,11 +62,11 @@ export default function Home() {
         aborted = true; // Strict Mode or navigation: first request was aborted
         return;
       }
-      setError("Failed to load dashboard.");
+      setError(t("dashboard.loadError"));
     } finally {
       if (!aborted) setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     const ac = new AbortController();
@@ -78,8 +80,8 @@ export default function Home() {
   return (
     <>
       <PageMeta
-        title="Dashboard | Hope - BMQAS"
-        description="Dashboard page for Hope Pro by Bengal Mobile QA Solution"
+        title={t("dashboard.metaTitle")}
+        description={t("dashboard.metaDescription")}
       />
       <div className="space-y-6">
         {error && (

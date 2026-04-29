@@ -1,4 +1,5 @@
 import { useState, FormEvent } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useLocation } from "react-router";
 import { EyeCloseIcon, EyeIcon } from "../../icons";
 import Label from "../form/Label";
@@ -10,6 +11,7 @@ import { useAuth } from "../../context/AuthContext";
 import { isValidEmail, validateBangladeshiPhone } from "../../utils/phoneValidation";
 
 export default function SignInForm() {
+  const { t } = useTranslation();
   const [showPassword, setShowPassword] = useState(false);
   const [isChecked, setIsChecked] = useState(false);
   const [emailOrPhone, setEmailOrPhone] = useState("admin@hope.com");
@@ -38,7 +40,7 @@ export default function SignInForm() {
     try {
       // Validate input before submitting
       if (!emailOrPhone || !password) {
-        setError("Email/Phone and password are required");
+        setError(t("auth.signIn.validationRequired"));
         setIsSubmitting(false);
         return;
       }
@@ -47,7 +49,7 @@ export default function SignInForm() {
       const isPhone = validateBangladeshiPhone(emailOrPhone);
 
       if (!isEmail && !isPhone) {
-        setError("Please enter a valid email or Bangladeshi phone number (e.g., 01712345678 or +8801712345678)");
+        setError(t("auth.signIn.validationInvalidContact"));
         setIsSubmitting(false);
         return;
       }
@@ -56,14 +58,14 @@ export default function SignInForm() {
       await login(emailOrPhone, password, isChecked);
       
       // Show success message
-      setSuccess("Login successful! Redirecting...");
+      setSuccess(t("auth.signIn.loginSuccess"));
       
       // Wait a moment to show success message, then redirect
       setTimeout(() => {
         navigate(from, { replace: true });
       }, 1000);
     } catch (err: any) {
-      let errorMessage = "Failed to sign in. Please try again.";
+      let errorMessage = t("auth.signIn.loginFailedDefault");
       if (err instanceof Error) {
         errorMessage = err.message;
       } else if (err?.message) {
@@ -75,7 +77,7 @@ export default function SignInForm() {
       } else if (typeof err === "string") {
         errorMessage = err;
       } else if (err?.status === 0 || err?.name === "TypeError") {
-        errorMessage = "Network error. Please check your connection and try again.";
+        errorMessage = t("auth.signIn.networkError");
       }
       setError(errorMessage);
       setIsSubmitting(false);
@@ -101,10 +103,10 @@ export default function SignInForm() {
         <div>
           <div className="mb-5 sm:mb-8">
             <h1 className="mb-2 font-semibold text-gray-800 text-title-sm dark:text-white/90 sm:text-title-md">
-              Sign In
+              {t("auth.signIn.title")}
             </h1>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Enter your email or phone number and password to sign in!
+              {t("auth.signIn.subtitle")}
             </p>
           </div>
           <div>
@@ -118,7 +120,7 @@ export default function SignInForm() {
                 <div className="mb-4">
                   <Alert
                     variant="error"
-                    title="Login Failed"
+                    title={t("auth.signIn.loginFailed")}
                     message={error}
                     showLink={false}
                   />
@@ -128,7 +130,7 @@ export default function SignInForm() {
                 <div className="mb-4">
                   <Alert
                     variant="success"
-                    title="Success"
+                    title={t("auth.signIn.successTitle")}
                     message={success}
                     showLink={false}
                   />
@@ -137,11 +139,11 @@ export default function SignInForm() {
               <div className="space-y-6">
                 <div>
                   <Label>
-                    Email or Phone <span className="text-error-500">*</span>{" "}
+                    {t("auth.signIn.emailOrPhone")} <span className="text-error-500">*</span>{" "}
                   </Label>
                   <Input
                     type="text"
-                    placeholder="info@gmail.com or 01712345678"
+                    placeholder={t("auth.signIn.emailOrPhonePlaceholder")}
                     value={emailOrPhone}
                     onChange={(e) => {
                       setEmailOrPhone(e.target.value);
@@ -156,17 +158,17 @@ export default function SignInForm() {
                     required
                   />
                   <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    Use email or Bangladeshi phone number (e.g., 01712345678, +8801712345678)
+                    {t("auth.signIn.emailOrPhoneHint")}
                   </p>
                 </div>
                 <div>
                   <Label>
-                    Password <span className="text-error-500">*</span>{" "}
+                    {t("auth.signIn.password")} <span className="text-error-500">*</span>{" "}
                   </Label>
                   <div className="relative">
                     <Input
                       type={showPassword ? "text" : "password"}
-                      placeholder="Enter your password"
+                      placeholder={t("auth.signIn.passwordPlaceholder")}
                       value={password}
                       onChange={(e) => {
                         setPassword(e.target.value);
@@ -196,14 +198,14 @@ export default function SignInForm() {
                   <div className="flex items-center gap-3">
                     <Checkbox checked={isChecked} onChange={setIsChecked} />
                     <span className="block font-normal text-gray-700 text-theme-sm dark:text-gray-400">
-                      Keep me logged in
+                      {t("auth.signIn.keepMeLoggedIn")}
                     </span>
                   </div>
                   <Link
                     to="/reset-password"
                     className="text-sm text-brand-500 hover:text-brand-600 dark:text-brand-400"
                   >
-                    Forgot password?
+                    {t("auth.signIn.forgotPassword")}
                   </Link>
                 </div>
                 <div>
@@ -214,7 +216,7 @@ export default function SignInForm() {
                     disabled={isSubmitting}
                     onClick={handleButtonClick}
                   >
-                    {isSubmitting ? "Signing in..." : "Sign in"}
+                    {isSubmitting ? t("auth.signIn.signingInButton") : t("auth.signIn.signInButton")}
                   </Button>
                 </div>
               </div>
@@ -222,12 +224,12 @@ export default function SignInForm() {
 
             <div className="mt-5">
               <p className="text-sm font-normal text-center text-gray-700 dark:text-gray-400 sm:text-start">
-                Don&apos;t have an account? {""}
+                {t("auth.signIn.noAccount")} {""}
                 <Link
                   to="/signup"
                   className="text-brand-500 hover:text-brand-600 dark:text-brand-400"
                 >
-                  Sign Up
+                  {t("auth.signIn.signUpLink")}
                 </Link>
               </p>
             </div>
