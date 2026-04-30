@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import PageMeta from "../components/common/PageMeta";
 import {
@@ -26,6 +27,7 @@ function toISODateLocal(date: Date): string {
 }
 
 export default function FinancialReports() {
+  const { t } = useTranslation();
   const [glSummary, setGlSummary] = useState<GlReconciliationSummaryResponseDto | null>(null);
   const [glSummaryLoading, setGlSummaryLoading] = useState(true);
   const [glSummaryError, setGlSummaryError] = useState("");
@@ -56,12 +58,12 @@ export default function FinancialReports() {
       const data = (res as { data?: GlReconciliationSummaryResponseDto }).data ?? res;
       setGlSummary(data as GlReconciliationSummaryResponseDto);
     } catch {
-      setGlSummaryError("Failed to load GL summary.");
+      setGlSummaryError(t("financialReports.failedLoadGlSummary"));
       setGlSummary(null);
     } finally {
       setGlSummaryLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     fetchGlSummary();
@@ -94,7 +96,7 @@ export default function FinancialReports() {
       const data = (res as { data?: GlDailyFlowResponseDto }).data ?? res;
       setGlHistory(data as GlDailyFlowResponseDto);
     } catch {
-      setGlHistoryError("Failed to load GL history.");
+      setGlHistoryError(t("financialReports.failedLoadGlHistory"));
       setGlHistory(null);
     } finally {
       setGlHistoryLoading(false);
@@ -119,7 +121,7 @@ export default function FinancialReports() {
       const data = (res as { data?: ProviderTransactionHistoryResponseDto }).data ?? res;
       setTransactions(data as ProviderTransactionHistoryResponseDto);
     } catch {
-      setTransactionsError("Failed to load transactions.");
+      setTransactionsError(t("financialReports.failedLoadTransactions"));
       setTransactions(null);
     } finally {
       setTransactionsLoading(false);
@@ -129,18 +131,18 @@ export default function FinancialReports() {
   return (
     <>
       <PageMeta
-        title="Financial Reports | Hope - BMQAS"
-        description="GL reconciliation and provider transaction history"
+        title={t("financialReports.metaTitle")}
+        description={t("financialReports.metaDescription")}
       />
-      <PageBreadcrumb pageTitle="Financial Reports" />
+      <PageBreadcrumb pageTitle={t("financialReports.pageTitle")} />
       <div className="space-y-6">
         {/* GL Reconciliation Summary */}
         <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] lg:p-6">
           <h3 className="mb-4 text-lg font-semibold text-gray-800 dark:text-white/90">
-            GL Reconciliation Summary
+            {t("financialReports.glSummaryTitle")}
           </h3>
           {glSummaryLoading ? (
-            <p className="text-gray-500 dark:text-gray-400">Loading…</p>
+            <p className="text-gray-500 dark:text-gray-400">{t("systemConfig.loading")}</p>
           ) : glSummaryError ? (
             <p className="text-red-600 dark:text-red-400">{glSummaryError}</p>
           ) : glSummary ? (
@@ -148,13 +150,13 @@ export default function FinancialReports() {
               {glSummary.profitSummary && (
                 <div className="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
                   <p className="mb-2 text-xs font-medium uppercase text-gray-500 dark:text-gray-400">
-                    Profit summary
+                    {t("financialReports.profitSummary")}
                   </p>
                   <div className="grid gap-2 text-sm sm:grid-cols-1">
                     <div>
-                      <span className="text-gray-500 dark:text-gray-400">Commission balance: </span>
+                      <span className="text-gray-500 dark:text-gray-400">{t("financialReports.commissionBalance")}: </span>
                       <span className="font-medium text-gray-800 dark:text-white/90">
-                        {glSummary.profitSummary.commissionBalance ?? "—"}
+                        {glSummary.profitSummary.commissionBalance ?? t("common.noValue")}
                       </span>
                     </div>
                   </div>
@@ -165,21 +167,21 @@ export default function FinancialReports() {
                   <Table className="min-w-[36rem]">
                     <TableHeader className="border-b border-gray-200 dark:border-gray-800">
                       <TableRow>
-                        <TableCell isHeader className="w-[28%] min-w-[11rem] max-w-[18rem] text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400 whitespace-normal break-words py-3">Wallet type</TableCell>
-                        <TableCell isHeader className="text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400 whitespace-nowrap py-3">Balance</TableCell>
-                        <TableCell isHeader className="text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400 whitespace-nowrap py-3">Credit</TableCell>
-                        <TableCell isHeader className="text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400 whitespace-nowrap py-3">Debit</TableCell>
-                        <TableCell isHeader className="text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400 whitespace-nowrap py-3">Net change</TableCell>
+                        <TableCell isHeader className="w-[28%] min-w-[11rem] max-w-[18rem] text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400 whitespace-normal break-words py-3">{t("financialReports.walletType")}</TableCell>
+                        <TableCell isHeader className="text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400 whitespace-nowrap py-3">{t("financialReports.balance")}</TableCell>
+                        <TableCell isHeader className="text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400 whitespace-nowrap py-3">{t("financialReports.credit")}</TableCell>
+                        <TableCell isHeader className="text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400 whitespace-nowrap py-3">{t("financialReports.debit")}</TableCell>
+                        <TableCell isHeader className="text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400 whitespace-nowrap py-3">{t("financialReports.netChange")}</TableCell>
                       </TableRow>
                     </TableHeader>
                     <TableBody className="divide-y divide-gray-100 dark:divide-gray-800">
                       {glSummary.wallets.map((w, i) => (
                         <TableRow key={w.walletType ?? i}>
-                          <TableCell className="w-[28%] min-w-[11rem] max-w-[18rem] font-medium text-gray-800 dark:text-white/90 whitespace-normal break-words py-2.5" title={w.walletType ?? undefined}>{w.walletType ?? "—"}</TableCell>
-                          <TableCell className="text-right text-gray-700 dark:text-gray-300 whitespace-nowrap py-2.5">{w.balance ?? "—"} {w.currency ?? ""}</TableCell>
-                          <TableCell className="text-right text-gray-700 dark:text-gray-300 whitespace-nowrap py-2.5">{w.totalCredit ?? "—"}</TableCell>
-                          <TableCell className="text-right text-gray-700 dark:text-gray-300 whitespace-nowrap py-2.5">{w.totalDebit ?? "—"}</TableCell>
-                          <TableCell className="text-right font-medium text-gray-800 dark:text-white/90 whitespace-nowrap py-2.5">{w.netChange ?? "—"}</TableCell>
+                          <TableCell className="w-[28%] min-w-[11rem] max-w-[18rem] font-medium text-gray-800 dark:text-white/90 whitespace-normal break-words py-2.5" title={w.walletType ?? undefined}>{w.walletType ?? t("common.noValue")}</TableCell>
+                          <TableCell className="text-right text-gray-700 dark:text-gray-300 whitespace-nowrap py-2.5">{w.balance ?? t("common.noValue")} {w.currency ?? ""}</TableCell>
+                          <TableCell className="text-right text-gray-700 dark:text-gray-300 whitespace-nowrap py-2.5">{w.totalCredit ?? t("common.noValue")}</TableCell>
+                          <TableCell className="text-right text-gray-700 dark:text-gray-300 whitespace-nowrap py-2.5">{w.totalDebit ?? t("common.noValue")}</TableCell>
+                          <TableCell className="text-right font-medium text-gray-800 dark:text-white/90 whitespace-nowrap py-2.5">{w.netChange ?? t("common.noValue")}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -188,18 +190,18 @@ export default function FinancialReports() {
               )}
             </div>
           ) : (
-            <p className="text-gray-500 dark:text-gray-400">No summary data.</p>
+            <p className="text-gray-500 dark:text-gray-400">{t("financialReports.noSummaryData")}</p>
           )}
         </div>
 
         {/* GL History (date range) */}
         <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] lg:p-6">
           <h3 className="mb-4 text-lg font-semibold text-gray-800 dark:text-white/90">
-            GL Daily Flow (History)
+            {t("financialReports.glHistoryTitle")}
           </h3>
           <div className="mb-4 flex flex-wrap items-end gap-3">
             <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Start date</span>
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("financialReports.startDate")}</span>
               <input
                 type="date"
                 value={historyStart}
@@ -208,7 +210,7 @@ export default function FinancialReports() {
               />
             </label>
             <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">End date</span>
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("financialReports.endDate")}</span>
               <input
                 type="date"
                 value={historyEnd}
@@ -222,7 +224,7 @@ export default function FinancialReports() {
               onClick={loadGlHistory}
               className="rounded bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 dark:bg-brand-700 dark:hover:bg-brand-800"
             >
-              {glHistoryLoading ? "Loading…" : "Load history"}
+              {glHistoryLoading ? t("systemConfig.loading") : t("financialReports.loadHistory")}
             </button>
           </div>
           {glHistoryError && (
@@ -233,10 +235,10 @@ export default function FinancialReports() {
               <Table>
                 <TableHeader className="border-b border-gray-200 dark:border-gray-800">
                   <TableRow>
-                    <TableCell isHeader className="text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Date</TableCell>
-                    <TableCell isHeader className="text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Total credit</TableCell>
-                    <TableCell isHeader className="text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Total debit</TableCell>
-                    <TableCell isHeader className="text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Net change</TableCell>
+                    <TableCell isHeader className="text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">{t("financialReports.date")}</TableCell>
+                    <TableCell isHeader className="text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400">{t("financialReports.totalCredit")}</TableCell>
+                    <TableCell isHeader className="text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400">{t("financialReports.totalDebit")}</TableCell>
+                    <TableCell isHeader className="text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400">{t("financialReports.netChange")}</TableCell>
                   </TableRow>
                 </TableHeader>
                 <TableBody className="divide-y divide-gray-100 dark:divide-gray-800">
@@ -252,29 +254,33 @@ export default function FinancialReports() {
               </Table>
               {glHistory?.total && (
                 <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                  Grand total — Credit: {glHistory.total.totalCredit}, Debit: {glHistory.total.totalDebit}, Net: {glHistory.total.netChange}
+                  {t("financialReports.grandTotal", {
+                    credit: glHistory.total.totalCredit,
+                    debit: glHistory.total.totalDebit,
+                    net: glHistory.total.netChange,
+                  })}
                 </p>
               )}
             </div>
           ) : glHistory != null && !glHistoryLoading ? (
-            <p className="text-gray-500 dark:text-gray-400">No daily data for this range.</p>
+            <p className="text-gray-500 dark:text-gray-400">{t("financialReports.noDailyData")}</p>
           ) : null}
         </div>
 
         {/* Provider transactions */}
         <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] lg:p-6">
           <h3 className="mb-4 text-lg font-semibold text-gray-800 dark:text-white/90">
-            Provider transaction history
+            {t("financialReports.providerTransactionsTitle")}
           </h3>
           <div className="mb-4 flex flex-wrap items-end gap-3">
             <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Provider</span>
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("financialReports.provider")}</span>
               <select
                 value={providerId === "" ? "" : providerId}
                 onChange={(e) => setProviderId(e.target.value === "" ? "" : Number(e.target.value))}
                 className="min-w-[12rem] rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
               >
-                <option value="">Select provider</option>
+                <option value="">{t("financialReports.selectProvider")}</option>
                 {providers.map((p) => (
                   <option key={p.id} value={p.id}>
                     {[p.firstName, p.lastName].filter(Boolean).join(" ") || `Provider #${p.id}`}
@@ -283,7 +289,7 @@ export default function FinancialReports() {
               </select>
             </label>
             <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">From (optional)</span>
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("financialReports.fromOptional")}</span>
               <input
                 type="date"
                 value={txStart}
@@ -292,7 +298,7 @@ export default function FinancialReports() {
               />
             </label>
             <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">To (optional)</span>
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("financialReports.toOptional")}</span>
               <input
                 type="date"
                 value={txEnd}
@@ -306,7 +312,7 @@ export default function FinancialReports() {
               onClick={loadProviderTransactions}
               className="rounded bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 dark:bg-brand-700 dark:hover:bg-brand-800"
             >
-              {transactionsLoading ? "Loading…" : "Load transactions"}
+              {transactionsLoading ? t("systemConfig.loading") : t("financialReports.loadTransactions")}
             </button>
           </div>
           {transactionsError && (
@@ -317,11 +323,11 @@ export default function FinancialReports() {
               <Table>
                 <TableHeader className="border-b border-gray-200 dark:border-gray-800">
                   <TableRow>
-                    <TableCell isHeader className="text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Date</TableCell>
-                    <TableCell isHeader className="text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Amount</TableCell>
-                    <TableCell isHeader className="text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Balance after</TableCell>
-                    <TableCell isHeader className="text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Type</TableCell>
-                    <TableCell isHeader className="text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Description</TableCell>
+                    <TableCell isHeader className="text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">{t("financialReports.date")}</TableCell>
+                    <TableCell isHeader className="text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400">{t("financialReports.amount")}</TableCell>
+                    <TableCell isHeader className="text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400">{t("financialReports.balanceAfter")}</TableCell>
+                    <TableCell isHeader className="text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">{t("financialReports.type")}</TableCell>
+                    <TableCell isHeader className="text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">{t("financialReports.description")}</TableCell>
                   </TableRow>
                 </TableHeader>
                 <TableBody className="divide-y divide-gray-100 dark:divide-gray-800">
@@ -329,19 +335,21 @@ export default function FinancialReports() {
                     <TableRow key={tx.id}>
                       <TableCell className="text-gray-700 dark:text-gray-300">{formatDate(tx.createdAt)}</TableCell>
                       <TableCell className="text-right font-medium text-gray-800 dark:text-white/90">{tx.amount}</TableCell>
-                      <TableCell className="text-right text-gray-700 dark:text-gray-300">{tx.balanceAfter ?? "—"}</TableCell>
-                      <TableCell className="text-gray-700 dark:text-gray-300">{tx.type ?? "—"}</TableCell>
-                      <TableCell className="text-gray-600 dark:text-gray-400">{tx.description ?? "—"}</TableCell>
+                      <TableCell className="text-right text-gray-700 dark:text-gray-300">{tx.balanceAfter ?? t("common.noValue")}</TableCell>
+                      <TableCell className="text-gray-700 dark:text-gray-300">{tx.type ?? t("common.noValue")}</TableCell>
+                      <TableCell className="text-gray-600 dark:text-gray-400">{tx.description ?? t("common.noValue")}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
               <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                Total: {transactions?.total ?? (transactions?.data?.length ?? 0)} record(s)
+                {t("financialReports.totalRecords", {
+                  count: transactions?.total ?? (transactions?.data?.length ?? 0),
+                })}
               </p>
             </div>
           ) : transactions != null && !transactionsLoading ? (
-            <p className="text-gray-500 dark:text-gray-400">No transactions for this provider.</p>
+            <p className="text-gray-500 dark:text-gray-400">{t("financialReports.noTransactions")}</p>
           ) : null}
         </div>
       </div>

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import PageMeta from "../components/common/PageMeta";
 import Button from "../components/ui/button/Button";
@@ -11,6 +12,7 @@ import {
 import { PencilIcon, PlusIcon } from "../icons";
 
 export default function VerificationDocumentTypes() {
+  const { t } = useTranslation();
   const [list, setList] = useState<VerificationDocumentTypeItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -33,13 +35,13 @@ export default function VerificationDocumentTypes() {
       const msg =
         err && typeof err === "object" && "message" in err
           ? String((err as { message: string }).message)
-          : "Failed to load document types.";
+          : t("verificationDocumentTypes.failedLoad");
       setError(msg);
       setList([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     fetchData();
@@ -64,7 +66,7 @@ export default function VerificationDocumentTypes() {
       const msg =
         err && typeof err === "object" && "message" in err
           ? String((err as { message: string }).message)
-          : "Failed to add.";
+          : t("verificationDocumentTypes.failedAdd");
       setError(msg);
     } finally {
       setSubmitting(false);
@@ -87,7 +89,7 @@ export default function VerificationDocumentTypes() {
       const msg =
         err && typeof err === "object" && "message" in err
           ? String((err as { message: string }).message)
-          : "Failed to update.";
+          : t("verificationDocumentTypes.failedUpdate");
       setError(msg);
     } finally {
       setSubmitting(false);
@@ -100,7 +102,7 @@ export default function VerificationDocumentTypes() {
       await verificationDocumentTypesApi.setActive(item.id, !item.isActive);
       await fetchData();
     } catch {
-      setError("Failed to update status.");
+      setError(t("verificationDocumentTypes.failedUpdateStatus"));
     } finally {
       setTogglingId(null);
     }
@@ -115,18 +117,18 @@ export default function VerificationDocumentTypes() {
   return (
     <>
       <PageMeta
-        title="Verification Document Types | Hope - BMQAS"
-        description="Manage the verification document types entity (add, update, activate/deactivate). These codes are used in consultation type requirements and document uploads."
+        title={t("verificationDocumentTypes.metaTitle")}
+        description={t("verificationDocumentTypes.metaDescription")}
       />
-      <PageBreadcrumb pageTitle="Verification Document Types" />
+      <PageBreadcrumb pageTitle={t("verificationDocumentTypes.pageTitle")} />
       <div className="min-w-0 max-w-full rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-white/[0.03]">
         <div className="flex flex-col gap-4 border-b border-gray-200 p-4 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between sm:p-6">
           <div className="min-w-0 flex-1">
             <h1 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">
-              Verification document types
+              {t("verificationDocumentTypes.heading")}
             </h1>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Manage the list of verification document types (code, label). Only active types appear in consultation type requirements and in document upload. Add, edit, or deactivate as needed.
+              {t("verificationDocumentTypes.subheading")}
             </p>
           </div>
           <div className="flex w-full flex-shrink-0 flex-wrap items-center gap-3 sm:w-auto">
@@ -143,7 +145,7 @@ export default function VerificationDocumentTypes() {
               disabled={loading}
               className="w-full rounded-xl shadow-sm transition-all duration-200 hover:shadow-md sm:w-auto"
             >
-              Add type
+              {t("verificationDocumentTypes.addType")}
             </Button>
           </div>
         </div>
@@ -157,7 +159,7 @@ export default function VerificationDocumentTypes() {
 
         {loading ? (
           <div className="py-8 text-center text-gray-500 dark:text-gray-400">
-            Loading…
+            {t("verificationDocumentTypes.loading")}
           </div>
         ) : (
           <div className="overflow-x-auto -mx-4 sm:-mx-6">
@@ -165,11 +167,11 @@ export default function VerificationDocumentTypes() {
             <table className="min-w-[600px] w-full border-collapse text-sm">
               <thead>
                 <tr className="border-b border-gray-200 dark:border-gray-800">
-                  <th className="py-3 text-left font-medium text-gray-500 dark:text-gray-400">Code</th>
-                  <th className="py-3 text-left font-medium text-gray-500 dark:text-gray-400">Label</th>
-                  <th className="py-3 text-left font-medium text-gray-500 dark:text-gray-400">Order</th>
-                  <th className="py-3 text-left font-medium text-gray-500 dark:text-gray-400">Status</th>
-                  <th className="whitespace-nowrap py-3 text-right font-medium text-gray-500 dark:text-gray-400">Actions</th>
+                  <th className="py-3 text-left font-medium text-gray-500 dark:text-gray-400">{t("verificationDocumentTypes.code")}</th>
+                  <th className="py-3 text-left font-medium text-gray-500 dark:text-gray-400">{t("verificationDocumentTypes.label")}</th>
+                  <th className="py-3 text-left font-medium text-gray-500 dark:text-gray-400">{t("verificationDocumentTypes.order")}</th>
+                  <th className="py-3 text-left font-medium text-gray-500 dark:text-gray-400">{t("verificationDocumentTypes.status")}</th>
+                  <th className="whitespace-nowrap py-3 text-right font-medium text-gray-500 dark:text-gray-400">{t("verificationDocumentTypes.actions")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
@@ -191,7 +193,7 @@ export default function VerificationDocumentTypes() {
                           size="sm"
                           color={item.isActive ? "success" : "error"}
                         >
-                          {item.isActive ? "Active" : "Inactive"}
+                          {item.isActive ? t("common.status.active") : t("common.status.inactive")}
                         </Badge>
                       </td>
                       <td className="whitespace-nowrap py-3 text-right">
@@ -212,8 +214,8 @@ export default function VerificationDocumentTypes() {
                             {togglingId === item.id
                               ? "…"
                               : item.isActive
-                                ? "Deactivate"
-                                : "Activate"}
+                                ? t("verificationDocumentTypes.deactivate")
+                                : t("verificationDocumentTypes.activate")}
                           </button>
                         </div>
                       </td>
@@ -223,7 +225,7 @@ export default function VerificationDocumentTypes() {
             </table>
             {list.length === 0 && (
               <p className="py-6 text-center text-gray-500 dark:text-gray-400">
-                No verification document types yet. Add one to get started; they will appear in consultation type requirements and document upload.
+                {t("verificationDocumentTypes.emptyState")}
               </p>
             )}
             </div>
@@ -236,31 +238,31 @@ export default function VerificationDocumentTypes() {
         <Modal
           isOpen={true}
           onClose={() => !submitting && setAddModal(false)}
-          title="Add verification document type"
+          title={t("verificationDocumentTypes.addModalTitle")}
         >
           <div className="space-y-3">
             <label className="block">
-              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Code (unique; e.g. BMDC_CERTIFICATE)</span>
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("verificationDocumentTypes.codeHint")}</span>
               <input
                 type="text"
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
                 className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
-                placeholder="UPPERCASE_WITH_UNDERSCORES"
+                placeholder={t("verificationDocumentTypes.codePlaceholder")}
               />
             </label>
             <label className="block">
-              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Label</span>
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("verificationDocumentTypes.label")}</span>
               <input
                 type="text"
                 value={label}
                 onChange={(e) => setLabel(e.target.value)}
                 className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
-                placeholder="e.g. BMDC Certificate"
+                placeholder={t("verificationDocumentTypes.labelPlaceholder")}
               />
             </label>
             <label className="block">
-              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Display order</span>
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("verificationDocumentTypes.displayOrder")}</span>
               <input
                 type="number"
                 min={0}
@@ -275,7 +277,7 @@ export default function VerificationDocumentTypes() {
                 onClick={() => !submitting && setAddModal(false)}
                 className="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
               >
-                Cancel
+                {t("common.actions.cancel")}
               </button>
               <button
                 type="button"
@@ -283,7 +285,7 @@ export default function VerificationDocumentTypes() {
                 onClick={handleAdd}
                 className="rounded bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
               >
-                {submitting ? "Saving…" : "Add"}
+                {submitting ? t("supervisor.saving") : t("verificationDocumentTypes.add")}
               </button>
             </div>
           </div>
@@ -294,14 +296,14 @@ export default function VerificationDocumentTypes() {
         <Modal
           isOpen={true}
           onClose={() => !submitting && setEditModal(null)}
-          title="Edit verification document type"
+          title={t("verificationDocumentTypes.editModalTitle")}
         >
           <div className="space-y-3">
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              Code: <strong>{editModal.code}</strong> (cannot be changed)
+              {t("verificationDocumentTypes.codeReadonly", { code: editModal.code })}
             </p>
             <label className="block">
-              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Label</span>
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("verificationDocumentTypes.label")}</span>
               <input
                 type="text"
                 value={label}
@@ -310,7 +312,7 @@ export default function VerificationDocumentTypes() {
               />
             </label>
             <label className="block">
-              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Display order</span>
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("verificationDocumentTypes.displayOrder")}</span>
               <input
                 type="number"
                 min={0}
@@ -325,7 +327,7 @@ export default function VerificationDocumentTypes() {
                 onClick={() => !submitting && setEditModal(null)}
                 className="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
               >
-                Cancel
+                {t("common.actions.cancel")}
               </button>
               <button
                 type="button"
@@ -333,7 +335,7 @@ export default function VerificationDocumentTypes() {
                 onClick={handleUpdate}
                 className="rounded bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
               >
-                {submitting ? "Saving…" : "Save"}
+                {submitting ? t("supervisor.saving") : t("common.actions.save")}
               </button>
             </div>
           </div>

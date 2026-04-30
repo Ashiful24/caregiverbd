@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import PageMeta from "../components/common/PageMeta";
 import {
@@ -63,6 +64,7 @@ function serviceRequestStatusBadgeColor(
 }
 
 export default function ServiceRequestList() {
+  const { t } = useTranslation();
   const [list, setList] = useState<AdminServiceRequestListDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -157,7 +159,7 @@ export default function ServiceRequestList() {
         const message =
           err && typeof err === "object" && "message" in err
             ? String((err as { message: string }).message)
-            : "Failed to load appointments.";
+            : t("appointments.failedToLoad");
         setError(message);
         setList([]);
         setTotal(0);
@@ -172,7 +174,7 @@ export default function ServiceRequestList() {
       consultationTypeFilterId,
       searchDoctorQuery,
       searchPatientQuery,
-      limit,
+      t,
     ]
   );
 
@@ -187,24 +189,21 @@ export default function ServiceRequestList() {
 
   return (
     <>
-      <PageMeta
-        title="Appointments | Hope - BMQAS"
-        description="All service requests (appointments) for Hope Pro by BMQAS"
-      />
-      <PageBreadcrumb pageTitle="Appointments" />
+      <PageMeta title={t("appointments.metaTitle")} description={t("appointments.metaDescription")} />
+      <PageBreadcrumb pageTitle={t("appointments.pageTitle")} />
       <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
         <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-6">
           <div>
             <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
-              Appointments
+              {t("appointments.heading")}
             </h3>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              All service requests. Search by doctor or patient.
+              {t("appointments.subheading")}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3 sm:ml-auto">
             <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-              <span className="shrink-0">Consultation type</span>
+              <span className="shrink-0">{t("appointments.consultationType")}</span>
               <select
                 value={consultationTypeFilterId}
                 onChange={(e) => {
@@ -214,7 +213,7 @@ export default function ServiceRequestList() {
                 }}
                 className="min-w-[180px] rounded-lg border border-gray-300 bg-white py-2 pl-3 pr-8 text-sm text-gray-800 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
               >
-                <option value="">All types</option>
+                <option value="">{t("appointments.allTypes")}</option>
                 {consultationTypeOptions.map((opt) => (
                   <option key={opt.id} value={opt.id}>
                     {opt.depth > 0 ? "—".repeat(opt.depth) + " " : ""}
@@ -229,14 +228,14 @@ export default function ServiceRequestList() {
         <div className="flex flex-col gap-3 border-b border-gray-200 px-4 pb-4 dark:border-gray-800 sm:flex-row sm:items-center sm:gap-4 sm:px-6 sm:pb-4">
           <input
             type="search"
-            placeholder="Search by doctor..."
+            placeholder={t("appointments.searchByDoctor")}
             value={searchDoctorInput}
             onChange={(e) => setSearchDoctorInput(e.target.value)}
             className="min-w-[180px] rounded-lg border border-gray-300 bg-white py-2 pl-3 pr-3 text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:placeholder:text-gray-500"
           />
           <input
             type="search"
-            placeholder="Search by patient..."
+            placeholder={t("appointments.searchByPatient")}
             value={searchPatientInput}
             onChange={(e) => setSearchPatientInput(e.target.value)}
             className="min-w-[180px] rounded-lg border border-gray-300 bg-white py-2 pl-3 pr-3 text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:placeholder:text-gray-500"
@@ -256,7 +255,7 @@ export default function ServiceRequestList() {
             </div>
           ) : list.length === 0 ? (
             <div className="py-16 text-center text-gray-500 dark:text-gray-400">
-              No appointments found.
+              {t("appointments.noAppointmentsFound")}
             </div>
           ) : (
             <>
@@ -280,7 +279,7 @@ export default function ServiceRequestList() {
                     <dl className="mt-3 grid grid-cols-1 gap-2 text-sm">
                       <div className="flex justify-between gap-2">
                         <dt className="text-gray-500 dark:text-gray-400">
-                          Patient
+                          {t("dashboard.patient")}
                         </dt>
                         <dd className="text-gray-800 dark:text-gray-200">
                           {item.patientName ?? "—"}
@@ -288,7 +287,7 @@ export default function ServiceRequestList() {
                       </div>
                       <div className="flex justify-between gap-2">
                         <dt className="text-gray-500 dark:text-gray-400">
-                          Doctor
+                          {t("appointments.doctor")}
                         </dt>
                         <dd className="text-gray-800 dark:text-gray-200">
                           {item.providerName ?? "—"}
@@ -296,7 +295,7 @@ export default function ServiceRequestList() {
                       </div>
                       <div className="flex justify-between gap-2">
                         <dt className="text-gray-500 dark:text-gray-400">
-                          Type
+                          {t("appointments.type")}
                         </dt>
                         <dd className="text-gray-800 dark:text-gray-200">
                           {item.consultationTypeName ?? "—"}
@@ -304,7 +303,7 @@ export default function ServiceRequestList() {
                       </div>
                       <div className="flex justify-between gap-2">
                         <dt className="text-gray-500 dark:text-gray-400">
-                          Amount
+                          {t("appointments.amount")}
                         </dt>
                         <dd className="text-gray-800 dark:text-gray-200">
                           {item.amount ?? "—"}
@@ -313,7 +312,7 @@ export default function ServiceRequestList() {
                       {item.scheduledAt && (
                         <div className="flex justify-between gap-2">
                           <dt className="text-gray-500 dark:text-gray-400">
-                            Scheduled
+                          {t("appointments.scheduled")}
                           </dt>
                           <dd className="text-gray-800 dark:text-gray-200">
                             {formatDateTime(item.scheduledAt)}
@@ -323,7 +322,7 @@ export default function ServiceRequestList() {
                       {item.createdAt && (
                         <div className="flex justify-between gap-2">
                           <dt className="text-gray-500 dark:text-gray-400">
-                            Created
+                          {t("appointments.created")}
                           </dt>
                           <dd className="text-gray-800 dark:text-gray-200">
                             {formatDate(item.createdAt)}
@@ -352,43 +351,43 @@ export default function ServiceRequestList() {
                         isHeader
                         className="w-[14%] py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
                       >
-                        Patient
+                        {t("dashboard.patient")}
                       </TableCell>
                       <TableCell
                         isHeader
                         className="w-[14%] py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
                       >
-                        Doctor
+                        {t("appointments.doctor")}
                       </TableCell>
                       <TableCell
                         isHeader
                         className="w-[14%] py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
                       >
-                        Type
+                        {t("appointments.type")}
                       </TableCell>
                       <TableCell
                         isHeader
                         className="w-[10%] py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
                       >
-                        Status
+                        {t("dashboard.status")}
                       </TableCell>
                       <TableCell
                         isHeader
                         className="w-[10%] py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
                       >
-                        Amount
+                        {t("appointments.amount")}
                       </TableCell>
                       <TableCell
                         isHeader
                         className="w-[16%] py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
                       >
-                        Scheduled
+                        {t("appointments.scheduled")}
                       </TableCell>
                       <TableCell
                         isHeader
                         className="w-[12%] py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
                       >
-                        Created
+                        {t("appointments.created")}
                       </TableCell>
                     </TableRow>
                   </TableHeader>
@@ -441,7 +440,7 @@ export default function ServiceRequestList() {
           <div className="flex flex-col gap-4 border-t border-gray-200 px-4 py-4 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <div className="flex flex-wrap items-center gap-4">
               <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                Rows per page
+                {t("pagination.rowsPerPage")}
                 <select
                   className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
                   value={limit}
@@ -458,9 +457,12 @@ export default function ServiceRequestList() {
                 </select>
               </label>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                Showing <span className="font-medium">{from}</span> to{" "}
-                <span className="font-medium">{to}</span> of{" "}
-                <span className="font-medium">{total}</span> appointments
+                {t("pagination.showingRangeOf", {
+                  from,
+                  to,
+                  total,
+                  entity: t("appointments.pageTitle").toLowerCase(),
+                })}
               </p>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-end">
@@ -470,10 +472,10 @@ export default function ServiceRequestList() {
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page <= 1}
               >
-                Previous
+                {t("common.actions.previous")}
               </button>
               <span className="px-3 py-2 text-sm text-gray-600 dark:text-gray-400">
-                Page {page} of {totalPages}
+                {t("pagination.pageOf", { page, totalPages })}
               </span>
               <button
                 type="button"
@@ -481,7 +483,7 @@ export default function ServiceRequestList() {
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page >= totalPages}
               >
-                Next
+                {t("common.actions.next")}
               </button>
             </div>
           </div>

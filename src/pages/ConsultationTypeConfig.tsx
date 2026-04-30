@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router";
 import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import PageMeta from "../components/common/PageMeta";
@@ -14,6 +15,7 @@ import {
 import { PencilIcon, PlusIcon, TrashBinIcon } from "../icons";
 
 export default function ConsultationTypeConfig() {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const typeId = id != null ? parseInt(id, 10) : NaN;
   const isValidId = Number.isInteger(typeId) && typeId > 0;
@@ -67,19 +69,19 @@ export default function ConsultationTypeConfig() {
         }
         return "";
       };
-      setTypeName(findName(tree) || `Type #${typeId}`);
+      setTypeName(findName(tree) || `${t("consultationConfig.typePrefix")} #${typeId}`);
       setServices(Array.isArray(servicesRes.data) ? servicesRes.data : []);
       setRequirements(Array.isArray(reqsRes.data) ? reqsRes.data : []);
     } catch (err: unknown) {
       const message =
         err && typeof err === "object" && "message" in err
           ? String((err as { message: string }).message)
-          : "Failed to load.";
+          : t("consultationConfig.failedToLoad");
       setError(message);
     } finally {
       setLoading(false);
     }
-  }, [typeId, isValidId]);
+  }, [typeId, isValidId, t]);
 
   useEffect(() => {
     fetchData();
@@ -118,12 +120,12 @@ export default function ConsultationTypeConfig() {
   };
 
   const handleDeleteService = async (serviceId: number) => {
-    if (!window.confirm("Remove this checklist service?")) return;
+    if (!window.confirm(t("consultationConfig.removeChecklistConfirm"))) return;
     try {
       await consultationTypesApi.deleteService(typeId, serviceId);
       await fetchData();
     } catch {
-      setError("Failed to delete service.");
+      setError(t("consultationConfig.failedDeleteService"));
     }
   };
 
@@ -163,20 +165,20 @@ export default function ConsultationTypeConfig() {
   };
 
   const handleDeleteReq = async (reqId: number) => {
-    if (!window.confirm("Remove this verification requirement?")) return;
+    if (!window.confirm(t("consultationConfig.removeVerificationConfirm"))) return;
     try {
       await consultationTypesApi.deleteVerificationRequirement(typeId, reqId);
       await fetchData();
     } catch {
-      setError("Failed to delete requirement.");
+      setError(t("consultationConfig.failedDeleteRequirement"));
     }
   };
 
   if (!isValidId) {
     return (
       <>
-        <PageBreadcrumb pageTitle="Consultation type config" />
-        <p className="text-gray-500 dark:text-gray-400">Invalid type ID.</p>
+        <PageBreadcrumb pageTitle={t("consultationConfig.pageTitle")} />
+        <p className="text-gray-500 dark:text-gray-400">{t("consultationConfig.invalidTypeId")}</p>
       </>
     );
   }
@@ -184,19 +186,19 @@ export default function ConsultationTypeConfig() {
   return (
     <>
       <PageMeta
-        title={`Config: ${typeName} | Hope - BMQAS`}
-        description="Manage checklist services and verification requirements for this consultation type"
+        title={`${t("consultationConfig.configPrefix")}: ${typeName} | Hope - BMQAS`}
+        description={t("consultationConfig.metaDescription")}
       />
-      <PageBreadcrumb pageTitle={`Config: ${typeName || `Type #${typeId}`}`} />
+      <PageBreadcrumb pageTitle={`${t("consultationConfig.configPrefix")}: ${typeName || `${t("consultationConfig.typePrefix")} #${typeId}`}`} />
       <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] lg:p-6">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
-              {typeName || `Type #${typeId}`}
+              {typeName || `${t("consultationConfig.typePrefix")} #${typeId}`}
             </h3>
             <p className="text-sm text-gray-500 dark:text-gray-400">
               <Link to="/consultation-types" className="text-brand-600 hover:underline dark:text-brand-400">
-                ← Back to tree
+                ← {t("consultationConfig.backToTree")}
               </Link>
             </p>
           </div>
@@ -210,17 +212,17 @@ export default function ConsultationTypeConfig() {
 
         {loading ? (
           <div className="py-8 text-center text-gray-500 dark:text-gray-400">
-            Loading…
+            {t("consultationConfig.loading")}
           </div>
         ) : (
           <div className="grid gap-8 lg:grid-cols-2">
             {/* Checklist services */}
             <div className="rounded-xl border border-gray-200 bg-gray-50/50 p-4 dark:border-gray-800 dark:bg-gray-800/30">
               <h4 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                Checklist services
+                {t("consultationConfig.checklistServices")}
               </h4>
               <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
-                Items providers can offer or exclude for this consultation type.
+                {t("consultationConfig.checklistHelp")}
               </p>
               <ul className="space-y-2">
                 {services
@@ -267,17 +269,17 @@ export default function ConsultationTypeConfig() {
                   setServiceDisplayOrder(services.length);
                 }}
               >
-                Add service
+                {t("consultationConfig.addService")}
               </Button>
             </div>
 
             {/* Verification requirements */}
             <div className="rounded-xl border border-gray-200 bg-gray-50/50 p-4 dark:border-gray-800 dark:bg-gray-800/30">
               <h4 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                Verification requirements
+                {t("consultationConfig.verificationRequirements")}
               </h4>
               <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
-                Verification document types required for this consultation type. Types are managed under Document Types in the sidebar.
+                {t("consultationConfig.verificationHelp")}
               </p>
               <ul className="space-y-2">
                 {requirements
@@ -296,7 +298,7 @@ export default function ConsultationTypeConfig() {
                         {typeLabel}
                         {r.isRequired && (
                           <span className="ml-1.5 rounded bg-amber-100 px-1 text-xs text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
-                            Required
+                            {t("consultationConfig.required")}
                           </span>
                         )}
                       </span>
@@ -337,7 +339,7 @@ export default function ConsultationTypeConfig() {
                   setReqDisplayOrder(requirements.length);
                 }}
               >
-                Add requirement
+                {t("consultationConfig.addRequirement")}
               </Button>
             </div>
           </div>
@@ -349,21 +351,21 @@ export default function ConsultationTypeConfig() {
         <Modal
           isOpen={true}
           onClose={() => !submitting && setServiceModal(null)}
-          title={serviceModal.mode === "add" ? "Add checklist service" : "Edit service"}
+          title={serviceModal.mode === "add" ? t("consultationConfig.addChecklistService") : t("consultationConfig.editService")}
         >
           <div className="space-y-3">
             <label className="block">
-              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Label</span>
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("consultationConfig.label")}</span>
               <input
                 type="text"
                 value={serviceLabel}
                 onChange={(e) => setServiceLabel(e.target.value)}
                 className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
-                placeholder="e.g. Vital signs check"
+                placeholder={t("consultationConfig.labelPlaceholder")}
               />
             </label>
             <label className="block">
-              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Display order</span>
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("consultationConfig.displayOrder")}</span>
               <input
                 type="number"
                 min={0}
@@ -378,7 +380,7 @@ export default function ConsultationTypeConfig() {
                 onClick={() => !submitting && setServiceModal(null)}
                 className="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
               >
-                Cancel
+                {t("common.actions.cancel")}
               </button>
               <button
                 type="button"
@@ -386,7 +388,7 @@ export default function ConsultationTypeConfig() {
                 onClick={serviceModal.mode === "add" ? handleAddService : handleEditService}
                 className="rounded bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
               >
-                {submitting ? "Saving…" : "Save"}
+                {submitting ? t("supervisor.saving") : t("common.actions.save")}
               </button>
             </div>
           </div>
@@ -400,13 +402,13 @@ export default function ConsultationTypeConfig() {
           onClose={() => !submitting && setReqModal(null)}
           title={
             reqModal.mode === "add"
-              ? "Add verification requirement"
-              : "Edit requirement"
+              ? t("consultationConfig.addVerificationRequirement")
+              : t("consultationConfig.editRequirement")
           }
         >
           <div className="space-y-3">
             <label className="block">
-              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Verification document type (from Document Types entity)</span>
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("consultationConfig.verificationDocumentType")}</span>
               <select
                 value={reqDocumentType}
                 onChange={(e) => setReqDocumentType(e.target.value)}
@@ -427,10 +429,10 @@ export default function ConsultationTypeConfig() {
                 onChange={(e) => setReqIsRequired(e.target.checked)}
                 className="h-4 w-4 rounded border-gray-300 text-brand-600"
               />
-              <span className="text-sm text-gray-700 dark:text-gray-300">Required</span>
+              <span className="text-sm text-gray-700 dark:text-gray-300">{t("consultationConfig.required")}</span>
             </label>
             <label className="block">
-              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Display order</span>
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("consultationConfig.displayOrder")}</span>
               <input
                 type="number"
                 min={0}
@@ -445,7 +447,7 @@ export default function ConsultationTypeConfig() {
                 onClick={() => !submitting && setReqModal(null)}
                 className="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
               >
-                Cancel
+                {t("common.actions.cancel")}
               </button>
               <button
                 type="button"
@@ -453,7 +455,7 @@ export default function ConsultationTypeConfig() {
                 onClick={reqModal.mode === "add" ? handleAddReq : handleEditReq}
                 className="rounded bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
               >
-                {submitting ? "Saving…" : "Save"}
+                {submitting ? t("supervisor.saving") : t("common.actions.save")}
               </button>
             </div>
           </div>
