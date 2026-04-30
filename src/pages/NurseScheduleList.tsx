@@ -27,9 +27,13 @@ const STATUS_TABS: { value: "all" | LongTermOpportunityStatusFilter; label: stri
   { value: "REQUESTED", label: "Requested" },
   { value: "SCHEDULE_PROPOSED", label: "Schedule proposed" },
   { value: "CHANGE_REQUESTED", label: "Change requested" },
-  { value: "SCHEDULE_CONFIRMED", label: "Schedule confirmed" },
-  { value: "PAYMENT_COMPLETED", label: "Payment completed" },
   { value: "IN_PROGRESS", label: "In progress" },
+  { value: "PAYMENT_PENDING", label: "Payment pending" },
+  { value: "PAID", label: "Paid" },
+  { value: "COMPLETED", label: "Completed" },
+  { value: "REJECTED", label: "Rejected" },
+  { value: "CANCELLED", label: "Cancelled" },
+  { value: "EXPIRED", label: "Expired" },
 ];
 
 function formatRequestWindow(row: LongTermOpportunityListItem): string {
@@ -685,13 +689,13 @@ export default function NurseScheduleList() {
                     "REQUESTED",
                     "SCHEDULE_PROPOSED",
                     "CHANGE_REQUESTED",
-                    "SCHEDULE_CONFIRMED",
-                    "PAYMENT_COMPLETED",
                     "IN_PROGRESS",
+                    "PAYMENT_PENDING",
+                    "PAID",
                     "COMPLETED",
+                    "REJECTED",
                     "CANCELLED",
                     "EXPIRED",
-                    "PAYMENT_PENDING",
                   ].map((status) => (
                     <option key={status} value={status}>
                       {status}

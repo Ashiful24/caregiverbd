@@ -812,6 +812,8 @@ export interface ProviderListItem {
   status: ProviderStatus;
   consultationTypeId?: number | null;
   consultationTypeName?: string | null;
+  rate?: string | null;
+  billingRateType?: string | null;
   createdAt: string;
   updatedAt?: string;
   /** Availability window when listing AVAILABLE providers (admin list). */
@@ -894,6 +896,8 @@ export function normalizeProviderListItem(raw: unknown): ProviderListItem {
   const consultationTypeId = Number(o.consultationTypeId ?? o.consultation_type_id);
   const consultationTypeName =
     str(o.consultationTypeName) || str(o.consultation_type_name) || undefined;
+  const rate = str(o.rate) || undefined;
+  const billingRateType = str(o.billingRateType) || str(o.billing_rate_type) || undefined;
   const updatedAt = str(o.updatedAt) || undefined;
   const startDate = str(o.startDate) || str(o.start_date) || undefined;
   const endDate = str(o.endDate) || str(o.end_date) || undefined;
@@ -918,6 +922,8 @@ export function normalizeProviderListItem(raw: unknown): ProviderListItem {
     status,
     consultationTypeId: Number.isFinite(consultationTypeId) ? consultationTypeId : undefined,
     consultationTypeName,
+    rate,
+    billingRateType,
     createdAt: str(o.createdAt) || new Date().toISOString(),
     updatedAt,
     startDate,
@@ -1829,9 +1835,13 @@ export type LongTermOpportunityStatusFilter =
   | "REQUESTED"
   | "SCHEDULE_PROPOSED"
   | "CHANGE_REQUESTED"
-  | "SCHEDULE_CONFIRMED"
-  | "PAYMENT_COMPLETED"
-  | "IN_PROGRESS";
+  | "IN_PROGRESS"
+  | "PAYMENT_PENDING"
+  | "PAID"
+  | "COMPLETED"
+  | "REJECTED"
+  | "CANCELLED"
+  | "EXPIRED";
 
 export interface LongTermOpportunityListItem {
   id: number;

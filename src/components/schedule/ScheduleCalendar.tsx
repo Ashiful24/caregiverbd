@@ -39,6 +39,7 @@ type Props = {
   subtitle: string;
   requestStartDate: string;
   requestEndDate: string;
+  baseServiceAmount?: string | number | null;
   initialEvents?: ScheduleEventRecord[];
 };
 
@@ -155,6 +156,7 @@ export function ScheduleCalendar({
   subtitle,
   requestStartDate,
   requestEndDate,
+  baseServiceAmount,
   initialEvents = [],
 }: Props) {
   const { user } = useAuth();
@@ -178,6 +180,7 @@ export function ScheduleCalendar({
   );
   const [formError, setFormError] = useState<string | null>(null);
   const [savingEvent, setSavingEvent] = useState(false);
+  const [locallyAddedAmount, setLocallyAddedAmount] = useState(0);
   const [removeTarget, setRemoveTarget] = useState<ScheduleEventRecord | null>(null);
   const [removingEvent, setRemovingEvent] = useState(false);
   const [removeReason, setRemoveReason] = useState("");
@@ -195,7 +198,34 @@ export function ScheduleCalendar({
 
   useEffect(() => {
     setEvents(initialEvents);
+    setLocallyAddedAmount(0);
   }, [initialEvents, requestId]);
+
+  const parseMoney = (v: unknown): number => {
+    const raw = String(v ?? "").trim();
+    if (!raw) return 0;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  const formatMoney = (v: number): string =>
+    `${v.toLocaleString(undefined, {
+      minimumFractionDigits: Number.isInteger(v) ? 0 : 2,
+      maximumFractionDigits: 2,
+    })} ৳`;
+
+  const extractApiErrorMessage = (err: unknown): string | null => {
+    if (!err || typeof err !== "object") return null;
+    const e = err as Record<string, unknown>;
+    const response = e.response && typeof e.response === "object" ? (e.response as Record<string, unknown>) : null;
+    const data = response?.data && typeof response.data === "object" ? (response.data as Record<string, unknown>) : null;
+    const candidates = [data?.message, e.message];
+    for (const candidate of candidates) {
+      const msg = String(candidate ?? "").trim();
+      if (msg) return msg;
+    }
+    return null;
+  };
 
   const dayInRange = useCallback(
     (day: Date) => {
@@ -211,6 +241,14 @@ export function ScheduleCalendar({
     const end = combineDateHour(modalDraft.endDateStr, modalDraft.endHour);
     return { start, end };
   }, [modalDraft]);
+
+  const selectedNurse = nurses.find((n) => n.id === selectedNurseId) ?? null;
+  const selectedNurseRate = parseMoney(selectedNurse?.rate);
+  const selectedDurationHours = computedRange
+    ? Math.max(0, differenceInMinutes(computedRange.end, computedRange.start) / 60)
+    : 0;
+  const selectedTotalAmount = selectedNurseRate * selectedDurationHours;
+  const totalServiceAmount = parseMoney(baseServiceAmount) + locallyAddedAmount;
 
   const rangeValidForSave = useMemo(() => {
     if (!computedRange) return false;
@@ -419,6 +457,7 @@ export function ScheduleCalendar({
       return;
     }
     const nurseId = String(nurse.id);
+    const eventAmount = parseMoney(nurse.rate) * (differenceInMinutes(end, start) / 60);
     if (eventOverlapsNurse(events, nurseId, start, end)) {
       setFormError("This nurse is already assigned in an overlapping time range.");
       return;
@@ -443,16 +482,20 @@ export function ScheduleCalendar({
         requestId,
         nurseId,
         nurseName: providerLabel(nurse),
-        title: `${providerLabel(nurse).split(" ")[0]} - Visit`,
+        title: providerLabel(nurse),
+        feeLabel: eventAmount > 0 ? formatMoney(eventAmount) : undefined,
         start: start.toISOString(),
         end: end.toISOString(),
         type: "visit",
         scheduleSlotId: created.scheduleSlotId,
       };
       setEvents((prev) => [...prev, newEvent]);
+      if (eventAmount > 0) {
+        setLocallyAddedAmount((prev) => prev + eventAmount);
+      }
       closeModal();
-    } catch {
-      setFormError("Failed to create schedule. Please try again.");
+    } catch (err: unknown) {
+      setFormError(extractApiErrorMessage(err) ?? "Failed to create schedule. Please try again.");
     } finally {
       setSavingEvent(false);
     }
@@ -490,6 +533,9 @@ export function ScheduleCalendar({
         <div>
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{title}</h2>
           <p className="text-sm text-gray-500 dark:text-gray-400">{subtitle}</p>
+          <p className="text-sm font-medium text-brand-700 dark:text-brand-400">
+            Service amount: {formatMoney(totalServiceAmount)}
+          </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -578,6 +624,13 @@ export function ScheduleCalendar({
           <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl border border-gray-200 bg-white p-4 shadow-xl dark:border-gray-800 dark:bg-gray-900">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Schedule visit</h3>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Choose start and end (full hours only), then pick a nurse and check availability by date.</p>
+            <p className="mt-2 text-sm font-medium text-brand-700 dark:text-brand-400">
+              {selectedNurse
+                ? `Total amount (${selectedDurationHours}h × ${formatMoney(selectedNurseRate)}): ${formatMoney(
+                    selectedTotalAmount
+                  )}`
+                : "Select a provider to see total amount."}
+            </p>
 
             <div className="mt-5 space-y-4">
               <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">

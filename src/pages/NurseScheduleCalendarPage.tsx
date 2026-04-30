@@ -166,7 +166,14 @@ function buildEventsFromScheduleDetails(
             s.name ??
             "Nurse"
         ).trim() || "Nurse";
-      const feeLabel = formatFee(serviceRequest?.fee ?? raw.fee);
+      const feeLabel = formatFee(
+        serviceRequest?.providerFee ??
+          serviceRequest?.provider_fee ??
+          serviceRequest?.fee ??
+          raw.providerFee ??
+          raw.provider_fee ??
+          raw.fee
+      );
       const event: ScheduleEventRecord = {
         id: String(
           serviceRequest?.longTermCalendarSlotId ??
@@ -177,7 +184,7 @@ function buildEventsFromScheduleDetails(
         requestId,
         nurseId: providerId,
         nurseName: providerName,
-        title: `${providerName.split(" ")[0]} - Visit`,
+        title: providerName,
         feeLabel: feeLabel ?? undefined,
         start: startIso,
         end: endIso,
@@ -340,6 +347,7 @@ export default function NurseScheduleCalendarPage() {
           subtitle={subtitle}
           requestStartDate={requestStartDate}
           requestEndDate={requestEndDate}
+          baseServiceAmount={request.amount}
           initialEvents={initialEvents}
         />
       </div>
