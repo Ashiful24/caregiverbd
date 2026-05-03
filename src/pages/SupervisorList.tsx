@@ -164,13 +164,6 @@ export default function SupervisorList() {
     }
   }, [t]);
 
-  const statusText = (status: SupervisorFullDetails["status"]) => {
-    if (status === "ACTIVE") return t("common.status.active");
-    if (status === "ON_LEAVE") return t("common.status.onLeave");
-    if (status === "INACTIVE") return t("common.status.inactive");
-    return String(status).replace("_", " ");
-  };
-
   useEffect(() => {
     void fetchSupervisors();
   }, [fetchSupervisors]);
@@ -288,7 +281,7 @@ export default function SupervisorList() {
                     <p className="mt-0.5 break-words text-sm text-gray-500 dark:text-gray-400">{s.email}</p>
                   </div>
                   <div className="flex shrink-0 items-start gap-2">
-                    {statusBadge(s.status, statusText(s.status))}
+                    {statusBadge(s.status, s.status)}
                     <ActionsMenu
                       isOpen={openActionsId === s.id}
                       onClose={() => setOpenActionsId(null)}
@@ -437,7 +430,7 @@ export default function SupervisorList() {
                     <TableCell className="min-w-0 py-3 align-top text-theme-sm text-gray-600 dark:text-gray-400">
                       {s.region}
                     </TableCell>
-                    <TableCell className="min-w-0 py-3 align-top">{statusBadge(s.status, statusText(s.status))}</TableCell>
+                    <TableCell className="min-w-0 py-3 align-top">{statusBadge(s.status, s.status)}</TableCell>
                     <TableCell className="min-w-0 py-3 align-top text-theme-sm text-gray-600 dark:text-gray-400">
                       {s.teamSize}
                     </TableCell>

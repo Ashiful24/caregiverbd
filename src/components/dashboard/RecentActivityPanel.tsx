@@ -24,26 +24,6 @@ function getStatusBadgeColor(status: string): "success" | "warning" | "error" | 
   return statusBadgeColor[key] ?? "light";
 }
 
-function statusLabel(status: string, t: (key: string) => string): string {
-  const key = String(status).toUpperCase();
-  switch (key) {
-    case "PENDING":
-      return t("common.status.pending");
-    case "ACCEPTED":
-      return t("common.status.accepted");
-    case "IN_PROGRESS":
-      return t("common.status.inProgress");
-    case "COMPLETED":
-      return t("common.status.completed");
-    case "CANCELLED":
-      return t("common.status.cancelled");
-    case "REJECTED":
-      return t("common.status.rejected");
-    default:
-      return status;
-  }
-}
-
 export interface RecentActivityPanelProps {
   items: DashboardRecentServiceRequest[];
   loading?: boolean;
@@ -138,7 +118,7 @@ export function RecentActivityPanel({ items, loading }: RecentActivityPanelProps
                   </TableCell>
                   <TableCell className="py-3">
                     <Badge size="sm" color={getStatusBadgeColor(row.status)}>
-                      {statusLabel(row.status, t)}
+                      {row.status}
                     </Badge>
                   </TableCell>
                 </TableRow>

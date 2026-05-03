@@ -61,3 +61,8 @@ export function formatRelativeTime(iso: string): string {
     return iso;
   }
 }
+
+/** English labels for account active flag (domain convention; not localized in data cells). */
+export function formatAccountActiveLabel(isActive: boolean): "Active" | "Inactive" {
+  return isActive ? "Active" : "Inactive";
+}

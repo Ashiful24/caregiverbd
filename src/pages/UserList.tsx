@@ -23,7 +23,7 @@ import {
   type UserListItem,
   type UserListStatusFilter,
 } from "../services/api";
-import { formatDate } from "../utils/format";
+import { formatAccountActiveLabel, formatDate } from "../utils/format";
 
 /** Full user profile from GET /users/:id (may include extra fields from backend) */
 interface UserProfileDetail extends UserListItem {
@@ -399,7 +399,7 @@ export default function UserList() {
                           size="sm"
                           color={isUserActive(user) ? "success" : "error"}
                         >
-                          {isUserActive(user) ? t("common.status.active") : t("common.status.inactive")}
+                          {formatAccountActiveLabel(isUserActive(user))}
                         </Badge>
                         <ActionsMenu
                           isOpen={openActionsId === user.id}
@@ -567,7 +567,7 @@ export default function UserList() {
                             size="sm"
                             color={isUserActive(user) ? "success" : "error"}
                           >
-                            {isUserActive(user) ? t("common.status.active") : t("common.status.inactive")}
+                            {formatAccountActiveLabel(isUserActive(user))}
                           </Badge>
                         </TableCell>
                         <TableCell className="py-3 text-theme-sm text-gray-600 dark:text-gray-400">
@@ -707,7 +707,7 @@ export default function UserList() {
               <dt className="font-medium text-gray-500 dark:text-gray-400">{t("users.status")}</dt>
               <dd className="text-gray-800 dark:text-gray-200">
                 <Badge size="sm" color={detailData.isActive !== false ? "success" : "error"}>
-                  {detailData.isActive !== false ? t("common.status.active") : t("common.status.inactive")}
+                  {formatAccountActiveLabel(detailData.isActive !== false)}
                 </Badge>
               </dd>
               <dt className="font-medium text-gray-500 dark:text-gray-400">{t("users.created")}</dt>

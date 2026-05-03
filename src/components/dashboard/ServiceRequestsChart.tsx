@@ -21,24 +21,8 @@ export interface ServiceRequestsChartProps {
 export function ServiceRequestsChart({ summary, loading }: ServiceRequestsChartProps) {
   const { t } = useTranslation();
   const series = STATUS_ORDER.map((s) => summary?.[s] ?? 0);
-  const labels = STATUS_ORDER.map((s) => {
-    switch (s) {
-      case "PENDING":
-        return t("common.status.pending");
-      case "ACCEPTED":
-        return t("common.status.accepted");
-      case "IN_PROGRESS":
-        return t("common.status.inProgress");
-      case "COMPLETED":
-        return t("common.status.completed");
-      case "CANCELLED":
-        return t("common.status.cancelled");
-      case "REJECTED":
-        return t("common.status.rejected");
-      default:
-        return s;
-    }
-  });
+  /** Legend labels match API enum keys (not localized — same in EN/BN). */
+  const labels = [...STATUS_ORDER];
   const total = series.reduce((a, b) => a + b, 0);
 
   const options: ApexOptions = {

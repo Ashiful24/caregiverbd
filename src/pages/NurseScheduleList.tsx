@@ -184,34 +184,6 @@ export default function NurseScheduleList() {
     [page, limit, statusTab, t]
   );
 
-  const statusLabel = (status: string) => {
-    const s = String(status).toUpperCase();
-    switch (s) {
-      case "REQUESTED":
-        return t("common.status.requested");
-      case "SCHEDULE_PROPOSED":
-        return t("common.status.scheduleProposed");
-      case "CHANGE_REQUESTED":
-        return t("common.status.changeRequested");
-      case "SCHEDULE_CONFIRMED":
-        return t("common.status.scheduleConfirmed");
-      case "PAYMENT_COMPLETED":
-        return t("common.status.paymentCompleted");
-      case "IN_PROGRESS":
-        return t("common.status.inProgress");
-      case "COMPLETED":
-        return t("common.status.completed");
-      case "CANCELLED":
-        return t("common.status.cancelled");
-      case "EXPIRED":
-        return t("common.status.expired");
-      case "PAYMENT_PENDING":
-        return t("common.status.paymentPending");
-      default:
-        return status || t("common.noValue");
-    }
-  };
-
   useEffect(() => {
     const controller = new AbortController();
     void fetchList(controller.signal);
@@ -363,7 +335,7 @@ export default function NurseScheduleList() {
                     : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:border-gray-600 dark:hover:text-gray-300"
                 }`}
               >
-                {tab.value === "all" ? t("common.all") : statusLabel(tab.value)}
+                {tab.value === "all" ? t("common.all") : tab.value}
               </button>
             ))}
           </nav>
@@ -396,7 +368,7 @@ export default function NurseScheduleList() {
                       <div>
                         <p className="font-semibold text-gray-800 dark:text-white/90">{rowTitle(request)}</p>
                         <p className="mt-0.5 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                          {statusLabel(request.status)}
+                          {request.status?.trim() || "—"}
                         </p>
                         {request.location ? (
                           <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">{request.location}</p>
@@ -520,7 +492,7 @@ export default function NurseScheduleList() {
                           {request.location?.trim() || "—"}
                         </TableCell>
                         <TableCell className="py-3 text-theme-sm leading-snug text-gray-600 dark:text-gray-400">
-                          {statusLabel(request.status)}
+                          {request.status?.trim() || "—"}
                         </TableCell>
                         <TableCell className="py-3 text-right text-theme-sm whitespace-nowrap text-gray-600 dark:text-gray-400">
                           {formatAmount(request)}
@@ -646,7 +618,7 @@ export default function NurseScheduleList() {
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-800/40">
                 <p className="text-xs text-gray-500 dark:text-gray-400">{t("dashboard.status")}</p>
                 <p className="mt-1 text-sm font-medium text-gray-800 dark:text-gray-200">
-                  {statusLabel(detailsItem.status)}
+                  {detailsItem.status?.trim() || "—"}
                 </p>
               </div>
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-800/40">

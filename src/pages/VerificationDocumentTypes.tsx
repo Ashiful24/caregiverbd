@@ -9,6 +9,7 @@ import {
   verificationDocumentTypesApi,
   type VerificationDocumentTypeItem,
 } from "../services/api";
+import { formatAccountActiveLabel } from "../utils/format";
 import { PencilIcon, PlusIcon } from "../icons";
 
 export default function VerificationDocumentTypes() {
@@ -193,7 +194,7 @@ export default function VerificationDocumentTypes() {
                           size="sm"
                           color={item.isActive ? "success" : "error"}
                         >
-                          {item.isActive ? t("common.status.active") : t("common.status.inactive")}
+                          {formatAccountActiveLabel(!!item.isActive)}
                         </Badge>
                       </td>
                       <td className="whitespace-nowrap py-3 text-right">

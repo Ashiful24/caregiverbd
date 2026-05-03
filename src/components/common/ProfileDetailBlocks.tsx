@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { formatDate } from "../../utils/format";
+import { formatAccountActiveLabel, formatDate } from "../../utils/format";
 import { getAssetUrl } from "../../utils/assetUrl";
 import { viewDocument, downloadDocument, printDocument } from "../../utils/documentActions";
 import Badge from "../ui/badge/Badge";
@@ -708,24 +708,24 @@ export function ProviderFullDetailsView({
   const allowedNextStatuses: { value: ProviderStatusValue; label: string }[] =
     currentStatus === "PENDING"
       ? [
-          { value: "ACTIVE", label: t("common.status.active") },
-          { value: "REJECTED", label: t("common.status.rejected") },
-          { value: "ARCHIVED", label: t("providers.statusArchived") },
+          { value: "ACTIVE", label: "ACTIVE" },
+          { value: "REJECTED", label: "REJECTED" },
+          { value: "ARCHIVED", label: "ARCHIVED" },
         ]
       : currentStatus === "ACTIVE"
         ? [
-            { value: "DEACTIVATED", label: t("providers.statusDeactivated") },
-            { value: "ARCHIVED", label: t("providers.statusArchived") },
+            { value: "DEACTIVATED", label: "DEACTIVATED" },
+            { value: "ARCHIVED", label: "ARCHIVED" },
           ]
         : currentStatus === "REJECTED"
           ? [
-              { value: "ACTIVE", label: t("common.status.active") },
-              { value: "ARCHIVED", label: t("providers.statusArchived") },
+              { value: "ACTIVE", label: "ACTIVE" },
+              { value: "ARCHIVED", label: "ARCHIVED" },
             ]
           : currentStatus === "DEACTIVATED"
             ? [
-                { value: "ACTIVE", label: t("common.status.active") },
-                { value: "ARCHIVED", label: t("providers.statusArchived") },
+                { value: "ACTIVE", label: "ACTIVE" },
+                { value: "ARCHIVED", label: "ARCHIVED" },
               ]
             : [];
   const [profileStatusChoice, setProfileStatusChoice] = useState<ProviderStatusValue>(
@@ -1226,7 +1226,7 @@ export function ProviderFullDetailsView({
           label={t("providers.account")}
           value={
             <Badge size="sm" color={user.isActive ? "success" : "error"}>
-              {user.isActive ? t("common.status.active") : t("common.status.inactive")}
+              {formatAccountActiveLabel(!!user.isActive)}
             </Badge>
           }
         />
@@ -1239,8 +1239,8 @@ export function ProviderFullDetailsView({
               onChange={(e) => setUserStatusChoice(e.target.value as "Active" | "Inactive")}
               className="w-full min-w-0 rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 sm:w-auto sm:min-w-[8rem]"
             >
-              <option value="Active">{t("common.status.active")}</option>
-              <option value="Inactive">{t("common.status.inactive")}</option>
+              <option value="Active">Active</option>
+              <option value="Inactive">Inactive</option>
             </select>
             <input
               type="text"

@@ -15,7 +15,7 @@ import {
 import Badge from "../components/ui/badge/Badge";
 import { DropdownItem } from "../components/ui/dropdown/DropdownItem";
 import { patientsApi, type PatientFullDetailsDto, type PatientListItem } from "../services/api";
-import { formatDate } from "../utils/format";
+import { formatAccountActiveLabel, formatDate } from "../utils/format";
 
 const LIMIT_OPTIONS = [10, 20, 50];
 const SEARCH_DEBOUNCE_MS = 300;
@@ -200,7 +200,7 @@ export default function PatientList() {
                           size="sm"
                           color={patient.isActive !== false ? "success" : "error"}
                         >
-                          {patient.isActive !== false ? t("common.status.active") : t("common.status.inactive")}
+                          {formatAccountActiveLabel(patient.isActive !== false)}
                         </Badge>
                         <ActionsMenu
                           isOpen={openActionsId === patient.id}
@@ -328,7 +328,7 @@ export default function PatientList() {
                             size="sm"
                             color={patient.isActive !== false ? "success" : "error"}
                           >
-                            {patient.isActive !== false ? t("common.status.active") : t("common.status.inactive")}
+                            {formatAccountActiveLabel(patient.isActive !== false)}
                           </Badge>
                         </TableCell>
                         <TableCell className="py-3 text-right">

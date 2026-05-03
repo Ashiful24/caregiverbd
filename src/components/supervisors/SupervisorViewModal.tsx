@@ -22,13 +22,6 @@ function Item({ label, value }: { label: string; value: string }) {
   );
 }
 
-function statusLabel(status: SupervisorFullDetails["status"], t: (k: string) => string) {
-  if (status === "ACTIVE") return t("common.status.active");
-  if (status === "ON_LEAVE") return t("common.status.onLeave");
-  if (status === "INACTIVE") return t("common.status.inactive");
-  return String(status).replace(/_/g, " ");
-}
-
 export interface SupervisorViewModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -105,7 +98,7 @@ export function SupervisorViewModal({
           </Section>
 
           <Section title={t("supervisor.accountInfo")}>
-            <Item label={t("dashboard.status")} value={statusLabel(supervisor.status, t)} />
+            <Item label={t("dashboard.status")} value={supervisor.status} />
             <Item label={t("supervisor.password")} value={t("supervisor.hiddenPassword")} />
           </Section>
 
