@@ -168,9 +168,12 @@ export function ScheduleWeekView({
                           height: `${layout.heightPct}%`,
                           minHeight: 22,
                         }}
-                        title={`${e.title} (${format(start, "h a")}–${format(endDisplay, "h a")})`}
+                        title={`${e.title}${e.feeLabel ? ` | Fee: ${e.feeLabel}` : ""} (${format(start, "h a")}–${format(endDisplay, "h a")})`}
                       >
                         <p className="truncate font-semibold">{e.title}</p>
+                        {e.feeLabel ? (
+                          <p className="truncate text-[10px] opacity-90">Fee: {e.feeLabel}</p>
+                        ) : null}
                         <p className="truncate text-[10px] opacity-90">
                           {format(start, "h a")} – {format(endDisplay, "h a")}
                         </p>

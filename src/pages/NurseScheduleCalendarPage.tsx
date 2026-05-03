@@ -78,6 +78,20 @@ function buildEventsFromScheduleDetails(
     return `${date}T${hhmm}:00`;
   };
 
+  const formatFee = (feeRaw: unknown): string | null => {
+    const raw = String(feeRaw ?? "").trim();
+    if (!raw) return null;
+    const amount = Number(raw);
+    if (Number.isFinite(amount)) {
+      const formatted = amount.toLocaleString(undefined, {
+        minimumFractionDigits: amount % 1 === 0 ? 0 : 2,
+        maximumFractionDigits: 2,
+      });
+      return `${formatted} ৳`;
+    }
+    return `${raw} ৳`;
+  };
+
   const slotsRaw = collectSlots(root);
   if (!slotsRaw.length) return [];
   const events = slotsRaw
@@ -152,6 +166,14 @@ function buildEventsFromScheduleDetails(
             s.name ??
             "Nurse"
         ).trim() || "Nurse";
+      const feeLabel = formatFee(
+        serviceRequest?.providerFee ??
+          serviceRequest?.provider_fee ??
+          serviceRequest?.fee ??
+          raw.providerFee ??
+          raw.provider_fee ??
+          raw.fee
+      );
       const event: ScheduleEventRecord = {
         id: String(
           serviceRequest?.longTermCalendarSlotId ??
@@ -162,7 +184,8 @@ function buildEventsFromScheduleDetails(
         requestId,
         nurseId: providerId,
         nurseName: providerName,
-        title: `${providerName.split(" ")[0]} - Visit`,
+        title: providerName,
+        feeLabel: feeLabel ?? undefined,
         start: startIso,
         end: endIso,
         type: "visit",
@@ -324,6 +347,7 @@ export default function NurseScheduleCalendarPage() {
           subtitle={subtitle}
           requestStartDate={requestStartDate}
           requestEndDate={requestEndDate}
+          baseServiceAmount={request.amount}
           initialEvents={initialEvents}
         />
       </div>

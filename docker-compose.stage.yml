@@ -1,5 +1,5 @@
 services:
-  hope-frontend:
+  hope-frontend-stage:
     build:
       context: .
       dockerfile: Dockerfile
