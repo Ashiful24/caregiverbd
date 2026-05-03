@@ -287,7 +287,7 @@ export default function ServiceRequestList() {
                       </div>
                       <div className="flex justify-between gap-2">
                         <dt className="text-gray-500 dark:text-gray-400">
-                          {t("dashboard.provider")}
+                          Provider
                         </dt>
                         <dd className="text-gray-800 dark:text-gray-200">
                           {item.providerName ?? "—"}
@@ -357,7 +357,7 @@ export default function ServiceRequestList() {
                         isHeader
                         className="w-[14%] py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
                       >
-                        {t("dashboard.provider")}
+                        Provider
                       </TableCell>
                       <TableCell
                         isHeader

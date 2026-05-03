@@ -1,5 +1,8 @@
 import { Fragment } from "react";
+import { useTranslation } from "react-i18next";
 import { format, isSameDay } from "date-fns";
+import { bn } from "date-fns/locale/bn";
+import { enUS } from "date-fns/locale/en-US";
 import type { ScheduleEventRecord } from "../../data/nurseScheduleSeed";
 import { parseEventRange } from "../../data/nurseScheduleSeed";
 import { eventTypeClasses } from "./scheduleEventStyles";
@@ -55,6 +58,9 @@ export function ScheduleDayView({
   onSelectHour,
   onEventClick,
 }: Props) {
+  const { t, i18n } = useTranslation();
+  const dateLoc = i18n.language?.startsWith("bn") ? bn : enUS;
+
   const hours = Array.from({ length: HOUR_COUNT }, (_, i) => START_HOUR + i);
   const dayEvents = eventsForDay(events, day);
   const inRange = dayInRange(day);
@@ -63,9 +69,11 @@ export function ScheduleDayView({
     <div className="overflow-x-auto">
       <div className="mx-auto max-w-3xl">
         <div className="mb-3 text-center sm:text-left">
-          <p className="text-lg font-semibold text-gray-900 dark:text-white">{format(day, "EEEE, MMMM d, yyyy")}</p>
+          <p className="text-lg font-semibold text-gray-900 dark:text-white">
+            {format(day, "EEEE, MMMM d, yyyy", { locale: dateLoc })}
+          </p>
           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            {inRange ? "Click an hour row to add a visit (minimum 1 hour)." : "This day is outside the service request window."}
+            {inRange ? t("scheduleCalendar.dayViewClickHint") : t("scheduleCalendar.dayOutsideWindow")}
           </p>
         </div>
         <div className="relative rounded-xl border-2 border-gray-300 bg-white dark:border-gray-600 dark:bg-gray-900/40">
@@ -79,7 +87,7 @@ export function ScheduleDayView({
             {hours.map((h) => (
               <Fragment key={h}>
                 <div className={timeCellClass} style={{ height: PX_PER_HOUR, minHeight: PX_PER_HOUR }}>
-                  {format(new Date(2000, 0, 1, h), "h a")}
+                  {format(new Date(2000, 0, 1, h), "h a", { locale: dateLoc })}
                 </div>
                 <button
                   type="button"
@@ -128,10 +136,12 @@ export function ScheduleDayView({
                   >
                     <p className="font-semibold text-gray-900 dark:text-gray-100">{e.title}</p>
                     {e.feeLabel ? (
-                      <p className="text-xs text-gray-600 dark:text-gray-300">Fee: {e.feeLabel}</p>
+                      <p className="text-xs text-gray-600 dark:text-gray-300">
+                        {t("scheduleCalendar.feeLine", { amount: e.feeLabel })}
+                      </p>
                     ) : null}
                     <p className="text-xs text-gray-600 dark:text-gray-300">
-                      {format(start, "h a")} – {format(endDisplay, "h a")}
+                      {format(start, "h a", { locale: dateLoc })} – {format(endDisplay, "h a", { locale: dateLoc })}
                     </p>
                   </div>
                 );

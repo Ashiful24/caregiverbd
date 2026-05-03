@@ -1,5 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useLocation, useParams } from "react-router";
+import { format, isValid, parseISO } from "date-fns";
+import { bn } from "date-fns/locale/bn";
+import { enUS } from "date-fns/locale/en-US";
 import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import PageMeta from "../components/common/PageMeta";
 import { ScheduleCalendar } from "../components/schedule/ScheduleCalendar";
@@ -36,7 +40,8 @@ function resolveOpportunityFromScheduleDetails(data: unknown): LongTermOpportuni
 
 function buildEventsFromScheduleDetails(
   data: unknown,
-  requestId: string
+  requestId: string,
+  nurseFallback = "Nurse"
 ): ScheduleEventRecord[] {
   if (!data || typeof data !== "object") return [];
   const root = data as Record<string, unknown>;
@@ -164,8 +169,8 @@ function buildEventsFromScheduleDetails(
                 ).trim()}`.trim() || providerObj.name
               : "") ??
             s.name ??
-            "Nurse"
-        ).trim() || "Nurse";
+            nurseFallback
+        ).trim() || nurseFallback;
       const feeLabel = formatFee(
         serviceRequest?.providerFee ??
           serviceRequest?.provider_fee ??
@@ -203,6 +208,20 @@ function buildEventsFromScheduleDetails(
 }
 
 export default function NurseScheduleCalendarPage() {
+  const { t, i18n } = useTranslation();
+  const dateLocale = i18n.language?.startsWith("bn") ? bn : enUS;
+  const nurseFallback = t("scheduleCalendar.nurseFallback");
+
+  const fmtRangeDate = useCallback((iso: string) => {
+    try {
+      const raw = iso.trim();
+      const d = parseISO(raw.length >= 10 ? raw.slice(0, 10) : raw);
+      return isValid(d) ? format(d, "d MMM yyyy", { locale: dateLocale }) : formatDate(iso);
+    } catch {
+      return formatDate(iso);
+    }
+  }, [dateLocale]);
+
   const { requestId } = useParams<{ requestId: string }>();
   const location = useLocation();
   const routeRequest =
@@ -214,7 +233,7 @@ export default function NurseScheduleCalendarPage() {
   const [request, setRequest] = useState<LongTermOpportunityListItem | null>(routeRequest ?? null);
   const [initialEvents, setInitialEvents] = useState<ScheduleEventRecord[]>(
     requestId && routeScheduleDetails
-      ? buildEventsFromScheduleDetails(routeScheduleDetails, requestId)
+      ? buildEventsFromScheduleDetails(routeScheduleDetails, requestId, nurseFallback)
       : []
   );
   const [loading, setLoading] = useState(!routeRequest && Boolean(requestId));
@@ -228,7 +247,7 @@ export default function NurseScheduleCalendarPage() {
     if (routeRequest && String(routeRequest.id) === requestId) {
       setRequest(routeRequest);
       if (routeScheduleDetails) {
-        setInitialEvents(buildEventsFromScheduleDetails(routeScheduleDetails, requestId));
+        setInitialEvents(buildEventsFromScheduleDetails(routeScheduleDetails, requestId, nurseFallback));
       }
       setLoading(false);
       return;
@@ -242,7 +261,7 @@ export default function NurseScheduleCalendarPage() {
         });
         const row = resolveOpportunityFromScheduleDetails(res.data);
         setRequest(row.id > 0 ? row : null);
-        setInitialEvents(buildEventsFromScheduleDetails(res.data, requestId));
+        setInitialEvents(buildEventsFromScheduleDetails(res.data, requestId, nurseFallback));
       } catch {
         try {
           const res = await adminLongTermOpportunitiesApi.getById(requestId, {
@@ -260,33 +279,33 @@ export default function NurseScheduleCalendarPage() {
       }
     })();
     return () => ac.abort();
-  }, [requestId, routeRequest, routeScheduleDetails]);
+  }, [requestId, routeRequest, routeScheduleDetails, nurseFallback]);
 
   const title = useMemo(() => {
-    if (!request) return "Service request";
+    if (!request) return t("scheduleCalendar.titleFallback");
     const no = request.requestNo?.trim() || `SR-${request.id}`;
-    const patient = request.patientName?.trim() || "Unknown";
-    return `${no} - ${patient}`;
-  }, [request]);
+    const patient = request.patientName?.trim() || t("scheduleCalendar.unknownPatient");
+    return t("scheduleCalendar.requestTitle", { no, name: patient });
+  }, [request, t]);
 
   const subtitle = useMemo(() => {
-    if (!request) return "Service request schedule";
+    if (!request) return t("scheduleCalendar.subtitleDefault");
     const parts: string[] = [];
     if (request.startDate && request.endDate) {
-      parts.push(`${formatDate(request.startDate)} - ${formatDate(request.endDate)}`);
+      parts.push(`${fmtRangeDate(request.startDate)} - ${fmtRangeDate(request.endDate)}`);
     } else if (request.startDate) {
-      parts.push(formatDate(request.startDate));
+      parts.push(fmtRangeDate(request.startDate));
     } else if (request.endDate) {
-      parts.push(formatDate(request.endDate));
+      parts.push(fmtRangeDate(request.endDate));
     }
     if (request.timeRange?.trim()) {
-      parts.push(`Time: ${request.timeRange.trim()}`);
+      parts.push(`${t("scheduleCalendar.timePrefix")}: ${request.timeRange.trim()}`);
     }
     if (request.assignedNursesLabel?.trim()) {
-      parts.push(`Nurses: ${request.assignedNursesLabel.trim()}`);
+      parts.push(`${t("scheduleCalendar.nursesPrefix")}: ${request.assignedNursesLabel.trim()}`);
     }
-    return parts.join(" | ") || "Service request schedule";
-  }, [request]);
+    return parts.join(" | ") || t("scheduleCalendar.subtitleDefault");
+  }, [request, t, fmtRangeDate]);
 
   const requestStartDate = request?.startDate ?? new Date().toISOString();
   const requestEndDate =
@@ -296,10 +315,10 @@ export default function NurseScheduleCalendarPage() {
   if (loading) {
     return (
       <>
-        <PageMeta title="Service request | Hope - BMQAS" description="Service request" />
-        <PageBreadcrumb pageTitle="Service request" />
+        <PageMeta title={t("scheduleCalendar.metaTitle")} description={t("schedule.pageTitle")} />
+        <PageBreadcrumb pageTitle={t("scheduleCalendar.pageBreadcrumb")} />
         <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center dark:border-gray-800 dark:bg-white/[0.03]">
-          <p className="text-gray-600 dark:text-gray-400">Loading service request…</p>
+          <p className="text-gray-600 dark:text-gray-400">{t("scheduleCalendar.loading")}</p>
         </div>
       </>
     );
@@ -308,17 +327,15 @@ export default function NurseScheduleCalendarPage() {
   if (!requestId || !request) {
     return (
       <>
-        <PageMeta title="Service request not found | Hope - BMQAS" description="Service request" />
-        <PageBreadcrumb pageTitle="Service request" />
+        <PageMeta title={t("scheduleCalendar.metaNotFoundTitle")} description={t("schedule.pageTitle")} />
+        <PageBreadcrumb pageTitle={t("scheduleCalendar.pageBreadcrumb")} />
         <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center dark:border-gray-800 dark:bg-white/[0.03]">
-          <p className="text-gray-600 dark:text-gray-400">
-            This service request was not found.
-          </p>
+          <p className="text-gray-600 dark:text-gray-400">{t("scheduleCalendar.notFound")}</p>
           <Link
             to="/schedule"
             className="mt-4 inline-flex text-sm font-semibold text-brand-600 hover:text-brand-700 dark:text-brand-400"
           >
-            Back to request list
+            {t("scheduleCalendar.backToList")}
           </Link>
         </div>
       </>
@@ -328,16 +345,20 @@ export default function NurseScheduleCalendarPage() {
   return (
     <>
       <PageMeta
-        title={`${request.requestNo ?? `SR-${request.id}`} — Service request | Hope - BMQAS`}
-        description={`Calendar for ${request.patientName ?? "patient"}`}
+        title={t("scheduleCalendar.metaTitleWithNo", {
+          requestNo: request.requestNo ?? `SR-${request.id}`,
+        })}
+        description={t("scheduleCalendar.metaDescriptionPatient", {
+          name: request.patientName?.trim() || t("schedule.patient"),
+        })}
       />
-      <PageBreadcrumb pageTitle="Service request" />
+      <PageBreadcrumb pageTitle={t("scheduleCalendar.pageBreadcrumb")} />
       <div className="mb-4">
         <Link
           to="/schedule"
           className="inline-flex items-center gap-1 text-sm font-semibold text-brand-600 hover:text-brand-700 dark:text-brand-400"
         >
-          <span aria-hidden>←</span> All service requests
+          <span aria-hidden>←</span> {t("scheduleCalendar.allRequests")}
         </Link>
       </div>
       <div className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03] sm:p-6">
