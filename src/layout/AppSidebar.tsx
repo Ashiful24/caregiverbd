@@ -73,6 +73,12 @@ const navSections: NavSection[] = [
         allowedRoles: ["ADMIN"],
       },
       {
+        icon: <ListIcon />,
+        nameKey: "navigation.consultationTypeLevels",
+        path: "/consultation-type-levels",
+        allowedRoles: ["ADMIN"],
+      },
+      {
         icon: <PageIcon />,
         nameKey: "navigation.documentTypes",
         path: "/verification-document-types",

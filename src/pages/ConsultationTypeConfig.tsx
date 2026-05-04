@@ -8,7 +8,7 @@ import { Modal } from "../components/ui/modal";
 import {
   consultationTypesApi,
   verificationDocumentTypesApi,
-  type ConsultationTypeServiceItem,
+  type ServiceCategoryChecklistItem,
   type ConsultationTypeVerificationRequirementItem,
   type VerificationDocumentTypeItem,
 } from "../services/api";
@@ -21,7 +21,7 @@ export default function ConsultationTypeConfig() {
   const isValidId = Number.isInteger(typeId) && typeId > 0;
 
   const [typeName, setTypeName] = useState<string>("");
-  const [services, setServices] = useState<ConsultationTypeServiceItem[]>([]);
+  const [services, setServices] = useState<ServiceCategoryChecklistItem[]>([]);
   const [requirements, setRequirements] = useState<
     ConsultationTypeVerificationRequirementItem[]
   >([]);
@@ -29,20 +29,26 @@ export default function ConsultationTypeConfig() {
   const [error, setError] = useState("");
 
   const [serviceModal, setServiceModal] = useState<
-    { mode: "add" } | { mode: "edit"; item: ConsultationTypeServiceItem } | null
+    { mode: "add" } | { mode: "edit"; item: ServiceCategoryChecklistItem } | null
   >(null);
   const [reqModal, setReqModal] = useState<
     | { mode: "add" }
     | { mode: "edit"; item: ConsultationTypeVerificationRequirementItem }
     | null
   >(null);
-  const [serviceLabel, setServiceLabel] = useState("");
+  const [serviceName, setServiceName] = useState("");
+  const [serviceDescription, setServiceDescription] = useState("");
+  const [serviceIsActive, setServiceIsActive] = useState(true);
   const [serviceDisplayOrder, setServiceDisplayOrder] = useState(0);
   const [documentTypes, setDocumentTypes] = useState<VerificationDocumentTypeItem[]>([]);
   const [reqDocumentType, setReqDocumentType] = useState("");
   const [reqIsRequired, setReqIsRequired] = useState(true);
   const [reqDisplayOrder, setReqDisplayOrder] = useState(0);
   const [submitting, setSubmitting] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<
+    { type: "service"; id: number } | { type: "requirement"; id: number } | null
+  >(null);
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
 
   const fetchData = useCallback(async () => {
     if (!isValidId) return;
@@ -92,11 +98,15 @@ export default function ConsultationTypeConfig() {
     setSubmitting(true);
     try {
       await consultationTypesApi.createService(typeId, {
-        label: serviceLabel.trim(),
+        name: serviceName.trim(),
+        description: serviceDescription.trim() || null,
+        isActive: serviceIsActive,
         displayOrder: serviceDisplayOrder,
       });
       setServiceModal(null);
-      setServiceLabel("");
+      setServiceName("");
+      setServiceDescription("");
+      setServiceIsActive(true);
       setServiceDisplayOrder(0);
       await fetchData();
     } finally {
@@ -109,7 +119,9 @@ export default function ConsultationTypeConfig() {
     setSubmitting(true);
     try {
       await consultationTypesApi.updateService(typeId, serviceModal.item.id, {
-        label: serviceLabel.trim(),
+        name: serviceName.trim(),
+        description: serviceDescription.trim() || null,
+        isActive: serviceIsActive,
         displayOrder: serviceDisplayOrder,
       });
       setServiceModal(null);
@@ -119,13 +131,27 @@ export default function ConsultationTypeConfig() {
     }
   };
 
-  const handleDeleteService = async (serviceId: number) => {
-    if (!window.confirm(t("consultationConfig.removeChecklistConfirm"))) return;
+  const handleConfirmDelete = async () => {
+    if (!pendingDelete) return;
+    setDeleteSubmitting(true);
+    setError("");
     try {
-      await consultationTypesApi.deleteService(typeId, serviceId);
+      if (pendingDelete.type === "service") {
+        await consultationTypesApi.deleteService(typeId, pendingDelete.id);
+      } else {
+        await consultationTypesApi.deleteVerificationRequirement(typeId, pendingDelete.id);
+      }
+      setPendingDelete(null);
       await fetchData();
     } catch {
-      setError(t("consultationConfig.failedDeleteService"));
+      setError(
+        pendingDelete.type === "service"
+          ? t("consultationConfig.failedDeleteService")
+          : t("consultationConfig.failedDeleteRequirement")
+      );
+      setPendingDelete(null);
+    } finally {
+      setDeleteSubmitting(false);
     }
   };
 
@@ -161,16 +187,6 @@ export default function ConsultationTypeConfig() {
       await fetchData();
     } finally {
       setSubmitting(false);
-    }
-  };
-
-  const handleDeleteReq = async (reqId: number) => {
-    if (!window.confirm(t("consultationConfig.removeVerificationConfirm"))) return;
-    try {
-      await consultationTypesApi.deleteVerificationRequirement(typeId, reqId);
-      await fetchData();
-    } catch {
-      setError(t("consultationConfig.failedDeleteRequirement"));
     }
   };
 
@@ -230,17 +246,33 @@ export default function ConsultationTypeConfig() {
                   .map((s) => (
                     <li
                       key={s.id}
-                      className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-800/50"
+                      className="flex items-center justify-between gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-800/50"
                     >
-                      <span className="font-medium text-gray-800 dark:text-white/90">
-                        {s.label}
-                      </span>
-                      <div className="flex gap-1">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-medium text-gray-800 dark:text-white/90">
+                            {s.name}
+                          </span>
+                          {!s.isActive && (
+                            <span className="rounded bg-gray-200 px-1.5 text-xs text-gray-700 dark:bg-gray-600 dark:text-gray-200">
+                              {t("common.status.inactive")}
+                            </span>
+                          )}
+                        </div>
+                        {s.description && (
+                          <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
+                            {s.description}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex shrink-0 gap-1">
                         <button
                           type="button"
                           onClick={() => {
                             setServiceModal({ mode: "edit", item: s });
-                            setServiceLabel(s.label);
+                            setServiceName(s.name);
+                            setServiceDescription(s.description ?? "");
+                            setServiceIsActive(s.isActive);
                             setServiceDisplayOrder(s.displayOrder);
                           }}
                           className="rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-gray-200"
@@ -249,7 +281,7 @@ export default function ConsultationTypeConfig() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => handleDeleteService(s.id)}
+                          onClick={() => setPendingDelete({ type: "service", id: s.id })}
                           className="rounded p-1 text-gray-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
                         >
                           <TrashBinIcon className="h-4 w-4" />
@@ -265,7 +297,9 @@ export default function ConsultationTypeConfig() {
                 startIcon={<PlusIcon className="h-4 w-4" />}
                 onClick={() => {
                   setServiceModal({ mode: "add" });
-                  setServiceLabel("");
+                  setServiceName("");
+                  setServiceDescription("");
+                  setServiceIsActive(true);
                   setServiceDisplayOrder(services.length);
                 }}
               >
@@ -317,7 +351,7 @@ export default function ConsultationTypeConfig() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => handleDeleteReq(r.id)}
+                          onClick={() => setPendingDelete({ type: "requirement", id: r.id })}
                           className="rounded p-1 text-gray-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
                         >
                           <TrashBinIcon className="h-4 w-4" />
@@ -352,17 +386,37 @@ export default function ConsultationTypeConfig() {
           isOpen={true}
           onClose={() => !submitting && setServiceModal(null)}
           title={serviceModal.mode === "add" ? t("consultationConfig.addChecklistService") : t("consultationConfig.editService")}
+          className="w-full max-w-lg"
         >
           <div className="space-y-3">
             <label className="block">
-              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("consultationConfig.label")}</span>
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("consultationConfig.serviceItemName")}</span>
               <input
                 type="text"
-                value={serviceLabel}
-                onChange={(e) => setServiceLabel(e.target.value)}
+                value={serviceName}
+                onChange={(e) => setServiceName(e.target.value)}
                 className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
-                placeholder={t("consultationConfig.labelPlaceholder")}
+                placeholder={t("consultationConfig.serviceItemNamePlaceholder")}
               />
+            </label>
+            <label className="block">
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("consultationConfig.serviceItemDescription")}</span>
+              <textarea
+                value={serviceDescription}
+                onChange={(e) => setServiceDescription(e.target.value)}
+                rows={3}
+                className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                placeholder={t("consultationConfig.serviceItemDescriptionPlaceholder")}
+              />
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={serviceIsActive}
+                onChange={(e) => setServiceIsActive(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-brand-600"
+              />
+              <span className="text-sm text-gray-700 dark:text-gray-300">{t("consultationConfig.serviceItemActive")}</span>
             </label>
             <label className="block">
               <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("consultationConfig.displayOrder")}</span>
@@ -384,7 +438,7 @@ export default function ConsultationTypeConfig() {
               </button>
               <button
                 type="button"
-                disabled={submitting || !serviceLabel.trim()}
+                disabled={submitting || !serviceName.trim()}
                 onClick={serviceModal.mode === "add" ? handleAddService : handleEditService}
                 className="rounded bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
               >
@@ -394,6 +448,39 @@ export default function ConsultationTypeConfig() {
           </div>
         </Modal>
       )}
+
+      {/* Remove checklist / requirement confirmation */}
+      <Modal
+        isOpen={pendingDelete != null}
+        onClose={() => !deleteSubmitting && setPendingDelete(null)}
+        title={t("consultationConfig.removeModalTitle")}
+        className="w-full max-w-lg"
+      >
+        <div className="space-y-4 pt-2">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            {pendingDelete?.type === "requirement"
+              ? t("consultationConfig.removeVerificationConfirm")
+              : t("consultationConfig.removeChecklistConfirm")}
+          </p>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => !deleteSubmitting && setPendingDelete(null)}
+              className="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+            >
+              {t("common.actions.cancel")}
+            </button>
+            <button
+              type="button"
+              disabled={deleteSubmitting}
+              onClick={() => void handleConfirmDelete()}
+              className="rounded bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+            >
+              {deleteSubmitting ? t("consultationConfig.removing") : t("consultationConfig.removeConfirmButton")}
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Verification requirement add/edit modal */}
       {reqModal && (
@@ -405,6 +492,7 @@ export default function ConsultationTypeConfig() {
               ? t("consultationConfig.addVerificationRequirement")
               : t("consultationConfig.editRequirement")
           }
+          className="w-full max-w-lg"
         >
           <div className="space-y-3">
             <label className="block">

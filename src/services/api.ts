@@ -567,39 +567,47 @@ export const consultationTypesApi = {
     return httpService.post<ConsultationType[]>("/admin/consultation-types/reorder", data);
   },
 
-  // --- Admin: Checklist services per consultation type ---
-  /** GET /admin/consultation-types/:id/services */
+  // --- Admin: Service category checklists per consultation type ---
+  /** GET /admin/consultation-types/:id/service-category-checklists */
   getServices: async (consultationTypeId: number) => {
-    return httpService.get<ConsultationTypeServiceItem[]>(
-      `/admin/consultation-types/${consultationTypeId}/services`
+    return httpService.get<ServiceCategoryChecklistItem[]>(
+      `/admin/consultation-types/${consultationTypeId}/service-category-checklists`
     );
   },
-  /** POST /admin/consultation-types/:id/services */
+  /** POST /admin/consultation-types/:id/service-category-checklists */
   createService: async (
     consultationTypeId: number,
-    data: { label: string; displayOrder?: number }
+    data: {
+      name: string;
+      description?: string | null;
+      isActive?: boolean;
+      displayOrder?: number;
+    }
   ) => {
-    return httpService.post<ConsultationTypeServiceItem>(
-      `/admin/consultation-types/${consultationTypeId}/services`,
+    return httpService.post<ServiceCategoryChecklistItem>(
+      `/admin/consultation-types/${consultationTypeId}/service-category-checklists`,
       data
     );
   },
-  /** PATCH /admin/consultation-types/:id/services/:serviceId */
+  /** PATCH /admin/service-category-checklists/:serviceId */
   updateService: async (
-    consultationTypeId: number,
+    _consultationTypeId: number,
     serviceId: number,
-    data: { label?: string; displayOrder?: number }
+    data: {
+      name?: string;
+      description?: string | null;
+      isActive?: boolean;
+      displayOrder?: number;
+    }
   ) => {
-    return httpService.patch<ConsultationTypeServiceItem>(
-      `/admin/consultation-types/${consultationTypeId}/services/${serviceId}`,
+    return httpService.patch<ServiceCategoryChecklistItem>(
+      `/admin/service-category-checklists/${serviceId}`,
       data
     );
   },
-  /** DELETE /admin/consultation-types/:id/services/:serviceId */
-  deleteService: async (consultationTypeId: number, serviceId: number) => {
-    return httpService.delete(
-      `/admin/consultation-types/${consultationTypeId}/services/${serviceId}`
-    );
+  /** DELETE /admin/service-category-checklists/:serviceId */
+  deleteService: async (_consultationTypeId: number, serviceId: number) => {
+    return httpService.delete(`/admin/service-category-checklists/${serviceId}`);
   },
 
   // --- Admin: Verification requirements per consultation type ---
@@ -641,10 +649,12 @@ export const consultationTypesApi = {
   },
 };
 
-/** Checklist service item (consultation type services). */
-export interface ConsultationTypeServiceItem {
+/** Service category checklist row (admin; per consultation type). */
+export interface ServiceCategoryChecklistItem {
   id: number;
-  label: string;
+  name: string;
+  description?: string | null;
+  isActive: boolean;
   displayOrder: number;
 }
 
@@ -715,6 +725,71 @@ export const verificationDocumentTypesApi = {
       `/admin/verification-document-types/${id}/active`,
       { isActive }
     );
+  },
+};
+
+// ============== Admin: Consultation type levels ==============
+
+export type ConsultationTypeLevelCategory = "DOCTOR" | "CAREGIVER";
+
+export interface ConsultationTypeLevel {
+  id: number;
+  name: string;
+  levelNumber: number;
+  category: ConsultationTypeLevelCategory;
+  minSalary: number;
+  maxSalary: number;
+}
+
+export type ConsultationTypeLevelPayload = {
+  name: string;
+  levelNumber: number;
+  category: ConsultationTypeLevelCategory;
+  minSalary: number;
+  maxSalary: number;
+};
+
+/**
+ * PATCH body for consultation-type-levels. The admin API update DTO typically expects
+ * snake_case JSON keys; POST create still accepts camelCase (common Nest/class-validator setup).
+ */
+function toConsultationTypeLevelPatchBody(
+  data: Partial<ConsultationTypeLevelPayload>
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (data.name !== undefined) out.name = data.name;
+  if (data.levelNumber !== undefined) out.level_number = data.levelNumber;
+  if (data.category !== undefined) out.category = data.category;
+  if (data.minSalary !== undefined) out.min_salary = data.minSalary;
+  if (data.maxSalary !== undefined) out.max_salary = data.maxSalary;
+  return out;
+}
+
+export const consultationTypeLevelsApi = {
+  /** GET /admin/consultation-type-levels?category=DOCTOR|CAREGIVER */
+  list: async (params: { category: ConsultationTypeLevelCategory }) => {
+    return httpService.get<ConsultationTypeLevel[]>("/admin/consultation-type-levels", {
+      params: { category: params.category },
+    });
+  },
+  /** GET /admin/consultation-type-levels/:id */
+  getById: async (id: number) => {
+    return httpService.get<ConsultationTypeLevel>(`/admin/consultation-type-levels/${id}`);
+  },
+  /** POST /admin/consultation-type-levels */
+  create: async (data: ConsultationTypeLevelPayload) => {
+    return httpService.post<ConsultationTypeLevel>("/admin/consultation-type-levels", data);
+  },
+  /** PATCH /admin/consultation-type-levels/:id (snake_case body per update DTO) */
+  update: async (id: number, data: Partial<ConsultationTypeLevelPayload>) => {
+    return httpService.patch<ConsultationTypeLevel>(
+      `/admin/consultation-type-levels/${id}`,
+      toConsultationTypeLevelPatchBody(data)
+    );
+  },
+  /** DELETE /admin/consultation-type-levels/:id */
+  delete: async (id: number) => {
+    return httpService.delete(`/admin/consultation-type-levels/${id}`);
   },
 };
 
