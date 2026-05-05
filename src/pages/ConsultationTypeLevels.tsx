@@ -9,13 +9,22 @@ import {
   type ConsultationTypeLevel,
   type ConsultationTypeLevelCategory,
 } from "../services/api";
-import { PencilIcon, PlusIcon, TrashBinIcon } from "../icons";
+import { PencilIcon, PlusIcon, TrashBinIcon, ViewIcon } from "../icons";
 
-const CATEGORIES: ConsultationTypeLevelCategory[] = ["DOCTOR", "CAREGIVER"];
+const CATEGORIES: ConsultationTypeLevelCategory[] = ["CAREGIVER", "DOCTOR"];
+
+const actionIconButtonClass =
+  "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded border border-gray-300 bg-white p-1.5 text-gray-600 hover:bg-gray-50 disabled:pointer-events-none disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700";
+
+function formatSalaryAmount(value: number): string {
+  return new Intl.NumberFormat(undefined, {
+    maximumFractionDigits: 0,
+  }).format(value);
+}
 
 export default function ConsultationTypeLevels() {
   const { t } = useTranslation();
-  const [category, setCategory] = useState<ConsultationTypeLevelCategory>("DOCTOR");
+  const [category, setCategory] = useState<ConsultationTypeLevelCategory>("CAREGIVER");
   const [list, setList] = useState<ConsultationTypeLevel[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -27,7 +36,7 @@ export default function ConsultationTypeLevels() {
 
   const [name, setName] = useState("");
   const [levelNumber, setLevelNumber] = useState(1);
-  const [formCategory, setFormCategory] = useState<ConsultationTypeLevelCategory>("DOCTOR");
+  const [formCategory, setFormCategory] = useState<ConsultationTypeLevelCategory>("CAREGIVER");
   const [minSalary, setMinSalary] = useState(0);
   const [maxSalary, setMaxSalary] = useState(0);
   const [submitting, setSubmitting] = useState(false);
@@ -300,25 +309,28 @@ export default function ConsultationTypeLevels() {
                                 type="button"
                                 onClick={() => void openDetail(item)}
                                 disabled={loadingDetail}
-                                className="inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded border border-gray-300 bg-white px-2 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                                className={actionIconButtonClass}
                                 title={t("common.actions.view")}
+                                aria-label={t("common.actions.view")}
                               >
-                                {t("common.actions.view")}
+                                <ViewIcon className="h-4 w-4" />
                               </button>
                               <button
                                 type="button"
                                 onClick={() => void openEdit(item)}
                                 disabled={loadingDetail}
-                                className="inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded border border-gray-300 bg-white p-1.5 text-gray-600 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
+                                className={actionIconButtonClass}
                                 title={t("common.actions.edit")}
+                                aria-label={t("common.actions.edit")}
                               >
                                 <PencilIcon className="h-4 w-4" />
                               </button>
                               <button
                                 type="button"
                                 onClick={() => setPendingDelete(item)}
-                                className="inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+                                className={actionIconButtonClass}
                                 title={t("consultationTypeLevels.remove")}
+                                aria-label={t("consultationTypeLevels.remove")}
                               >
                                 <TrashBinIcon className="h-4 w-4" />
                               </button>
@@ -548,46 +560,69 @@ export default function ConsultationTypeLevels() {
       <Modal
         isOpen={detailItem != null}
         onClose={() => !loadingDetail && setDetailItem(null)}
-        title={t("consultationTypeLevels.detailTitle")}
-        className="w-full max-w-lg"
+        title={detailItem?.name ?? t("consultationTypeLevels.detailTitle")}
+        className="w-full max-w-lg overflow-hidden"
       >
         {detailItem && (
-          <div className="space-y-2 pt-2 text-sm">
-            <p>
-              <span className="font-medium text-gray-500 dark:text-gray-400">
-                {t("consultationTypeLevels.name")}:{" "}
-              </span>
-              {detailItem.name}
+          <div className="space-y-4 pt-1">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {t("consultationTypeLevels.detailSubtitle")}
+              <span className="mx-1.5 text-gray-300 dark:text-gray-600">·</span>
+              <span className="tabular-nums">{t("consultationTypeLevels.idLabel", { id: detailItem.id })}</span>
             </p>
-            <p>
-              <span className="font-medium text-gray-500 dark:text-gray-400">
-                {t("consultationTypeLevels.levelNumber")}:{" "}
+
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-gradient-to-r from-gray-50/90 to-white px-4 py-4 dark:border-gray-700 dark:from-gray-800/50 dark:to-gray-900/30">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                  {t("consultationTypeLevels.detailLevelStat")}
+                </p>
+                <p className="mt-0.5 text-3xl font-bold tabular-nums leading-none text-gray-900 dark:text-white">
+                  {detailItem.levelNumber}
+                </p>
+              </div>
+              <span
+                className={
+                  detailItem.category === "DOCTOR"
+                    ? "inline-flex shrink-0 items-center rounded-full bg-sky-100 px-3 py-1.5 text-xs font-semibold text-sky-900 dark:bg-sky-900/40 dark:text-sky-100"
+                    : "inline-flex shrink-0 items-center rounded-full bg-emerald-100 px-3 py-1.5 text-xs font-semibold text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-100"
+                }
+              >
+                {t(`consultationTypeLevels.categoryLabels.${detailItem.category}`)}
               </span>
-              {detailItem.levelNumber}
-            </p>
-            <p>
-              <span className="font-medium text-gray-500 dark:text-gray-400">
-                {t("consultationTypeLevels.category")}:{" "}
-              </span>
-              {t(`consultationTypeLevels.categoryLabels.${detailItem.category}`)}
-            </p>
-            <p>
-              <span className="font-medium text-gray-500 dark:text-gray-400">
-                {t("consultationTypeLevels.minSalary")}:{" "}
-              </span>
-              {detailItem.minSalary}
-            </p>
-            <p>
-              <span className="font-medium text-gray-500 dark:text-gray-400">
-                {t("consultationTypeLevels.maxSalary")}:{" "}
-              </span>
-              {detailItem.maxSalary}
-            </p>
-            <div className="flex justify-end pt-2">
+            </div>
+
+            <div className="rounded-xl border border-brand-200/80 bg-gradient-to-br from-brand-50/95 via-white to-white p-5 shadow-sm dark:border-brand-900/45 dark:from-brand-950/25 dark:via-gray-900/40 dark:to-gray-900/60">
+              <p className="text-xs font-semibold uppercase tracking-wider text-brand-800 dark:text-brand-200">
+                {t("consultationTypeLevels.detailSalaryBand")}
+              </p>
+              <div className="mt-5 flex flex-col gap-6 sm:flex-row sm:items-stretch sm:gap-0">
+                <div className="flex-1 sm:border-r sm:border-brand-200/60 sm:pr-6 dark:sm:border-brand-900/40">
+                  <p className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                    {t("consultationTypeLevels.minSalary")}
+                  </p>
+                  <p className="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-gray-900 dark:text-white">
+                    {formatSalaryAmount(detailItem.minSalary)}
+                  </p>
+                </div>
+                <div className="hidden shrink-0 items-center justify-center px-2 sm:flex" aria-hidden>
+                  <span className="text-2xl font-light text-brand-300 dark:text-brand-700">|</span>
+                </div>
+                <div className="flex-1 sm:pl-2">
+                  <p className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                    {t("consultationTypeLevels.maxSalary")}
+                  </p>
+                  <p className="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-gray-900 dark:text-white">
+                    {formatSalaryAmount(detailItem.maxSalary)}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end border-t border-gray-100 pt-4 dark:border-gray-800">
               <button
                 type="button"
                 onClick={() => setDetailItem(null)}
-                className="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-brand-700 dark:hover:bg-brand-500"
               >
                 {t("common.actions.close")}
               </button>
