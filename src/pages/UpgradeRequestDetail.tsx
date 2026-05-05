@@ -20,7 +20,7 @@ import {
   type AdminVerificationDocumentsResponse,
   type VerificationDocumentTypeItem,
 } from "../services/api";
-import { formatDate } from "../utils/format";
+import { formatDate, formatStatusLabel } from "../utils/format";
 import { viewDocument, downloadDocument, printDocument } from "../utils/documentActions";
 import { DownloadIcon } from "../icons";
 
@@ -219,7 +219,7 @@ export default function UpgradeRequestDetail() {
                       : "error"
                 }
               >
-                {req.status}
+                {formatStatusLabel(req.status)}
               </Badge>
             </p>
             <p>
@@ -310,7 +310,7 @@ export default function UpgradeRequestDetail() {
                                     : "warning"
                               }
                             >
-                              {doc.status}
+                              {formatStatusLabel(doc.status)}
                             </Badge>
                           ) : (
                             t("common.noValue")

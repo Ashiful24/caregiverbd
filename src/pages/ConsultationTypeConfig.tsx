@@ -4,6 +4,7 @@ import { Link, useParams } from "react-router";
 import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import PageMeta from "../components/common/PageMeta";
 import Button from "../components/ui/button/Button";
+import Checkbox from "../components/form/input/Checkbox";
 import { Modal } from "../components/ui/modal";
 import {
   consultationTypesApi,
@@ -410,11 +411,10 @@ export default function ConsultationTypeConfig() {
               />
             </label>
             <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={serviceIsActive}
-                onChange={(e) => setServiceIsActive(e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300 text-brand-600"
+                onChange={setServiceIsActive}
+                className="h-4 w-4"
               />
               <span className="text-sm text-gray-700 dark:text-gray-300">{t("consultationConfig.serviceItemActive")}</span>
             </label>
@@ -511,11 +511,10 @@ export default function ConsultationTypeConfig() {
               </select>
             </label>
             <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={reqIsRequired}
-                onChange={(e) => setReqIsRequired(e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300 text-brand-600"
+                onChange={setReqIsRequired}
+                className="h-4 w-4"
               />
               <span className="text-sm text-gray-700 dark:text-gray-300">{t("consultationConfig.required")}</span>
             </label>

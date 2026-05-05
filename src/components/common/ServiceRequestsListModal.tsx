@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Modal } from "../ui/modal";
 import Badge from "../ui/badge/Badge";
-import { formatDate } from "../../utils/format";
+import { formatDate, formatStatusLabel } from "../../utils/format";
 import {
   patientsApi,
   providersApi,
@@ -86,7 +86,7 @@ export function ServiceRequestsListModal({
   }, [isOpen, status, fetchList]);
 
   const totalRequests = groups.reduce((sum, g) => sum + (g.requests?.length ?? 0), 0);
-  const title = status ? `Service requests — ${status}` : "Service requests";
+  const title = status ? `Service requests — ${formatStatusLabel(status)}` : "Service requests";
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} className="max-w-4xl p-6 sm:p-8">
@@ -152,7 +152,7 @@ export function ServiceRequestsListModal({
                             </td>
                             <td className="px-4 py-3">
                               <Badge size="sm" color={statusBadgeColor(req.status)}>
-                                {req.status}
+                                {formatStatusLabel(req.status)}
                               </Badge>
                             </td>
                             <td className="px-4 py-3 font-medium text-gray-800 dark:text-white/90">

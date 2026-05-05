@@ -12,7 +12,7 @@ import {
   TableRow,
 } from "../components/ui/table";
 import { upgradeRequestsApi, type UpgradeRequestListItem } from "../services/api";
-import { formatDate } from "../utils/format";
+import { formatDate, formatStatusLabel } from "../utils/format";
 
 type StatusFilter = "PENDING" | "all";
 
@@ -139,7 +139,7 @@ export default function UpgradeRequests() {
                               : "error"
                         }
                       >
-                        {req.status}
+                        {formatStatusLabel(req.status)}
                       </Badge>
                     </TableCell>
                     <TableCell className="py-3 text-sm text-gray-600 dark:text-gray-400">

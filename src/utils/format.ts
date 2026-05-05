@@ -66,3 +66,14 @@ export function formatRelativeTime(iso: string): string {
 export function formatAccountActiveLabel(isActive: boolean): "Active" | "Inactive" {
   return isActive ? "Active" : "Inactive";
 }
+
+/**
+ * Format enum-like status labels for UI (e.g. "IN_PROGRESS" -> "In progress").
+ * Keeps existing spacing and normalizes underscores to spaces.
+ */
+export function formatStatusLabel(status: string): string {
+  if (!status) return "";
+  const normalized = status.replace(/_/g, " ").toLowerCase().trim();
+  if (!normalized) return "";
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}

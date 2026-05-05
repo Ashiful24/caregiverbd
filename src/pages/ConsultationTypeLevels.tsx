@@ -4,6 +4,8 @@ import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import PageMeta from "../components/common/PageMeta";
 import Button from "../components/ui/button/Button";
 import { Modal } from "../components/ui/modal";
+import ThemedSelect from "../components/form/ThemedSelect";
+import Checkbox from "../components/form/input/Checkbox";
 import {
   consultationTypesApi,
   consultationTypeLevelsApi,
@@ -553,7 +555,7 @@ export default function ConsultationTypeLevels() {
               <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
                 {t("consultationTypeLevels.category")}
               </span>
-              <select
+              <ThemedSelect
                 value={formCategory}
                 onChange={(e) =>
                   setFormCategory(e.target.value as ConsultationTypeLevelCategory)
@@ -565,7 +567,7 @@ export default function ConsultationTypeLevels() {
                     {t(`consultationTypeLevels.categoryLabels.${c}`)}
                   </option>
                 ))}
-              </select>
+              </ThemedSelect>
             </label>
             <label className="block">
               <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
@@ -637,7 +639,7 @@ export default function ConsultationTypeLevels() {
                   <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
                     {t("consultationTypeLevels.consultationType")}
                   </span>
-                  <select
+                  <ThemedSelect
                     value={mappingConsultationTypeId ?? ""}
                     onChange={(e) => setMappingConsultationTypeId(Number(e.target.value) || null)}
                     className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
@@ -647,13 +649,13 @@ export default function ConsultationTypeLevels() {
                         {ct.name} (#{ct.id})
                       </option>
                     ))}
-                  </select>
+                  </ThemedSelect>
                 </label>
                 <label className="block">
                   <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
                     {t("consultationTypeLevels.level")}
                   </span>
-                  <select
+                  <ThemedSelect
                     value={mappingLevelId ?? ""}
                     onChange={(e) => setMappingLevelId(Number(e.target.value) || null)}
                     className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
@@ -665,7 +667,7 @@ export default function ConsultationTypeLevels() {
                           {lv.name} ({t(`consultationTypeLevels.categoryLabels.${lv.category}`)})
                         </option>
                       ))}
-                  </select>
+                  </ThemedSelect>
                 </label>
               </div>
 
@@ -688,11 +690,10 @@ export default function ConsultationTypeLevels() {
                         key={item.id}
                         className="flex items-start gap-2 rounded-lg border border-gray-200 p-2 text-sm dark:border-gray-700"
                       >
-                        <input
-                          type="checkbox"
+                        <Checkbox
                           checked={mappingChecklistIds.includes(item.id)}
                           onChange={() => toggleChecklist(item.id)}
-                          className="mt-0.5 h-4 w-4 rounded border-gray-300 text-brand-600"
+                          className="h-4 w-4"
                         />
                         <span className="min-w-0">
                           <span className="block font-medium text-gray-800 dark:text-gray-100">
@@ -777,7 +778,7 @@ export default function ConsultationTypeLevels() {
               <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
                 {t("consultationTypeLevels.category")}
               </span>
-              <select
+              <ThemedSelect
                 value={formCategory}
                 onChange={(e) =>
                   setFormCategory(e.target.value as ConsultationTypeLevelCategory)
@@ -789,7 +790,7 @@ export default function ConsultationTypeLevels() {
                     {t(`consultationTypeLevels.categoryLabels.${c}`)}
                   </option>
                 ))}
-              </select>
+              </ThemedSelect>
             </label>
             <label className="block">
               <span className="text-xs font-medium text-gray-500 dark:text-gray-400">

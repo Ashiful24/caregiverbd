@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { formatAccountActiveLabel, formatDate } from "../../utils/format";
+import { formatAccountActiveLabel, formatDate, formatStatusLabel } from "../../utils/format";
 import { getAssetUrl } from "../../utils/assetUrl";
 import { viewDocument, downloadDocument, printDocument } from "../../utils/documentActions";
 import Badge from "../ui/badge/Badge";
@@ -9,6 +9,7 @@ import { ConfirmModal } from "../ui/confirm-modal";
 import { UserCircleIcon, EyeIcon, DownloadIcon } from "../../icons";
 import { Calendar } from "../ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+import Checkbox from "../form/input/Checkbox";
 import { providersApi, adminCertificationsApi, patientsApi, adminUsersApi, adminDocumentsApi, adminProvidersApi } from "../../services/api";
 import type {
   AdminCertificationDto,
@@ -161,7 +162,7 @@ function ServiceRequestStatusCard({
       title={disabled ? "Available after provider is verified (Active)" : undefined}
     >
       <span className="block text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-        {status}
+        {formatStatusLabel(status)}
       </span>
       <p className="mt-1 text-lg font-semibold text-gray-800 dark:text-white/90">{count}</p>
       <span className="mt-0.5 block text-xs text-gray-400 dark:text-gray-500">
@@ -269,7 +270,7 @@ function BeneficiaryCard({
                   className="rounded-lg border border-gray-200 px-2 py-2 text-left transition-colors hover:border-brand-500 hover:bg-brand-50/50 dark:border-gray-700 dark:hover:border-brand-500 dark:hover:bg-brand-500/10"
                 >
                   <span className="block text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                    {status}
+                    {formatStatusLabel(status)}
                   </span>
                   <p className="mt-0.5 text-sm font-semibold text-gray-800 dark:text-white/90">{count}</p>
                 </button>
@@ -510,7 +511,7 @@ export function PatientFullDetailsView({
           label="Status"
           value={
             <Badge size="sm" color={statusBadgeColor(patient.status)}>
-              {patient.status}
+              {formatStatusLabel(patient.status)}
             </Badge>
           }
         />
@@ -1200,12 +1201,11 @@ export function ProviderFullDetailsView({
                   checklistUpdating ? "opacity-60" : ""
                 }`}
               >
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={item.checked}
                   disabled={checklistUpdating}
                   onChange={() => void handleProfileChecklistToggle(item)}
-                  className="mt-0.5 h-4 w-4 cursor-pointer rounded border-gray-300 text-amber-500 focus:ring-amber-500 disabled:cursor-not-allowed"
+                  className="mt-0.5 h-4 w-4"
                 />
                 <span>
                   {item.displayOrder}. {item.label}
@@ -1288,7 +1288,7 @@ export function ProviderFullDetailsView({
           label={t("users.status")}
           value={
             <Badge size="sm" color={statusBadgeColor(provider.status)}>
-              {provider.status}
+              {formatStatusLabel(provider.status)}
             </Badge>
           }
         />
@@ -1464,13 +1464,12 @@ export function ProviderFullDetailsView({
                     key={s.id}
                     className="flex cursor-pointer items-center gap-3 rounded-lg border border-gray-200 bg-white p-2 dark:border-gray-700 dark:bg-gray-800/50"
                   >
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={servicesOffered[s.id] ?? s.offered}
-                      onChange={(e) =>
-                        setServicesOffered((prev) => ({ ...prev, [s.id]: e.target.checked }))
+                      onChange={(checked) =>
+                        setServicesOffered((prev) => ({ ...prev, [s.id]: checked }))
                       }
-                      className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                      className="h-4 w-4"
                     />
                     <span className="text-sm font-medium text-gray-800 dark:text-white/90">{s.label}</span>
                     <span className="text-xs text-gray-500 dark:text-gray-400">
@@ -1573,7 +1572,7 @@ export function ProviderFullDetailsView({
                           <td className="py-1.5 pr-2 text-gray-700 dark:text-gray-300">{cert.certificationNumber}</td>
                           <td className="py-1.5 pr-2">
                             <Badge size="sm" color={cert.status === "APPROVED" ? "success" : cert.status === "REJECTED" ? "error" : "warning"}>
-                              {cert.status}
+                              {formatStatusLabel(cert.status)}
                             </Badge>
                           </td>
                           <td className="py-1.5 pr-2 text-gray-700 dark:text-gray-300">{cert.approvedByName ?? "—"}</td>
@@ -1693,7 +1692,7 @@ export function ProviderFullDetailsView({
                     <td className="py-1.5 pr-2 text-gray-700 dark:text-gray-300">{ref.contact}</td>
                     <td className="py-1.5 pr-2">
                       <Badge size="sm" color={ref.status === "VERIFIED" ? "success" : "warning"}>
-                        {ref.status}
+                        {formatStatusLabel(ref.status)}
                       </Badge>
                     </td>
                     <td className="py-1.5 text-gray-600 dark:text-gray-400">{ref.note}</td>
@@ -1735,7 +1734,7 @@ export function ProviderFullDetailsView({
                       <td className="py-1.5 pr-2 font-medium text-gray-800 dark:text-white/90">{doc.type}</td>
                       <td className="py-1.5 pr-2">
                         <Badge size="sm" color={doc.status === "APPROVED" ? "success" : doc.status === "REJECTED" ? "error" : "warning"}>
-                          {doc.status}
+                          {formatStatusLabel(doc.status)}
                         </Badge>
                       </td>
                       <td className="py-1.5 pr-2 text-gray-700 dark:text-gray-300">{formatDate(doc.createdAt)}</td>
@@ -1973,7 +1972,7 @@ export function ProviderFullDetailsView({
                       <tr key={entry.transactionId} className="border-b border-gray-100 dark:border-gray-800">
                         <td className="py-1.5 px-2 text-gray-700 dark:text-gray-300">{entry.createdAt ? formatDate(entry.createdAt) : t("common.noValue")}</td>
                         <td className="py-1.5 px-2 text-gray-700 dark:text-gray-300">{entry.purpose}</td>
-                        <td className="py-1.5 px-2 text-gray-700 dark:text-gray-300">{entry.status}</td>
+                        <td className="py-1.5 px-2 text-gray-700 dark:text-gray-300">{formatStatusLabel(entry.status)}</td>
                         <td className="py-1.5 px-2 text-gray-700 dark:text-gray-300">{entry.paymentMethod ?? t("common.noValue")}</td>
                         <td className="py-1.5 px-2 font-medium text-gray-800 dark:text-white/90">{entry.amount}</td>
                         <td className="py-1.5 px-2 text-gray-600 dark:text-gray-400">{entry.reason ?? t("common.noValue")}</td>
