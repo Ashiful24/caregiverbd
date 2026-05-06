@@ -340,7 +340,7 @@ export default function NurseScheduleList() {
                     : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:border-gray-600 dark:hover:text-gray-300"
                 }`}
               >
-                {tab.value === "all" ? t("common.all") : tab.value}
+                {tab.value === "all" ? t("common.all") : formatStatusLabel(tab.value)}
               </button>
             ))}
           </nav>
@@ -373,7 +373,7 @@ export default function NurseScheduleList() {
                       <div>
                         <p className="font-semibold text-gray-800 dark:text-white/90">{rowTitle(request)}</p>
                         <p className="mt-0.5 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                          {request.status?.trim() || "—"}
+                          {request.status?.trim() ? formatStatusLabel(request.status) : "—"}
                         </p>
                         {request.location ? (
                           <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">{request.location}</p>
@@ -497,7 +497,7 @@ export default function NurseScheduleList() {
                           {request.location?.trim() || "—"}
                         </TableCell>
                         <TableCell className="py-3 text-theme-sm leading-snug text-gray-600 dark:text-gray-400">
-                          {request.status?.trim() || "—"}
+                          {request.status?.trim() ? formatStatusLabel(request.status) : "—"}
                         </TableCell>
                         <TableCell className="py-3 text-right text-theme-sm whitespace-nowrap text-gray-600 dark:text-gray-400">
                           {formatAmount(request)}
