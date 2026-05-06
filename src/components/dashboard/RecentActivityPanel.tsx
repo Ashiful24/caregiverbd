@@ -1,4 +1,5 @@
 import { formatDate, formatTime } from "../../utils/format";
+import { useTranslation } from "react-i18next";
 import type { DashboardRecentServiceRequest } from "../../services/api";
 import {
   Table,
@@ -29,11 +30,13 @@ export interface RecentActivityPanelProps {
 }
 
 export function RecentActivityPanel({ items, loading }: RecentActivityPanelProps) {
+  const { t } = useTranslation();
+
   if (loading) {
     return (
       <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 pb-3 pt-4 dark:border-gray-800 dark:bg-white/[0.03] sm:px-6">
         <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
-          Recent activity
+          {t("dashboard.recentActivity")}
         </h3>
         <div className="mt-4 space-y-3">
           {[1, 2, 3, 4, 5].map((i) => (
@@ -52,18 +55,18 @@ export function RecentActivityPanel({ items, loading }: RecentActivityPanelProps
     <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 pb-3 pt-4 dark:border-gray-800 dark:bg-white/[0.03] sm:px-6">
       <div className="flex flex-col gap-2 mb-4 sm:flex-row sm:items-center sm:justify-between">
         <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
-          Recent activity
+          {t("dashboard.recentActivity")}
         </h3>
         {items?.length > 0 && (
           <span className="text-sm text-gray-500 dark:text-gray-400">
-            Latest service requests
+            {t("dashboard.latestServiceRequests")}
           </span>
         )}
       </div>
 
       {!items?.length ? (
         <p className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
-          No recent service requests.
+          {t("dashboard.noRecentServiceRequests")}
         </p>
       ) : (
         <div className="max-w-full overflow-x-auto">
@@ -74,25 +77,25 @@ export function RecentActivityPanel({ items, loading }: RecentActivityPanelProps
                   isHeader
                   className="py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400"
                 >
-                  Patient
+                  {t("dashboard.patient")}
                 </TableCell>
                 <TableCell
                   isHeader
                   className="py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400"
                 >
-                  Provider
+                  {t("dashboard.provider")}
                 </TableCell>
                 <TableCell
                   isHeader
                   className="py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400"
                 >
-                  Date & time
+                  {t("dashboard.dateTime")}
                 </TableCell>
                 <TableCell
                   isHeader
                   className="py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400"
                 >
-                  Status
+                  {t("dashboard.status")}
                 </TableCell>
               </TableRow>
             </TableHeader>
@@ -101,11 +104,11 @@ export function RecentActivityPanel({ items, loading }: RecentActivityPanelProps
                 <TableRow key={row.id}>
                   <TableCell className="py-3">
                     <p className="min-w-0 truncate font-medium text-gray-800 text-theme-sm dark:text-white/90">
-                      {row.patientName ?? "—"}
+                      {row.patientName ?? t("common.noValue")}
                     </p>
                   </TableCell>
                   <TableCell className="py-3 text-theme-sm text-gray-600 dark:text-gray-400">
-                    {row.providerName ?? "—"}
+                    {row.providerName ?? t("common.noValue")}
                   </TableCell>
                   <TableCell className="py-3 text-theme-sm text-gray-600 dark:text-gray-400">
                     <div>

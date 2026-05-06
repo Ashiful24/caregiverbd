@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Modal } from "../ui/modal";
 import Button from "../ui/button/Button";
 import type { SupervisorFullDetails } from "../../data/supervisorSeed";
@@ -76,6 +77,7 @@ type Props = {
 const PAGE_SIZE = 10;
 
 export function SupervisorAssignNursesModal({ isOpen, onClose, supervisor, onAssigned }: Props) {
+  const { t } = useTranslation();
   const [providers, setProviders] = useState<ProviderListItem[]>([]);
   /** Total rows in the unsupervised pool (GET /providers/all), not including assigned-only rows. */
   const [total, setTotal] = useState(0);
@@ -124,7 +126,7 @@ export function SupervisorAssignNursesModal({ isOpen, onClose, supervisor, onAss
             poolErr && typeof poolErr === "object" && "message" in poolErr
               ? String((poolErr as { message: string }).message)
               : "Failed to load available nurses.";
-          setError(`${message} Showing assigned nurses only.`);
+          setError(message);
           setTotal(0);
           setPage(1);
           setLastBatchSize(0);
@@ -146,7 +148,7 @@ export function SupervisorAssignNursesModal({ isOpen, onClose, supervisor, onAss
       const message =
         err && typeof err === "object" && "message" in err
           ? String((err as { message: string }).message)
-          : "Failed to load providers.";
+          : t("supervisor.assignmentFailed");
       setError(message);
       setProviders([]);
       setTotal(0);
@@ -155,7 +157,7 @@ export function SupervisorAssignNursesModal({ isOpen, onClose, supervisor, onAss
     } finally {
       setListLoading(false);
     }
-  }, [supervisor]);
+  }, [supervisor, t]);
 
   const fetchPoolPageAppend = useCallback(async (nextPage: number) => {
     setListLoadingMore(true);
@@ -175,12 +177,12 @@ export function SupervisorAssignNursesModal({ isOpen, onClose, supervisor, onAss
       const message =
         err && typeof err === "object" && "message" in err
           ? String((err as { message: string }).message)
-          : "Failed to load providers.";
+          : t("supervisor.assignmentFailed");
       setError(message);
     } finally {
       setListLoadingMore(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!isOpen || !supervisor) return;
@@ -229,7 +231,7 @@ export function SupervisorAssignNursesModal({ isOpen, onClose, supervisor, onAss
     if (!supervisor) return;
     const supervisorId = Number(supervisor.id);
     if (!Number.isFinite(supervisorId) || supervisorId <= 0) {
-      setError("Invalid supervisor ID. Only supervisors from the server can assign nurses.");
+      setError(t("supervisor.invalidSupervisorId"));
       return;
     }
     const providerIds = Array.from(selected);
@@ -243,7 +245,7 @@ export function SupervisorAssignNursesModal({ isOpen, onClose, supervisor, onAss
       const message =
         err && typeof err === "object" && "message" in err
           ? String((err as { message: string }).message)
-          : "Assignment failed.";
+          : t("supervisor.assignmentFailed");
       setError(message);
     } finally {
       setSubmitting(false);
@@ -261,17 +263,17 @@ export function SupervisorAssignNursesModal({ isOpen, onClose, supervisor, onAss
     >
       <div className="flex max-h-[min(90vh,720px)] min-h-0 flex-col">
         <div className="shrink-0 border-b border-gray-200 px-6 pb-4 pt-6 dark:border-gray-800">
-          <h3 className="pr-10 text-xl font-semibold text-gray-900 dark:text-white/90">Assign nurses</h3>
+          <h3 className="pr-10 text-xl font-semibold text-gray-900 dark:text-white/90">{t("supervisor.assignNursesTitle")}</h3>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Supervisor: <span className="font-medium text-gray-800 dark:text-gray-200">{supervisor.name}</span>
+            {t("supervisor.supervisorLabel")}: <span className="font-medium text-gray-800 dark:text-gray-200">{supervisor.name}</span>
           </p>
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
           {listLoading ? (
-            <p className="text-sm text-gray-500 dark:text-gray-400">Loading providers…</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">{t("supervisor.loadingProviders")}</p>
           ) : providers.length === 0 ? (
-            <p className="text-sm text-gray-500 dark:text-gray-400">No nurses to show.</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">{t("supervisor.noNursesToShow")}</p>
           ) : (
             <ul className="space-y-2">
               {providers.map((p) => {
@@ -296,7 +298,7 @@ export function SupervisorAssignNursesModal({ isOpen, onClose, supervisor, onAss
                     >
                       <span className="block font-semibold text-gray-900 dark:text-white/90">{name}</span>
                       <span className="mt-0.5 block text-xs text-gray-600 dark:text-gray-400">
-                        Experience:{" "}
+                        {t("supervisor.experience")}:{" "}
                         <span className="text-gray-800 dark:text-gray-300">{formatExperience(p.experience)}</span>
                       </span>
                       {p.email ? (
@@ -315,7 +317,7 @@ export function SupervisorAssignNursesModal({ isOpen, onClose, supervisor, onAss
           )}
 
           <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">
-            Selected: {selected.size} nurse{selected.size === 1 ? "" : "s"}
+            {t("supervisor.selectedCount", { count: selected.size })}
           </p>
 
           {error ? (
@@ -330,16 +332,16 @@ export function SupervisorAssignNursesModal({ isOpen, onClose, supervisor, onAss
             <p className="mb-3 text-center text-xs text-gray-500 dark:text-gray-400">
               {total > 0 ? (
                 <>
-                  Showing {poolRowsInList} of {total} available nurses
+                  {t("supervisor.showingAvailable", { shown: poolRowsInList, total })}
                   {assignedPrefixCount > 0 ? (
-                    <span> ({assignedPrefixCount} already assigned)</span>
+                    <span> {t("supervisor.alreadyAssigned", { count: assignedPrefixCount })}</span>
                   ) : null}
                 </>
               ) : (
                 <>
-                  Loaded {poolRowsInList} from available pool
-                  {assignedPrefixCount > 0 ? <span> + {assignedPrefixCount} assigned</span> : null}{" "}
-                  — more may be available
+                  {t("supervisor.loadedFromPool", { count: poolRowsInList })}
+                  {assignedPrefixCount > 0 ? <span> {t("supervisor.plusAssigned", { count: assignedPrefixCount })}</span> : null}{" "}
+                  - {t("supervisor.moreMayBeAvailable")}
                 </>
               )}
             </p>
@@ -351,7 +353,7 @@ export function SupervisorAssignNursesModal({ isOpen, onClose, supervisor, onAss
               disabled={listLoadingMore}
               className="w-full"
             >
-              {listLoadingMore ? "Loading more…" : "Load more"}
+              {listLoadingMore ? t("common.actions.loadingMore") : t("common.actions.loadMore")}
             </Button>
           </div>
         ) : null}
@@ -359,10 +361,10 @@ export function SupervisorAssignNursesModal({ isOpen, onClose, supervisor, onAss
         <div className="shrink-0 border-t border-gray-200 bg-gray-50/80 px-6 py-4 dark:border-gray-800 dark:bg-gray-900/50">
           <div className="flex flex-wrap items-center justify-end gap-3">
             <Button type="button" variant="outline" onClick={handleClose} disabled={submitting}>
-              Cancel
+              {t("common.actions.cancel")}
             </Button>
             <Button type="button" onClick={() => void handleSubmit()} disabled={submitting || listLoading}>
-              {submitting ? "Assigning…" : "Assign selected"}
+              {submitting ? t("supervisor.assigning") : t("supervisor.assignSelected")}
             </Button>
           </div>
         </div>

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
+import { useTranslation } from "react-i18next";
 import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import PageMeta from "../components/common/PageMeta";
 import Badge from "../components/ui/badge/Badge";
@@ -24,6 +25,7 @@ import { viewDocument, downloadDocument, printDocument } from "../utils/document
 import { DownloadIcon } from "../icons";
 
 export default function UpgradeRequestDetail() {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const requestId = id ? parseInt(id, 10) : NaN;
 
@@ -38,7 +40,7 @@ export default function UpgradeRequestDetail() {
 
   const fetchData = useCallback(async () => {
     if (!requestId || Number.isNaN(requestId)) {
-      setError("Invalid request ID.");
+      setError(t("upgradeRequests.invalidRequestId"));
       setLoading(false);
       return;
     }
@@ -58,7 +60,7 @@ export default function UpgradeRequestDetail() {
 
       const reqData = reqRes?.data ?? reqRes;
       if (!reqData || typeof reqData !== "object") {
-        setError("Upgrade request not found.");
+        setError(t("upgradeRequests.requestNotFound"));
         setLoading(false);
         return;
       }
@@ -79,14 +81,14 @@ export default function UpgradeRequestDetail() {
       const message =
         err && typeof err === "object" && "message" in err
           ? String((err as { message: string }).message)
-          : "Failed to load upgrade request.";
+          : t("upgradeRequests.failedLoadDetail");
       setError(message);
       setRequest(null);
       setDocuments(null);
     } finally {
       setLoading(false);
     }
-  }, [requestId]);
+  }, [requestId, t]);
 
   useEffect(() => {
     fetchData();
@@ -98,7 +100,7 @@ export default function UpgradeRequestDetail() {
       await adminDocumentsApi.verify(docId, { status });
       await fetchData();
     } catch {
-      setError("Failed to update document.");
+      setError(t("upgradeRequests.failedUpdateDocument"));
     } finally {
       setVerifyingDocId(null);
     }
@@ -119,7 +121,7 @@ export default function UpgradeRequestDetail() {
       const message =
         err && typeof err === "object" && "message" in err
           ? String((err as { message: string }).message)
-          : "Failed to submit review.";
+          : t("upgradeRequests.failedSubmitReview");
       setError(message);
     } finally {
       setReviewingUpgrade(false);
@@ -129,9 +131,9 @@ export default function UpgradeRequestDetail() {
   if (loading) {
     return (
       <>
-        <PageMeta title="Upgrade Request | Hope - BMQAS" description="Review upgrade request and documents" />
-        <PageBreadcrumb pageTitle="Upgrade Request" />
-        <div className="py-8 text-center text-gray-500 dark:text-gray-400">Loading…</div>
+        <PageMeta title={t("upgradeRequests.detailMetaTitle")} description={t("upgradeRequests.detailMetaDescription")} />
+        <PageBreadcrumb pageTitle={t("upgradeRequests.detailPageTitle")} />
+        <div className="py-8 text-center text-gray-500 dark:text-gray-400">{t("systemConfig.loading")}</div>
       </>
     );
   }
@@ -139,13 +141,13 @@ export default function UpgradeRequestDetail() {
   if (error && !request) {
     return (
       <>
-        <PageMeta title="Upgrade Request | Hope - BMQAS" description="Review upgrade request" />
-        <PageBreadcrumb pageTitle="Upgrade Request" />
+        <PageMeta title={t("upgradeRequests.detailMetaTitle")} description={t("upgradeRequests.detailMetaDescription")} />
+        <PageBreadcrumb pageTitle={t("upgradeRequests.detailPageTitle")} />
         <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-red-700 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-300">
           {error}
         </div>
         <Link to="/upgrade-requests" className="mt-4 inline-block text-brand-600 hover:underline dark:text-brand-400">
-          ← Back to list
+          ← {t("upgradeRequests.backToList")}
         </Link>
       </>
     );
@@ -169,10 +171,10 @@ export default function UpgradeRequestDetail() {
   return (
     <>
       <PageMeta
-        title="Upgrade Request | Hope - BMQAS"
-        description="Review upgrade request and verification documents"
+        title={t("upgradeRequests.detailMetaTitle")}
+        description={t("upgradeRequests.detailMetaDescription")}
       />
-      <PageBreadcrumb pageTitle={`Upgrade Request #${req.id}`} />
+      <PageBreadcrumb pageTitle={t("upgradeRequests.detailPageTitleWithId", { id: req.id })} />
 
       <div className="space-y-6">
         {error && (
@@ -184,29 +186,29 @@ export default function UpgradeRequestDetail() {
         {/* Request summary */}
         <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] lg:p-6">
           <h3 className="mb-4 text-lg font-semibold text-gray-800 dark:text-white/90">
-            Request summary
+            {t("upgradeRequests.requestSummary")}
           </h3>
           <div className="grid gap-2 text-sm">
             <p>
-              <span className="text-gray-500 dark:text-gray-400">Provider:</span>{" "}
+              <span className="text-gray-500 dark:text-gray-400">{t("upgradeRequests.provider")}:</span>{" "}
               <span className="font-medium text-gray-800 dark:text-white/90">
                 {req.providerName ?? `Provider #${req.providerId}`}
               </span>
             </p>
             <p>
-              <span className="text-gray-500 dark:text-gray-400">Current type:</span>{" "}
+              <span className="text-gray-500 dark:text-gray-400">{t("upgradeRequests.currentType")}:</span>{" "}
               <span className="text-gray-800 dark:text-white/90">
-                {req.currentConsultationTypeName ?? "—"}
+                {req.currentConsultationTypeName ?? t("common.noValue")}
               </span>
             </p>
             <p>
-              <span className="text-gray-500 dark:text-gray-400">Target type:</span>{" "}
+              <span className="text-gray-500 dark:text-gray-400">{t("upgradeRequests.targetType")}:</span>{" "}
               <span className="text-gray-800 dark:text-white/90">
-                {req.targetConsultationTypeName ?? "—"}
+                {req.targetConsultationTypeName ?? t("common.noValue")}
               </span>
             </p>
             <p>
-              <span className="text-gray-500 dark:text-gray-400">Status:</span>{" "}
+              <span className="text-gray-500 dark:text-gray-400">{t("upgradeRequests.status")}:</span>{" "}
               <Badge
                 size="sm"
                 color={
@@ -221,14 +223,14 @@ export default function UpgradeRequestDetail() {
               </Badge>
             </p>
             <p>
-              <span className="text-gray-500 dark:text-gray-400">Requested:</span>{" "}
+              <span className="text-gray-500 dark:text-gray-400">{t("upgradeRequests.requested")}:</span>{" "}
               <span className="text-gray-800 dark:text-white/90">
-                {req.createdAt ? formatDate(req.createdAt) : "—"}
+                {req.createdAt ? formatDate(req.createdAt) : t("common.noValue")}
               </span>
             </p>
             {req.reviewedAt && (
               <p>
-                <span className="text-gray-500 dark:text-gray-400">Reviewed at:</span>{" "}
+                <span className="text-gray-500 dark:text-gray-400">{t("upgradeRequests.reviewedAt")}:</span>{" "}
                 <span className="text-gray-800 dark:text-white/90">
                   {formatDate(req.reviewedAt)}
                 </span>
@@ -236,7 +238,7 @@ export default function UpgradeRequestDetail() {
             )}
             {req.adminComment && (
               <p>
-                <span className="text-gray-500 dark:text-gray-400">Admin comment:</span>{" "}
+                <span className="text-gray-500 dark:text-gray-400">{t("upgradeRequests.adminComment")}:</span>{" "}
                 <span className="text-gray-800 dark:text-white/90">
                   {req.adminComment}
                 </span>
@@ -248,12 +250,12 @@ export default function UpgradeRequestDetail() {
         {/* Verification documents for target type */}
         <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] lg:p-6">
           <h3 className="mb-4 text-lg font-semibold text-gray-800 dark:text-white/90">
-            Verification documents for target type
+            {t("upgradeRequests.verificationDocsForTargetType")}
             {documents?.consultationTypeName ? ` (${documents.consultationTypeName})` : ""}
           </h3>
           {requirements.length === 0 ? (
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              No document requirements for this consultation type, or not loaded.
+              {t("upgradeRequests.noRequirements")}
             </p>
           ) : (
             <div className="overflow-x-auto">
@@ -261,22 +263,22 @@ export default function UpgradeRequestDetail() {
                 <TableHeader className="border-b border-gray-200 dark:border-gray-800">
                   <TableRow>
                     <TableCell isHeader className="py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">
-                      Document type
+                      {t("upgradeRequests.documentType")}
                     </TableCell>
                     <TableCell isHeader className="py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">
-                      Required
+                      {t("upgradeRequests.required")}
                     </TableCell>
                     <TableCell isHeader className="py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">
-                      Uploaded
+                      {t("upgradeRequests.uploaded")}
                     </TableCell>
                     <TableCell isHeader className="py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">
-                      Status
+                      {t("upgradeRequests.status")}
                     </TableCell>
                     <TableCell isHeader className="py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">
-                      Document
+                      {t("upgradeRequests.document")}
                     </TableCell>
                     <TableCell isHeader className="py-3 text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400">
-                      Actions
+                      {t("upgradeRequests.actions")}
                     </TableCell>
                   </TableRow>
                 </TableHeader>
@@ -291,10 +293,10 @@ export default function UpgradeRequestDetail() {
                           {documentTypeLabels[r.documentType] ?? r.documentType.replace(/_/g, " ")}
                         </TableCell>
                         <TableCell className="py-3 text-sm text-gray-600 dark:text-gray-400">
-                          {r.isRequired ? "Yes" : "No"}
+                          {r.isRequired ? t("upgradeRequests.yes") : t("upgradeRequests.no")}
                         </TableCell>
                         <TableCell className="py-3 text-sm text-gray-600 dark:text-gray-400">
-                          {doc ? "Yes" : "—"}
+                          {doc ? t("upgradeRequests.yes") : t("common.noValue")}
                         </TableCell>
                         <TableCell className="py-3">
                           {doc ? (
@@ -311,7 +313,7 @@ export default function UpgradeRequestDetail() {
                               {doc.status}
                             </Badge>
                           ) : (
-                            "—"
+                            t("common.noValue")
                           )}
                           {doc?.adminComment && (
                             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
@@ -326,7 +328,7 @@ export default function UpgradeRequestDetail() {
                                 type="button"
                                 disabled={!docUrl}
                                 onClick={() => viewDocument(docUrl)}
-                                title="View"
+                                title={t("upgradeRequests.view")}
                                 className="rounded border border-gray-300 bg-white p-1.5 text-gray-600 hover:bg-gray-50 hover:text-gray-800 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
                               >
                                 <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
@@ -337,7 +339,7 @@ export default function UpgradeRequestDetail() {
                                 type="button"
                                 disabled={!docUrl}
                                 onClick={() => downloadDocument(docUrl, `${r.documentType}_${doc.id}.pdf`)}
-                                title="Download"
+                                title={t("upgradeRequests.download")}
                                 className="rounded border border-gray-300 bg-white p-1.5 text-gray-600 hover:bg-gray-50 hover:text-gray-800 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
                               >
                                 <DownloadIcon className="h-4 w-4" />
@@ -346,7 +348,7 @@ export default function UpgradeRequestDetail() {
                                 type="button"
                                 disabled={!docUrl}
                                 onClick={() => printDocument(docUrl)}
-                                title="Print"
+                                title={t("upgradeRequests.print")}
                                 className="rounded border border-gray-300 bg-white p-1.5 text-gray-600 hover:bg-gray-50 hover:text-gray-800 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
                               >
                                 <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -355,7 +357,7 @@ export default function UpgradeRequestDetail() {
                               </button>
                             </div>
                           ) : (
-                            "—"
+                            t("common.noValue")
                           )}
                         </TableCell>
                         <TableCell className="py-3 text-right">
@@ -367,7 +369,7 @@ export default function UpgradeRequestDetail() {
                                 onClick={() => handleVerifyDocument(doc.id, "APPROVED")}
                                 className="rounded bg-green-600 px-2 py-1 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50 dark:bg-green-700 dark:hover:bg-green-800"
                               >
-                                {isVerifying ? "…" : "Approve"}
+                                {isVerifying ? "…" : t("upgradeRequests.approve")}
                               </button>
                               <button
                                 type="button"
@@ -375,7 +377,7 @@ export default function UpgradeRequestDetail() {
                                 onClick={() => handleVerifyDocument(doc.id, "REJECTED")}
                                 className="rounded bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-50 dark:bg-red-700 dark:hover:bg-red-800"
                               >
-                                Reject
+                                {t("upgradeRequests.reject")}
                               </button>
                             </div>
                           )}
@@ -393,25 +395,25 @@ export default function UpgradeRequestDetail() {
         {req.status === "PENDING" && (
           <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] lg:p-6">
             <h3 className="mb-4 text-lg font-semibold text-gray-800 dark:text-white/90">
-              Review upgrade request
+              {t("upgradeRequests.reviewRequest")}
             </h3>
             {!canApproveUpgrade && req.status === "PENDING" && (
               <p className="mb-4 text-sm text-amber-600 dark:text-amber-400">
                 {missingOrNotApproved.length > 0
-                  ? `All required verification documents for the target type must be uploaded and approved first. Missing or not approved: ${missingOrNotApproved.map((r) => documentTypeLabels[r.documentType] ?? r.documentType.replace(/_/g, " ")).join(", ")}.`
-                  : "Approve all required documents above before approving the upgrade."}
+                  ? t("upgradeRequests.missingDocsPrefix", { docs: missingOrNotApproved.map((r) => documentTypeLabels[r.documentType] ?? r.documentType.replace(/_/g, " ")).join(", ") })
+                  : t("upgradeRequests.approveDocsFirst")}
               </p>
             )}
             <label className="mb-4 block">
               <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                Comment (optional)
+                {t("upgradeRequests.commentOptional")}
               </span>
               <textarea
                 value={upgradeComment}
                 onChange={(e) => setUpgradeComment(e.target.value)}
                 rows={3}
                 className="mt-1 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
-                placeholder="Note or reason for rejection..."
+                placeholder={t("upgradeRequests.rejectionNotePlaceholder")}
               />
             </label>
             <div className="flex flex-wrap gap-2">
@@ -421,7 +423,7 @@ export default function UpgradeRequestDetail() {
                 onClick={() => handleReviewUpgrade("APPROVED")}
                 className="rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 dark:bg-green-700 dark:hover:bg-green-800"
               >
-                {reviewingUpgrade ? "Submitting…" : "Approve upgrade"}
+                {reviewingUpgrade ? t("upgradeRequests.submitting") : t("upgradeRequests.approveUpgrade")}
               </button>
               <button
                 type="button"
@@ -429,7 +431,7 @@ export default function UpgradeRequestDetail() {
                 onClick={() => handleReviewUpgrade("REJECTED")}
                 className="rounded bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 dark:bg-red-700 dark:hover:bg-red-800"
               >
-                Reject upgrade
+                {t("upgradeRequests.rejectUpgrade")}
               </button>
             </div>
           </div>
@@ -439,7 +441,7 @@ export default function UpgradeRequestDetail() {
           to="/upgrade-requests"
           className="inline-block text-brand-600 hover:underline dark:text-brand-400"
         >
-          ← Back to upgrade requests
+          ← {t("upgradeRequests.backToUpgradeRequests")}
         </Link>
       </div>
     </>
