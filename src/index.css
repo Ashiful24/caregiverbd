@@ -790,3 +790,10 @@ span.flatpickr-weekday,
 .simplebar-scrollbar.simplebar-visible:before {
   @apply opacity-100;
 }
+
+/* Loading bar keyframe — used by the Master Financial Report top-progress bar */
+@keyframes loadingBar {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(400%);  }
+}
+

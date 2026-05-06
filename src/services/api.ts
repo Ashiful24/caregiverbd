@@ -2462,16 +2462,51 @@ export interface GlWalletReconciliationDto {
   totalCredit: string;
   totalDebit: string;
   netChange: string;
+  /** balance − netChange, must be 0 */
+  drift: string;
+  isHealthy: boolean;
 }
 
 export interface GlProfitSummaryDto {
   commissionBalance: string;
-  commissionNetChange: string;
+  taxBalance: string;
+  totalPlatformEarnings: string;
+  totalPayoutsProcessed: string;
+}
+
+export interface GlCrossSystemValidationDto {
+  srCommissionTotal: string;
+  glCommissionBalance: string;
+  commissionDrift: string;
+  commissionInSync: boolean;
+  srTaxTotal: string;
+  glTaxBalance: string;
+  taxDrift: string;
+  taxInSync: boolean;
+}
+
+export interface GlOverallHealthDto {
+  healthy: boolean;
+  walletsDriftFree: boolean;
+  crossSystemInSync: boolean;
+  driftedWallets: string[];
+}
+
+export interface GlReconciliationHealthDto {
+  balanced: boolean;
+  driftedRowCount: number;
+  imbalancedTransactionCount: number;
+  strictModeCutoverAt: string | null;
+  legacyDriftedRowCount: number;
+  legacyImbalancedTransactionCount: number;
 }
 
 export interface GlReconciliationSummaryResponseDto {
   wallets: GlWalletReconciliationDto[];
   profitSummary: GlProfitSummaryDto;
+  crossSystemValidation: GlCrossSystemValidationDto;
+  overallHealth: GlOverallHealthDto;
+  reconciliationHealth: GlReconciliationHealthDto;
 }
 
 export interface GlDailyFlowEntryDto {
@@ -2479,7 +2514,15 @@ export interface GlDailyFlowEntryDto {
   totalCredit: string;
   totalDebit: string;
   netChange: string;
-  wallets: GlWalletReconciliationDto[];
+  wallets: Array<{
+    walletType: string;
+    walletId: number | null;
+    balance: string;
+    currency: string;
+    totalCredit: string;
+    totalDebit: string;
+    netChange: string;
+  }>;
 }
 
 export interface GlDailyFlowResponseDto {
@@ -2487,6 +2530,157 @@ export interface GlDailyFlowResponseDto {
   endDate: string;
   days: GlDailyFlowEntryDto[];
   total: { totalCredit: string; totalDebit: string; netChange: string };
+}
+
+// ============== Admin Financial Report (combined) ==============
+
+export type FinancialTxType =
+  | "CONSULTATION_PAYMENT"
+  | "WITHDRAWAL"
+  | "REFUND"
+  | "COMMISSION"
+  | "ADJUSTMENT";
+export type FinancialPaymentMethod = "ONLINE" | "CASH";
+export type FinancialServiceType = "SHORT_TERM" | "LONG_TERM";
+export type FinancialTxStatus = "PENDING" | "COMPLETED" | "FAILED" | "CANCELLED";
+
+export interface FinancialReportFiltersDto {
+  startDate: string;
+  endDate: string;
+  providerId: number | null;
+  patientId: number | null;
+  type: FinancialTxType | null;
+  paymentMethod: FinancialPaymentMethod | null;
+  serviceType: FinancialServiceType | null;
+  status: FinancialTxStatus | null;
+}
+
+export interface FinancialReportTotalsDto {
+  onlinePayments: string;
+  cashPayments: string;
+  totalInflow: string;
+  totalProviderFee: string;
+  totalCommission: string;
+  totalTax: string;
+  totalWithdrawals: string;
+  netPlatformEarnings: string;
+  consultationCount: number;
+  withdrawalCount: number;
+}
+
+export interface FinancialReportDayDto {
+  date: string;
+  inflow: { onlinePayments: string; cashPayments: string; total: string };
+  distribution: { providerFee: string; commission: string; tax: string };
+  outflow: { withdrawals: string };
+  transactionCount: number;
+}
+
+export interface FinancialReportSummaryDto {
+  totals: FinancialReportTotalsDto;
+  byDay: FinancialReportDayDto[];
+}
+
+export interface FinancialReportTxItemDto {
+  transactionId: number;
+  date: string;
+  type: FinancialTxType;
+  status: FinancialTxStatus;
+  paymentMethod: FinancialPaymentMethod | null;
+  serviceType: FinancialServiceType | null;
+  longTermOpportunityId: number | null;
+  consultationTypeName: string | null;
+  scheduledDate: string | null;
+  providerId: number | null;
+  providerName: string | null;
+  patientId: number | null;
+  patientName: string | null;
+  totalFee: string | null;
+  providerFee: string | null;
+  commission: string | null;
+  tax: string | null;
+}
+
+export interface FinancialReportPaginationDto {
+  page: number;
+  limit: number;
+  hasMore: boolean;
+  total: number | null;
+}
+
+export interface FinancialReportTxListDto {
+  data: FinancialReportTxItemDto[];
+  pagination: FinancialReportPaginationDto;
+}
+
+export interface FinancialReportResponseDto {
+  filters: FinancialReportFiltersDto;
+  summary: FinancialReportSummaryDto | null;
+  transactions: FinancialReportTxListDto;
+}
+
+// ===== transaction detail =====
+
+export interface FinancialTxDetailBreakdownPart {
+  amount: string;
+  percent: string;
+  inclusive: boolean;
+}
+
+export interface FinancialTxDetailBreakdownDto {
+  totalFee: string;
+  commission: FinancialTxDetailBreakdownPart;
+  tax: FinancialTxDetailBreakdownPart;
+  providerFee: string;
+}
+
+export interface FinancialTxDetailServiceRequestDto {
+  id: number;
+  status: string;
+  scheduledDate: string | null;
+  rateType: string | null;
+  rate: string | null;
+  shiftDuration: number | null;
+  referenceType: FinancialServiceType | null;
+  longTermOpportunityId: number | null;
+}
+
+export interface FinancialTxDetailPartyDto {
+  id: number;
+  name: string | null;
+  phone: string | null;
+  email: string | null;
+}
+
+export interface FinancialTxDetailLedgerEntryDto {
+  ledgerId: number;
+  debitWalletType: string;
+  creditWalletType: string;
+  debitWalletId: number;
+  creditWalletId: number;
+  amount: string;
+  debitBalanceBefore: string | null;
+  debitBalanceAfter: string;
+  creditBalanceBefore: string | null;
+  creditBalanceAfter: string;
+  description: string | null;
+  createdAt: string | null;
+}
+
+export interface FinancialTxDetailResponseDto {
+  transactionId: number;
+  type: FinancialTxType;
+  status: FinancialTxStatus;
+  paymentMethod: FinancialPaymentMethod | null;
+  amount: string;
+  createdAt: string;
+  serviceRequest: FinancialTxDetailServiceRequestDto | null;
+  consultationTypeName: string | null;
+  patient: FinancialTxDetailPartyDto | null;
+  provider: FinancialTxDetailPartyDto | null;
+  breakdown: FinancialTxDetailBreakdownDto | null;
+  ledgerEntries: FinancialTxDetailLedgerEntryDto[];
+  metadata: Record<string, unknown> | null;
 }
 
 export interface ProviderTransactionLedgerEntryDto {
@@ -2534,6 +2728,57 @@ export const adminFinancialApi = {
     return httpService.get<ProviderTransactionHistoryResponseDto>(
       `/admin/financial/providers/${providerId}/transactions`,
       { params: query, signal: config?.signal }
+    );
+  },
+  /**
+   * Combined admin financial report (summary + paginated transaction list).
+   * Mandatory date range, max 90 days. Pass `paginationOnly: true` on page 2+
+   * to skip the summary recomputation (significant cost saver at scale).
+   * Pass `includeTotal: true` to opt into the COUNT(*) query.
+   */
+  getFinancialReport: async (
+    params: {
+      startDate: string;
+      endDate: string;
+      providerId?: number;
+      patientId?: number;
+      type?: FinancialTxType;
+      paymentMethod?: FinancialPaymentMethod;
+      serviceType?: FinancialServiceType;
+      status?: FinancialTxStatus;
+      page?: number;
+      limit?: number;
+      paginationOnly?: boolean;
+      includeTotal?: boolean;
+    },
+    config?: { signal?: AbortSignal }
+  ) => {
+    const query: Record<string, string | number | boolean> = {
+      startDate: params.startDate,
+      endDate: params.endDate,
+    };
+    if (params.providerId != null)    query.providerId    = params.providerId;
+    if (params.patientId != null)     query.patientId     = params.patientId;
+    if (params.type)                  query.type          = params.type;
+    if (params.paymentMethod)         query.paymentMethod = params.paymentMethod;
+    if (params.serviceType)           query.serviceType   = params.serviceType;
+    if (params.status)                query.status        = params.status;
+    if (params.page != null)          query.page          = params.page;
+    if (params.limit != null)         query.limit         = params.limit;
+    if (params.paginationOnly)        query.paginationOnly = true;
+    if (params.includeTotal)          query.includeTotal   = true;
+    return httpService.get<FinancialReportResponseDto>("/admin/financial/report", {
+      params: query,
+      signal: config?.signal,
+    });
+  },
+  getFinancialTransactionDetail: async (
+    transactionId: number,
+    config?: { signal?: AbortSignal }
+  ) => {
+    return httpService.get<FinancialTxDetailResponseDto>(
+      `/admin/financial/transactions/${transactionId}`,
+      { signal: config?.signal }
     );
   },
 };
