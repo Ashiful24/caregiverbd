@@ -1,4 +1,5 @@
 import { useState, FormEvent } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router";
 import { ChevronLeftIcon, EyeCloseIcon, EyeIcon } from "../../icons";
 import Label from "../form/Label";
@@ -7,6 +8,7 @@ import Checkbox from "../form/input/Checkbox";
 import { useAuth } from "../../context/AuthContext";
 
 export default function SignUpForm() {
+  const { t } = useTranslation();
   const [showPassword, setShowPassword] = useState(false);
   const [isChecked, setIsChecked] = useState(false);
   const [firstName, setFirstName] = useState("");
@@ -23,7 +25,7 @@ export default function SignUpForm() {
     setError("");
 
     if (!isChecked) {
-      setError("Please agree to the Terms and Conditions and Privacy Policy");
+      setError(t("auth.signUp.termsValidation"));
       return;
     }
 
@@ -34,7 +36,7 @@ export default function SignUpForm() {
       // Redirect to home after successful signup
       navigate("/", { replace: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to sign up. Please try again.");
+      setError(err instanceof Error ? err.message : t("auth.signUp.signUpFailedDefault"));
     } finally {
       setIsSubmitting(false);
     }
@@ -47,17 +49,17 @@ export default function SignUpForm() {
           className="inline-flex items-center text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
         >
           <ChevronLeftIcon className="size-5" />
-          Back to dashboard
+          {t("auth.signUp.backToDashboard")}
         </Link>
       </div>
       <div className="flex flex-col justify-center flex-1 w-full max-w-md mx-auto">
         <div>
           <div className="mb-5 sm:mb-8">
             <h1 className="mb-2 font-semibold text-gray-800 text-title-sm dark:text-white/90 sm:text-title-md">
-              Sign Up
+              {t("auth.signUp.title")}
             </h1>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Enter your email and password to sign up!
+              {t("auth.signUp.subtitle")}
             </p>
           </div>
           <div>
@@ -87,7 +89,7 @@ export default function SignUpForm() {
                     fill="#EB4335"
                   />
                 </svg>
-                Sign up with Google
+                {t("auth.signUp.signUpWithGoogle")}
               </button>
               <button className="inline-flex items-center justify-center gap-3 py-3 text-sm font-normal text-gray-700 transition-colors bg-gray-100 rounded-lg px-7 hover:bg-gray-200 hover:text-gray-800 dark:bg-white/5 dark:text-white/90 dark:hover:bg-white/10">
                 <svg
@@ -100,7 +102,7 @@ export default function SignUpForm() {
                 >
                   <path d="M15.6705 1.875H18.4272L12.4047 8.75833L19.4897 18.125H13.9422L9.59717 12.4442L4.62554 18.125H1.86721L8.30887 10.7625L1.51221 1.875H7.20054L11.128 7.0675L15.6705 1.875ZM14.703 16.475H16.2305L6.37054 3.43833H4.73137L14.703 16.475Z" />
                 </svg>
-                Sign up with X
+                {t("auth.signUp.signUpWithX")}
               </button>
             </div>
             <div className="relative py-3 sm:py-5">
@@ -109,7 +111,7 @@ export default function SignUpForm() {
               </div>
               <div className="relative flex justify-center text-sm">
                 <span className="p-2 text-gray-400 bg-white dark:bg-gray-900 sm:px-5 sm:py-2">
-                  Or
+                  {t("auth.signUp.or")}
                 </span>
               </div>
             </div>
@@ -124,13 +126,13 @@ export default function SignUpForm() {
                   {/* <!-- First Name --> */}
                   <div className="sm:col-span-1">
                     <Label>
-                      First Name<span className="text-error-500">*</span>
+                      {t("auth.signUp.firstName")}<span className="text-error-500">*</span>
                     </Label>
                     <Input
                       type="text"
                       id="fname"
                       name="fname"
-                      placeholder="Enter your first name"
+                      placeholder={t("auth.signUp.firstNamePlaceholder")}
                       value={firstName}
                       onChange={(e) => setFirstName(e.target.value)}
                       required
@@ -139,13 +141,13 @@ export default function SignUpForm() {
                   {/* <!-- Last Name --> */}
                   <div className="sm:col-span-1">
                     <Label>
-                      Last Name<span className="text-error-500">*</span>
+                      {t("auth.signUp.lastName")}<span className="text-error-500">*</span>
                     </Label>
                     <Input
                       type="text"
                       id="lname"
                       name="lname"
-                      placeholder="Enter your last name"
+                      placeholder={t("auth.signUp.lastNamePlaceholder")}
                       value={lastName}
                       onChange={(e) => setLastName(e.target.value)}
                       required
@@ -155,13 +157,13 @@ export default function SignUpForm() {
                 {/* <!-- Email --> */}
                 <div>
                   <Label>
-                    Email<span className="text-error-500">*</span>
+                    {t("auth.signUp.email")}<span className="text-error-500">*</span>
                   </Label>
                   <Input
                     type="email"
                     id="email"
                     name="email"
-                    placeholder="Enter your email"
+                    placeholder={t("auth.signUp.emailPlaceholder")}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
@@ -170,11 +172,11 @@ export default function SignUpForm() {
                 {/* <!-- Password --> */}
                 <div>
                   <Label>
-                    Password<span className="text-error-500">*</span>
+                    {t("auth.signUp.password")}<span className="text-error-500">*</span>
                   </Label>
                   <div className="relative">
                     <Input
-                      placeholder="Enter your password"
+                      placeholder={t("auth.signUp.passwordPlaceholder")}
                       type={showPassword ? "text" : "password"}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
@@ -200,13 +202,13 @@ export default function SignUpForm() {
                     onChange={setIsChecked}
                   />
                   <p className="inline-block font-normal text-gray-500 dark:text-gray-400">
-                    By creating an account means you agree to the{" "}
+                    {t("auth.signUp.termsPrefix")}{" "}
                     <span className="text-gray-800 dark:text-white/90">
-                      Terms and Conditions,
+                      {t("auth.signUp.termsAndConditions")}
                     </span>{" "}
-                    and our{" "}
+                    {t("auth.signUp.privacyPrefix")}{" "}
                     <span className="text-gray-800 dark:text-white">
-                      Privacy Policy
+                      {t("auth.signUp.privacyPolicy")}
                     </span>
                   </p>
                 </div>
@@ -217,7 +219,7 @@ export default function SignUpForm() {
                     disabled={isSubmitting}
                     className="flex items-center justify-center w-full px-4 py-3 text-sm font-medium text-white transition rounded-lg bg-brand-500 shadow-theme-xs hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {isSubmitting ? "Signing up..." : "Sign Up"}
+                    {isSubmitting ? t("auth.signUp.signingUpButton") : t("auth.signUp.signUpButton")}
                   </button>
                 </div>
               </div>
@@ -225,12 +227,12 @@ export default function SignUpForm() {
 
             <div className="mt-5">
               <p className="text-sm font-normal text-center text-gray-700 dark:text-gray-400 sm:text-start">
-                Already have an account? {""}
+                {t("auth.signUp.alreadyAccount")} {""}
                 <Link
                   to="/signin"
                   className="text-brand-500 hover:text-brand-600 dark:text-brand-400"
                 >
-                  Sign In
+                  {t("auth.signUp.signInLink")}
                 </Link>
               </p>
             </div>

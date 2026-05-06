@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { formatDate } from "../../utils/format";
+import { useTranslation } from "react-i18next";
+import { formatAccountActiveLabel, formatDate } from "../../utils/format";
 import { getAssetUrl } from "../../utils/assetUrl";
 import { viewDocument, downloadDocument, printDocument } from "../../utils/documentActions";
 import Badge from "../ui/badge/Badge";
@@ -649,6 +650,7 @@ export function ProviderFullDetailsView({
   data: ProviderFullDetailsDto;
   onRefresh?: () => void | Promise<void>;
 }) {
+  const { t } = useTranslation();
   const {
     user,
     provider,
@@ -706,31 +708,33 @@ export function ProviderFullDetailsView({
   const allowedNextStatuses: { value: ProviderStatusValue; label: string }[] =
     currentStatus === "PENDING"
       ? [
-          { value: "ACTIVE", label: "Active" },
-          { value: "REJECTED", label: "Rejected" },
-          { value: "ARCHIVED", label: "Archived" },
+          { value: "ACTIVE", label: "ACTIVE" },
+          { value: "REJECTED", label: "REJECTED" },
+          { value: "ARCHIVED", label: "ARCHIVED" },
         ]
       : currentStatus === "ACTIVE"
         ? [
-            { value: "DEACTIVATED", label: "Deactivated" },
-            { value: "ARCHIVED", label: "Archived" },
+            { value: "DEACTIVATED", label: "DEACTIVATED" },
+            { value: "ARCHIVED", label: "ARCHIVED" },
           ]
         : currentStatus === "REJECTED"
           ? [
-              { value: "ACTIVE", label: "Active" },
-              { value: "ARCHIVED", label: "Archived" },
+              { value: "ACTIVE", label: "ACTIVE" },
+              { value: "ARCHIVED", label: "ARCHIVED" },
             ]
           : currentStatus === "DEACTIVATED"
             ? [
-                { value: "ACTIVE", label: "Active" },
-                { value: "ARCHIVED", label: "Archived" },
+                { value: "ACTIVE", label: "ACTIVE" },
+                { value: "ARCHIVED", label: "ARCHIVED" },
               ]
             : [];
   const [profileStatusChoice, setProfileStatusChoice] = useState<ProviderStatusValue>(
     allowedNextStatuses[0]?.value ?? "DEACTIVATED"
   );
   const [profileStatusComment, setProfileStatusComment] = useState("");
-  const [userStatusChoice, setUserStatusChoice] = useState<"Active" | "Inactive">(user.isActive ? "Active" : "Inactive");
+  const [userStatusChoice, setUserStatusChoice] = useState<"Active" | "Inactive">(
+    user.isActive ? "Active" : "Inactive"
+  );
   const [userStatusComment, setUserStatusComment] = useState("");
   const [userStatusUpdating, setUserStatusUpdating] = useState(false);
   const [showProviderStatusConfirm, setShowProviderStatusConfirm] = useState(false);
@@ -1099,7 +1103,8 @@ export function ProviderFullDetailsView({
     (serviceRequestsByStatus.COMPLETED?.length ?? 0) +
     (serviceRequestsByStatus.CANCELLED?.length ?? 0);
 
-  const providerDisplayName = [user.firstName, user.lastName].filter(Boolean).join(" ") || "Provider";
+  const providerDisplayName =
+    [user.firstName, user.lastName].filter(Boolean).join(" ") || t("providers.providerName");
   /* Hardcoded reference check preview — disabled until API exists.
   const referenceChecks = [
     {
@@ -1150,12 +1155,12 @@ export function ProviderFullDetailsView({
                 </p>
               )}
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                Applied: {formatDate(user.createdAt)}
+                {t("providers.created")}: {formatDate(user.createdAt)}
                 {experienceLabel != null && (
                   <>
                     {" "}
                     • {experienceLabel}
-                    {/^\d+$/.test(experienceLabel) ? " years experience" : ""}
+                    {/^\d+$/.test(experienceLabel) ? ` ${t("providers.experienceYears")}` : ""}
                   </>
                 )}
               </p>
@@ -1163,8 +1168,8 @@ export function ProviderFullDetailsView({
           </div>
           <div className="w-full sm:max-w-[240px]">
             <div className="flex items-center justify-between text-xs font-medium text-gray-600 dark:text-gray-300">
-              <span>Profile Completion</span>
-              <span>{checklistTotal === 0 ? "—" : `${completionPercent}%`}</span>
+              <span>{t("providers.profileCompletion")}</span>
+              <span>{checklistTotal === 0 ? t("common.noValue") : `${completionPercent}%`}</span>
             </div>
             <div className="mt-2 h-2.5 rounded-full bg-gray-200 dark:bg-gray-700">
               <div
@@ -1174,8 +1179,8 @@ export function ProviderFullDetailsView({
             </div>
             <p className="mt-1 text-right text-xs text-gray-500 dark:text-gray-400">
               {checklistTotal === 0
-                ? "No checklist items"
-                : `${completedSteps} of ${checklistTotal} steps checked`}
+                ? t("providers.noChecklistItems")
+                : t("providers.stepsChecked", { completed: completedSteps, total: checklistTotal })}
             </p>
           </div>
         </div>
@@ -1185,7 +1190,7 @@ export function ProviderFullDetailsView({
         <div className="grid grid-cols-1 gap-2 px-4 py-3 sm:grid-cols-3 sm:px-5">
           {profileChecklistItems.length === 0 ? (
             <p className="col-span-full text-sm text-gray-500 dark:text-gray-400">
-              No profile checklist items returned from the API.
+              {t("providers.noChecklistItemsApi")}
             </p>
           ) : (
             profileChecklistItems.map((item) => (
@@ -1211,23 +1216,23 @@ export function ProviderFullDetailsView({
         </div>
       </div>
 
-      <DetailBlock title="Personal (User)">
-        <DetailBlockRow label="First name" value={user.firstName} />
-        <DetailBlockRow label="Last name" value={user.lastName} />
-        <DetailBlockRow label="Email" value={user.email} />
-        <DetailBlockRow label="Username / Mobile" value={user.username} />
-        <DetailBlockRow label="Role" value={user.role} />
+      <DetailBlock title={t("providers.personalUser")}>
+        <DetailBlockRow label={t("users.firstName")} value={user.firstName} />
+        <DetailBlockRow label={t("users.lastName")} value={user.lastName} />
+        <DetailBlockRow label={t("users.email")} value={user.email} />
+        <DetailBlockRow label={t("users.usernameOrMobile")} value={user.username} />
+        <DetailBlockRow label={t("users.role")} value={user.role} />
         <DetailBlockRow
-          label="Account"
+          label={t("providers.account")}
           value={
             <Badge size="sm" color={user.isActive ? "success" : "error"}>
-              {user.isActive ? "Active" : "Inactive"}
+              {formatAccountActiveLabel(!!user.isActive)}
             </Badge>
           }
         />
-        <DetailBlockRow label="Created" value={formatDate(user.createdAt)} />
+        <DetailBlockRow label={t("users.created")} value={formatDate(user.createdAt)} />
         <div className="mt-3 w-full min-w-0 border-t border-gray-100 pt-3 dark:border-gray-700">
-          <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">User account status</label>
+          <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">{t("providers.userAccountStatus")}</label>
           <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
             <select
               value={userStatusChoice}
@@ -1241,7 +1246,7 @@ export function ProviderFullDetailsView({
               type="text"
               value={userStatusComment}
               onChange={(e) => setUserStatusComment(e.target.value)}
-              placeholder="Comment (optional)"
+              placeholder={t("providers.commentOptional")}
               className="w-full min-w-0 rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:placeholder:text-gray-500 sm:min-w-[12rem] sm:flex-1"
             />
             <button
@@ -1250,7 +1255,7 @@ export function ProviderFullDetailsView({
               onClick={() => setShowUserStatusConfirm(true)}
               className="w-full shrink-0 rounded bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 dark:bg-brand-700 dark:hover:bg-brand-800 sm:w-auto"
             >
-              {userStatusUpdating ? "Updating…" : "Update"}
+              {userStatusUpdating ? t("providers.updating") : t("common.actions.update")}
             </button>
           </div>
         </div>
@@ -1259,40 +1264,40 @@ export function ProviderFullDetailsView({
       <ConfirmModal
         isOpen={showUserStatusConfirm}
         onClose={() => setShowUserStatusConfirm(false)}
-        title={userStatusChoice === "Active" ? "Activate user" : "Deactivate user"}
+        title={userStatusChoice === "Active" ? t("users.activateTitle") : t("users.deactivateTitle")}
         message={
           <>
-            Are you sure you want to {userStatusChoice === "Active" ? "activate" : "deactivate"}{" "}
+            {userStatusChoice === "Active" ? t("users.activateConfirmPrefix") : t("users.deactivateConfirmPrefix")}{" "}
             <span className="font-medium text-gray-800 dark:text-white/90">
               {user.firstName} {user.lastName}
             </span>
-            ? They will {userStatusChoice === "Active" ? "be able to" : "not be able to"} sign in.
+            ? {userStatusChoice === "Active" ? t("users.activateConfirmSuffix") : t("users.deactivateConfirmSuffix")}
           </>
         }
-        confirmLabel={userStatusChoice === "Active" ? "Activate" : "Deactivate"}
-        cancelLabel="Cancel"
+        confirmLabel={userStatusChoice === "Active" ? t("users.activate") : t("users.deactivate")}
+        cancelLabel={t("common.actions.cancel")}
         confirmVariant={userStatusChoice === "Active" ? "primary" : "danger"}
         onConfirm={handleUserStatusUpdate}
         onError={() => setCertsError("Failed to update user status.")}
       />
 
-      <DetailBlock title="Provider profile">
-        <DetailBlockRow label="Provider ID" value={provider.id} />
-        <DetailBlockRow label="Experience" value={provider.experience} />
+      <DetailBlock title={t("providers.providerProfile")}>
+        <DetailBlockRow label={t("providers.providerId")} value={provider.id} />
+        <DetailBlockRow label={t("providers.experience")} value={provider.experience} />
         <DetailBlockRow
-          label="Status"
+          label={t("users.status")}
           value={
             <Badge size="sm" color={statusBadgeColor(provider.status)}>
               {provider.status}
             </Badge>
           }
         />
-        <DetailBlockRow label="Consultation type" value={provider.consultationTypeName} />
-        <DetailBlockRow label="Location" value={provider.latitude && provider.longitude ? `${provider.latitude}, ${provider.longitude}` : undefined} />
-        <DetailBlockRow label="Service radius (km)" value={provider.serviceRadiusKm} />
-        <DetailBlockRow label="Created" value={formatDate(provider.createdAt)} />
+        <DetailBlockRow label={t("providers.consultationType")} value={provider.consultationTypeName} />
+        <DetailBlockRow label={t("providers.location")} value={provider.latitude && provider.longitude ? `${provider.latitude}, ${provider.longitude}` : undefined} />
+        <DetailBlockRow label={t("providers.serviceRadiusKm")} value={provider.serviceRadiusKm} />
+        <DetailBlockRow label={t("providers.created")} value={formatDate(provider.createdAt)} />
         <div className="mt-3 w-full min-w-0 border-t border-gray-100 pt-3 dark:border-gray-700">
-          <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">Provider profile status</label>
+          <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">{t("providers.providerProfileStatus")}</label>
           {canChangeStatus ? (
             <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
               <select
@@ -1310,7 +1315,7 @@ export function ProviderFullDetailsView({
                 type="text"
                 value={profileStatusComment}
                 onChange={(e) => setProfileStatusComment(e.target.value)}
-                placeholder="Comment (optional)"
+                placeholder={t("providers.commentOptional")}
                 className="w-full min-w-0 rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:placeholder:text-gray-500 sm:min-w-[12rem] sm:flex-1"
               />
               <button
@@ -1319,11 +1324,11 @@ export function ProviderFullDetailsView({
                 onClick={() => setShowProviderStatusConfirm(true)}
                 className="w-full shrink-0 rounded bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 dark:bg-brand-700 dark:hover:bg-brand-800 sm:w-auto"
               >
-                {statusUpdating ? "Updating…" : "Update"}
+                {statusUpdating ? t("providers.updating") : t("common.actions.update")}
               </button>
             </div>
           ) : (
-            <p className="text-xs text-gray-500 dark:text-gray-400">Status cannot be changed from Archived.</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">{t("providers.statusChangeArchived")}</p>
           )}
         </div>
       </DetailBlock>
@@ -1331,37 +1336,37 @@ export function ProviderFullDetailsView({
       <ConfirmModal
         isOpen={showProviderStatusConfirm}
         onClose={() => setShowProviderStatusConfirm(false)}
-        title="Change provider status"
+        title={t("providers.changeProviderStatus")}
         message={
           <>
-            Are you sure you want to change this provider&apos;s status to{" "}
+            {t("providers.changeProviderStatusConfirm")}{" "}
             <span className="font-medium text-gray-800 dark:text-white/90">
               {allowedNextStatuses.find((o) => o.value === profileStatusChoice)?.label ?? profileStatusChoice}
             </span>
             ?{" "}
             {provider.consultationTypeName && (
               <span className="block mt-1 text-gray-500 dark:text-gray-400">
-                Provider: {user.firstName} {user.lastName} ({provider.consultationTypeName})
+                {t("providers.providerLabel")}: {user.firstName} {user.lastName} ({provider.consultationTypeName})
               </span>
             )}
           </>
         }
-        confirmLabel="Update status"
-        cancelLabel="Cancel"
+        confirmLabel={t("providers.updateStatus")}
+        cancelLabel={t("common.actions.cancel")}
         confirmVariant="primary"
         onConfirm={handleSetProviderStatus}
         onError={() => setCertsError("Failed to update provider status.")}
       />
 
       <div className="w-full min-w-0 sm:col-span-2">
-        <DetailBlock title="Provider availability">
+        <DetailBlock title={t("providers.providerAvailability")}>
           <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
-            Select a single date, time, and shift duration to check availability.
+            {t("providers.providerAvailabilityHelp")}
           </p>
           <div className="space-y-3">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <label className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                Date
+                {t("providers.date")}
                 <Popover
                   open={availabilityDatePickerOpen}
                   onOpenChange={setAvailabilityDatePickerOpen}
@@ -1371,7 +1376,7 @@ export function ProviderFullDetailsView({
                       type="button"
                       className="mt-1 w-full rounded border border-gray-300 bg-white px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
                     >
-                      {availabilityDate ? toYmd(availabilityDate) : "Select a date"}
+                      {availabilityDate ? toYmd(availabilityDate) : t("providers.selectDate")}
                     </button>
                   </PopoverTrigger>
                   <PopoverContent className="z-[100120] w-auto p-2" align="start">
@@ -1388,7 +1393,7 @@ export function ProviderFullDetailsView({
                 </Popover>
               </label>
                 <label className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                  Time
+                  {t("providers.time")}
                   <input
                     type="time"
                     value={availabilityTime}
@@ -1397,7 +1402,7 @@ export function ProviderFullDetailsView({
                   />
                 </label>
                 <label className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                  Shift duration (hours)
+                  {t("providers.shiftDurationHours")}
                   <input
                     type="number"
                     min={1}
@@ -1415,7 +1420,7 @@ export function ProviderFullDetailsView({
                 disabled={availabilityLoading || !availabilityDate}
                 className="rounded bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 dark:bg-brand-700 dark:hover:bg-brand-800"
               >
-                {availabilityLoading ? "Checking..." : "Check availability"}
+                {availabilityLoading ? t("providers.checking") : t("providers.checkAvailability")}
               </button>
             </div>
             {availabilityError ? (
@@ -1424,7 +1429,7 @@ export function ProviderFullDetailsView({
             {availabilitySlots.length > 0 ? (
               <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 dark:border-emerald-800/40 dark:bg-emerald-900/20">
                 <p className="text-xs font-medium uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
-                  Available slots
+                  {t("providers.availableSlots")}
                 </p>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {availabilitySlots.map((slot) => (
@@ -1443,12 +1448,12 @@ export function ProviderFullDetailsView({
       </div>
 
       <div className="w-full min-w-0 sm:col-span-2">
-        <DetailBlock title="Consultation type services">
+        <DetailBlock title={t("providers.consultationTypeServices")}>
           <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
-            Checklist of services for this provider&apos;s consultation type. &quot;Offered&quot; = provider offers this; &quot;Excluded&quot; = provider does not offer it.
+            {t("providers.consultationTypeServicesHelp")}
           </p>
           {consultationTypeServices.length === 0 ? (
-            <p className="text-gray-500 dark:text-gray-400">No services configured for this consultation type.</p>
+            <p className="text-gray-500 dark:text-gray-400">{t("providers.noConsultationServices")}</p>
           ) : servicesEditMode ? (
             <div className="space-y-3">
               {consultationTypeServices
@@ -1469,7 +1474,7 @@ export function ProviderFullDetailsView({
                     />
                     <span className="text-sm font-medium text-gray-800 dark:text-white/90">{s.label}</span>
                     <span className="text-xs text-gray-500 dark:text-gray-400">
-                      {servicesOffered[s.id] ?? s.offered ? "Offered" : "Excluded"}
+                      {servicesOffered[s.id] ?? s.offered ? t("providers.offered") : t("providers.excluded")}
                     </span>
                   </label>
                 ))}
@@ -1483,7 +1488,7 @@ export function ProviderFullDetailsView({
                   onClick={handleSaveConsultationServices}
                   className="rounded bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 dark:bg-brand-700 dark:hover:bg-brand-800"
                 >
-                  {servicesSaving ? "Saving…" : "Save"}
+                  {servicesSaving ? t("supervisor.saving") : t("common.actions.save")}
                 </button>
                 <button
                   type="button"
@@ -1499,7 +1504,7 @@ export function ProviderFullDetailsView({
                   }}
                   className="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700 disabled:opacity-50"
                 >
-                  Cancel
+                  {t("common.actions.cancel")}
                 </button>
               </div>
             </div>
@@ -1515,7 +1520,7 @@ export function ProviderFullDetailsView({
                   >
                     <span className="font-medium text-gray-800 dark:text-white/90">{s.label}</span>
                     <Badge size="sm" color={s.offered ? "success" : "light"}>
-                      {s.offered ? "Offered" : "Excluded"}
+                      {s.offered ? t("providers.offered") : t("providers.excluded")}
                     </Badge>
                   </div>
                 ))}
@@ -1524,7 +1529,7 @@ export function ProviderFullDetailsView({
                 onClick={() => setServicesEditMode(true)}
                 className="mt-2 rounded border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
               >
-                Update list
+                {t("providers.updateList")}
               </button>
             </div>
           )}
@@ -1532,27 +1537,27 @@ export function ProviderFullDetailsView({
       </div>
 
       <div className="w-full min-w-0 sm:col-span-2">
-        <DetailBlock title="Certifications & documents">
+        <DetailBlock title={t("providers.certificationsAndDocuments")}>
           <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
-            Documents uploaded by the provider for profile verification. Verify each certification to approve or reject.
+            {t("providers.certificationsHelp")}
           </p>
           {certsLoading ? (
-            <p className="text-gray-500 dark:text-gray-400">Loading…</p>
+            <p className="text-gray-500 dark:text-gray-400">{t("systemConfig.loading")}</p>
           ) : certsError ? (
             <p className="text-red-600 dark:text-red-400">{certsError}</p>
           ) : !certifications.length ? (
-            <p className="text-gray-500 dark:text-gray-400">No certifications submitted yet.</p>
+            <p className="text-gray-500 dark:text-gray-400">{t("providers.noCertifications")}</p>
           ) : (
             <div className="w-full min-w-0 max-h-64 overflow-auto">
               <table className="w-full min-w-[32rem] text-left text-sm">
                 <thead>
                   <tr className="border-b border-gray-200 dark:border-gray-700">
-                    <th className="py-2 pr-2 font-medium text-gray-500 dark:text-gray-400">Type</th>
-                    <th className="py-2 pr-2 font-medium text-gray-500 dark:text-gray-400">Cert. number</th>
-                    <th className="py-2 pr-2 font-medium text-gray-500 dark:text-gray-400">Status</th>
-                    <th className="py-2 pr-2 font-medium text-gray-500 dark:text-gray-400">Approved by</th>
-                    <th className="py-2 pr-2 font-medium text-gray-500 dark:text-gray-400">See document</th>
-                    <th className="w-10 py-2 font-medium text-gray-500 dark:text-gray-400" aria-label="Expand" />
+                    <th className="py-2 pr-2 font-medium text-gray-500 dark:text-gray-400">{t("providers.type")}</th>
+                    <th className="py-2 pr-2 font-medium text-gray-500 dark:text-gray-400">{t("providers.certNumber")}</th>
+                    <th className="py-2 pr-2 font-medium text-gray-500 dark:text-gray-400">{t("users.status")}</th>
+                    <th className="py-2 pr-2 font-medium text-gray-500 dark:text-gray-400">{t("providers.approvedBy")}</th>
+                    <th className="py-2 pr-2 font-medium text-gray-500 dark:text-gray-400">{t("providers.seeDocument")}</th>
+                    <th className="w-10 py-2 font-medium text-gray-500 dark:text-gray-400" aria-label={t("providers.showMore")} />
                   </tr>
                 </thead>
                 <tbody>
@@ -1580,7 +1585,7 @@ export function ProviderFullDetailsView({
                                 rel="noopener noreferrer"
                                 className="text-brand-600 hover:underline dark:text-brand-400"
                               >
-                                See document
+                                {t("providers.seeDocument")}
                               </a>
                             ) : (
                               <span className="text-gray-400 dark:text-gray-500">—</span>
@@ -1591,7 +1596,7 @@ export function ProviderFullDetailsView({
                               type="button"
                               onClick={() => setExpandedCertId(isExpanded ? null : cert.id)}
                               className="rounded p-1 text-gray-500 hover:bg-gray-200 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-gray-200"
-                              title={isExpanded ? "Collapse" : "Show more"}
+                              title={isExpanded ? t("providers.collapse") : t("providers.showMore")}
                               aria-expanded={isExpanded}
                             >
                               <svg
@@ -1610,23 +1615,23 @@ export function ProviderFullDetailsView({
                             <td colSpan={6} className="px-3 py-2">
                               <div className="flex flex-wrap items-start gap-4 text-xs">
                                 <div>
-                                  <span className="font-medium text-gray-500 dark:text-gray-400">Requested at: </span>
+                                  <span className="font-medium text-gray-500 dark:text-gray-400">{t("providers.requestedAt")}: </span>
                                   <span className="text-gray-700 dark:text-gray-300">
                                     {cert.createdAt ? formatDate(cert.createdAt) : "—"}
                                   </span>
                                 </div>
                                 <div>
-                                  <span className="font-medium text-gray-500 dark:text-gray-400">Approved at: </span>
+                                  <span className="font-medium text-gray-500 dark:text-gray-400">{t("providers.approvedAt")}: </span>
                                   <span className="text-gray-700 dark:text-gray-300">
                                     {cert.approvedAt ? formatDate(cert.approvedAt) : "—"}
                                   </span>
                                 </div>
                                 <div>
-                                  <span className="font-medium text-gray-500 dark:text-gray-400">Approved by: </span>
+                                  <span className="font-medium text-gray-500 dark:text-gray-400">{t("providers.approvedBy")}: </span>
                                   <span className="text-gray-700 dark:text-gray-300">{cert.approvedByName ?? "—"}</span>
                                 </div>
                                 <div>
-                                  <span className="font-medium text-gray-500 dark:text-gray-400">Admin comment: </span>
+                                  <span className="font-medium text-gray-500 dark:text-gray-400">{t("providers.adminComment")}: </span>
                                   <span className="text-gray-700 dark:text-gray-300">{cert.adminComment ?? "—"}</span>
                                 </div>
                                 {cert.status === "PENDING" && (
@@ -1637,7 +1642,7 @@ export function ProviderFullDetailsView({
                                       onClick={() => handleVerifyCertification(cert.id, "APPROVED")}
                                       className="rounded bg-green-600 px-2 py-1 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50 dark:bg-green-700 dark:hover:bg-green-800"
                                     >
-                                      {verifyingId === cert.id ? "…" : "Approve"}
+                                      {verifyingId === cert.id ? "…" : t("upgradeRequests.approve")}
                                     </button>
                                     <button
                                       type="button"
@@ -1645,7 +1650,7 @@ export function ProviderFullDetailsView({
                                       onClick={() => handleVerifyCertification(cert.id, "REJECTED")}
                                       className="rounded bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-50 dark:bg-red-700 dark:hover:bg-red-800"
                                     >
-                                      Reject
+                                      {t("upgradeRequests.reject")}
                                     </button>
                                   </span>
                                 )}
@@ -1702,26 +1707,26 @@ export function ProviderFullDetailsView({
       */}
 
       <div className="w-full min-w-0 sm:col-span-2">
-        <DetailBlock title="User documents">
+        <DetailBlock title={t("providers.userDocuments")}>
           <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
-            All documents uploaded by this user. Use Approve/Reject to verify individual documents.
+            {t("providers.userDocumentsHelp")}
           </p>
           {userDocsLoading ? (
-            <p className="text-gray-500 dark:text-gray-400">Loading…</p>
+            <p className="text-gray-500 dark:text-gray-400">{t("systemConfig.loading")}</p>
           ) : userDocsError ? (
             <p className="text-red-600 dark:text-red-400">{userDocsError}</p>
           ) : !userDocuments.length ? (
-            <p className="text-gray-500 dark:text-gray-400">No documents.</p>
+            <p className="text-gray-500 dark:text-gray-400">{t("providers.noDocuments")}</p>
           ) : (
             <div className="w-full min-w-0 max-h-48 overflow-auto">
               <table className="w-full min-w-[28rem] text-left text-sm">
                 <thead>
                   <tr className="border-b border-gray-200 dark:border-gray-700">
-                    <th className="py-2 pr-2 font-medium text-gray-500 dark:text-gray-400">Type</th>
-                    <th className="py-2 pr-2 font-medium text-gray-500 dark:text-gray-400">Status</th>
-                    <th className="py-2 pr-2 font-medium text-gray-500 dark:text-gray-400">Created</th>
-                    <th className="py-2 pr-2 font-medium text-gray-500 dark:text-gray-400">Document</th>
-                    <th className="w-24 py-2 font-medium text-gray-500 dark:text-gray-400">Verify</th>
+                    <th className="py-2 pr-2 font-medium text-gray-500 dark:text-gray-400">{t("providers.type")}</th>
+                    <th className="py-2 pr-2 font-medium text-gray-500 dark:text-gray-400">{t("users.status")}</th>
+                    <th className="py-2 pr-2 font-medium text-gray-500 dark:text-gray-400">{t("users.created")}</th>
+                    <th className="py-2 pr-2 font-medium text-gray-500 dark:text-gray-400">{t("providers.document")}</th>
+                    <th className="w-24 py-2 font-medium text-gray-500 dark:text-gray-400">{t("providers.verify")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1740,7 +1745,7 @@ export function ProviderFullDetailsView({
                             type="button"
                             disabled={!(doc.filePath ?? doc.path)}
                             onClick={() => viewDocument(doc.filePath ?? doc.path)}
-                            title="View"
+                            title={t("common.actions.view")}
                             className="rounded border border-gray-300 bg-white p-1.5 text-gray-600 hover:bg-gray-50 hover:text-gray-800 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
                           >
                             <EyeIcon className="h-4 w-4" />
@@ -1749,7 +1754,7 @@ export function ProviderFullDetailsView({
                             type="button"
                             disabled={!(doc.filePath ?? doc.path)}
                             onClick={() => downloadDocument(doc.filePath ?? doc.path, `${doc.type}_${doc.id}.pdf`)}
-                            title="Download"
+                            title={t("upgradeRequests.download")}
                             className="rounded border border-gray-300 bg-white p-1.5 text-gray-600 hover:bg-gray-50 hover:text-gray-800 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
                           >
                             <DownloadIcon className="h-4 w-4" />
@@ -1758,7 +1763,7 @@ export function ProviderFullDetailsView({
                             type="button"
                             disabled={!(doc.filePath ?? doc.path)}
                             onClick={() => printDocument(doc.filePath ?? doc.path)}
-                            title="Print"
+                            title={t("upgradeRequests.print")}
                             className="rounded border border-gray-300 bg-white p-1.5 text-gray-600 hover:bg-gray-50 hover:text-gray-800 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
                           >
                             <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -1776,7 +1781,7 @@ export function ProviderFullDetailsView({
                               onClick={() => handleVerifyDocument(doc.id, "APPROVED")}
                               className="rounded bg-green-600 px-2 py-1 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50 dark:bg-green-700 dark:hover:bg-green-800"
                             >
-                              {verifyingDocId === doc.id ? "…" : "Approve"}
+                              {verifyingDocId === doc.id ? "…" : t("upgradeRequests.approve")}
                             </button>
                             <button
                               type="button"
@@ -1784,7 +1789,7 @@ export function ProviderFullDetailsView({
                               onClick={() => handleVerifyDocument(doc.id, "REJECTED")}
                               className="rounded bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-50 dark:bg-red-700 dark:hover:bg-red-800"
                             >
-                              Reject
+                              {t("upgradeRequests.reject")}
                             </button>
                           </span>
                         ) : (
@@ -1801,16 +1806,16 @@ export function ProviderFullDetailsView({
       </div>
 
       <div className={`w-full min-w-0 sm:col-span-2 ${isProviderPending ? "relative opacity-60" : ""}`}>
-        <DetailBlock title="Service requests">
+        <DetailBlock title={t("providers.serviceRequests")}>
           {isProviderPending && (
             <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
-              Not available for pending providers. Service requests and wallet become accessible after the provider is verified (Active).
+              {t("providers.pendingProviderLocked")}
             </div>
           )}
           <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
             {isProviderPending
-              ? "Verify the provider to view and manage service requests."
-              : "Click a status to view all service requests of that type."}
+              ? t("providers.verifyProviderToManageRequests")
+              : t("providers.clickStatusToViewRequests")}
           </p>
           <div className={`grid w-full min-w-0 grid-cols-2 gap-3 text-sm sm:grid-cols-3 md:grid-cols-6 ${isProviderPending ? "pointer-events-none" : ""}`}>
             {SERVICE_REQUEST_STATUSES.map((status) => (
@@ -1835,56 +1840,56 @@ export function ProviderFullDetailsView({
               />
             ))}
           </div>
-          <p className="mt-3 text-gray-500 dark:text-gray-400">Total: {totalRequests} requests</p>
+          <p className="mt-3 text-gray-500 dark:text-gray-400">{t("providers.totalRequests", { count: totalRequests })}</p>
         </DetailBlock>
       </div>
 
       <ServiceRequestsListModal
         isOpen={openStatus != null}
         onClose={() => setOpenStatus(null)}
-        entityLabel="Provider"
+        entityLabel={t("providers.providerLabel")}
         entityId={provider.id}
         status={openStatus}
         variant="provider"
       />
 
       <div className={`w-full min-w-0 grid grid-cols-1 gap-4 lg:grid-cols-2 sm:col-span-2 ${isProviderPending ? "relative opacity-60 pointer-events-none" : ""}`}>
-        <DetailBlock title="Wallet">
+        <DetailBlock title={t("providers.wallet")}>
           {isProviderPending && (
             <p className="mb-2 text-xs text-amber-600 dark:text-amber-400">
-              Available after provider is verified (Active).
+              {t("providers.availableAfterActive")}
             </p>
           )}
           <DetailBlockRow
-            label="Total balance"
-            value={totalBalance != null && totalBalance !== "" ? totalBalance : wallet ? `${wallet.balance} ${wallet.currency}` : "—"}
+            label={t("providers.totalBalance")}
+            value={totalBalance != null && totalBalance !== "" ? totalBalance : wallet ? `${wallet.balance} ${wallet.currency}` : t("common.noValue")}
           />
-          <DetailBlockRow label="Claimable balance" value={claimableBalance ?? "—"} />
-          <DetailBlockRow label="Non-claimable balance" value={nonClaimableBalance ?? "—"} />
-          <DetailBlockRow label="Cash commission due" value={cashCommissionDue ?? "—"} />
-          <DetailBlockRow label="Pending withdrawal" value={pendingWithdrawal ?? "—"} />
+          <DetailBlockRow label={t("providers.claimableBalance")} value={claimableBalance ?? t("common.noValue")} />
+          <DetailBlockRow label={t("providers.nonClaimableBalance")} value={nonClaimableBalance ?? t("common.noValue")} />
+          <DetailBlockRow label={t("providers.cashCommissionDue")} value={cashCommissionDue ?? t("common.noValue")} />
+          <DetailBlockRow label={t("providers.pendingWithdrawal")} value={pendingWithdrawal ?? t("common.noValue")} />
           {wallet && (
-            <DetailBlockRow label="Created" value={formatDate(wallet.createdAt)} />
+            <DetailBlockRow label={t("users.created")} value={formatDate(wallet.createdAt)} />
           )}
         </DetailBlock>
 
-        <DetailBlock title="Wallet history">
+        <DetailBlock title={t("providers.walletHistory")}>
           {isProviderPending && (
             <p className="mb-2 text-xs text-amber-600 dark:text-amber-400">
-              Available after provider is verified (Active).
+              {t("providers.availableAfterActive")}
             </p>
           )}
           {!walletHistory?.length ? (
-            <p className="text-gray-500 dark:text-gray-400">No history.</p>
+            <p className="text-gray-500 dark:text-gray-400">{t("providers.noHistory")}</p>
           ) : (
             <div className="w-full min-w-0 max-h-48 overflow-auto">
               <table className="w-full min-w-[20rem] text-left text-sm">
                 <thead>
                   <tr className="border-b border-gray-200 dark:border-gray-700">
-                    <th className="py-2 pr-2 font-medium text-gray-500 dark:text-gray-400">Date</th>
-                    <th className="py-2 pr-2 font-medium text-gray-500 dark:text-gray-400">Amount</th>
-                    <th className="py-2 pr-2 font-medium text-gray-500 dark:text-gray-400">Balance after</th>
-                    <th className="py-2 font-medium text-gray-500 dark:text-gray-400">Description</th>
+                    <th className="py-2 pr-2 font-medium text-gray-500 dark:text-gray-400">{t("providers.date")}</th>
+                    <th className="py-2 pr-2 font-medium text-gray-500 dark:text-gray-400">{t("providers.amount")}</th>
+                    <th className="py-2 pr-2 font-medium text-gray-500 dark:text-gray-400">{t("providers.balanceAfter")}</th>
+                    <th className="py-2 font-medium text-gray-500 dark:text-gray-400">{t("providers.description")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1893,7 +1898,7 @@ export function ProviderFullDetailsView({
                       <td className="py-1.5 pr-2 text-gray-700 dark:text-gray-300">{formatDate(entry.createdAt)}</td>
                       <td className="py-1.5 pr-2 font-medium text-gray-800 dark:text-white/90">{entry.amount}</td>
                       <td className="py-1.5 pr-2 text-gray-700 dark:text-gray-300">{entry.balanceAfter}</td>
-                      <td className="py-1.5 text-gray-600 dark:text-gray-400">{entry.description ?? "—"}</td>
+                      <td className="py-1.5 text-gray-600 dark:text-gray-400">{entry.description ?? t("common.noValue")}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1904,9 +1909,9 @@ export function ProviderFullDetailsView({
       </div>
 
       <div className="w-full min-w-0 sm:col-span-2 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <DetailBlock title="Wallet funding (admin)">
+        <DetailBlock title={t("providers.walletFundingAdmin")}>
           <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
-            Add manual wallet credit and review provider recharge/credit history.
+            {t("providers.walletFundingHelp")}
           </p>
           <div className="mb-3 flex flex-wrap items-end gap-2">
             <input
@@ -1915,21 +1920,21 @@ export function ProviderFullDetailsView({
               step={0.01}
               value={manualCreditAmount}
               onChange={(e) => setManualCreditAmount(e.target.value)}
-              placeholder="Amount"
+              placeholder={t("providers.amount")}
               className="w-28 rounded border border-gray-300 bg-white px-2 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
             />
             <input
               type="text"
               value={manualCreditReason}
               onChange={(e) => setManualCreditReason(e.target.value)}
-              placeholder="Reason (optional)"
+              placeholder={t("providers.reasonOptional")}
               className="w-48 rounded border border-gray-300 bg-white px-2 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
             />
             <input
               type="text"
               value={manualCreditReference}
               onChange={(e) => setManualCreditReference(e.target.value)}
-              placeholder="Reference (optional)"
+              placeholder={t("providers.referenceOptional")}
               className="w-48 rounded border border-gray-300 bg-white px-2 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
             />
             <button
@@ -1938,41 +1943,41 @@ export function ProviderFullDetailsView({
               onClick={handleManualCredit}
               className="rounded bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 dark:bg-brand-700 dark:hover:bg-brand-800"
             >
-              {manualCreditLoading ? "Applying..." : "Manual credit"}
+              {manualCreditLoading ? t("providers.applying") : t("providers.manualCredit")}
             </button>
           </div>
           {fundingHistoryError && (
             <p className="mb-2 text-xs text-rose-600 dark:text-rose-400">{fundingHistoryError}</p>
           )}
           {fundingHistoryLoading ? (
-            <p className="text-sm text-gray-500 dark:text-gray-400">Loading funding history...</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">{t("providers.loadingFundingHistory")}</p>
           ) : !fundingHistory?.data?.length ? (
-            <p className="text-sm text-gray-500 dark:text-gray-400">No funding records.</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">{t("providers.noFundingRecords")}</p>
           ) : (
             <>
               <div className="max-h-56 overflow-auto rounded border border-gray-200 dark:border-gray-700">
                 <table className="w-full min-w-[42rem] text-left text-xs">
                   <thead className="bg-gray-50 dark:bg-gray-800/50">
                     <tr className="border-b border-gray-200 dark:border-gray-700">
-                      <th className="py-2 px-2 font-medium text-gray-500 dark:text-gray-400">Date</th>
-                      <th className="py-2 px-2 font-medium text-gray-500 dark:text-gray-400">Purpose</th>
-                      <th className="py-2 px-2 font-medium text-gray-500 dark:text-gray-400">Status</th>
-                      <th className="py-2 px-2 font-medium text-gray-500 dark:text-gray-400">Method</th>
-                      <th className="py-2 px-2 font-medium text-gray-500 dark:text-gray-400">Amount</th>
-                      <th className="py-2 px-2 font-medium text-gray-500 dark:text-gray-400">Reason</th>
-                      <th className="py-2 px-2 font-medium text-gray-500 dark:text-gray-400">Reference</th>
+                      <th className="py-2 px-2 font-medium text-gray-500 dark:text-gray-400">{t("providers.date")}</th>
+                      <th className="py-2 px-2 font-medium text-gray-500 dark:text-gray-400">{t("providers.purpose")}</th>
+                      <th className="py-2 px-2 font-medium text-gray-500 dark:text-gray-400">{t("users.status")}</th>
+                      <th className="py-2 px-2 font-medium text-gray-500 dark:text-gray-400">{t("providers.method")}</th>
+                      <th className="py-2 px-2 font-medium text-gray-500 dark:text-gray-400">{t("providers.amount")}</th>
+                      <th className="py-2 px-2 font-medium text-gray-500 dark:text-gray-400">{t("providers.description")}</th>
+                      <th className="py-2 px-2 font-medium text-gray-500 dark:text-gray-400">{t("providers.reference")}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {(fundingHistory.data ?? []).map((entry) => (
                       <tr key={entry.transactionId} className="border-b border-gray-100 dark:border-gray-800">
-                        <td className="py-1.5 px-2 text-gray-700 dark:text-gray-300">{entry.createdAt ? formatDate(entry.createdAt) : "—"}</td>
+                        <td className="py-1.5 px-2 text-gray-700 dark:text-gray-300">{entry.createdAt ? formatDate(entry.createdAt) : t("common.noValue")}</td>
                         <td className="py-1.5 px-2 text-gray-700 dark:text-gray-300">{entry.purpose}</td>
                         <td className="py-1.5 px-2 text-gray-700 dark:text-gray-300">{entry.status}</td>
-                        <td className="py-1.5 px-2 text-gray-700 dark:text-gray-300">{entry.paymentMethod ?? "—"}</td>
+                        <td className="py-1.5 px-2 text-gray-700 dark:text-gray-300">{entry.paymentMethod ?? t("common.noValue")}</td>
                         <td className="py-1.5 px-2 font-medium text-gray-800 dark:text-white/90">{entry.amount}</td>
-                        <td className="py-1.5 px-2 text-gray-600 dark:text-gray-400">{entry.reason ?? "—"}</td>
-                        <td className="py-1.5 px-2 text-gray-600 dark:text-gray-400">{entry.reference ?? "—"}</td>
+                        <td className="py-1.5 px-2 text-gray-600 dark:text-gray-400">{entry.reason ?? t("common.noValue")}</td>
+                        <td className="py-1.5 px-2 text-gray-600 dark:text-gray-400">{entry.reference ?? t("common.noValue")}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -1980,7 +1985,11 @@ export function ProviderFullDetailsView({
               </div>
               <div className="mt-2 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
                 <span>
-                  Page {fundingHistory.meta.page} of {fundingHistory.meta.totalPages} (total {fundingHistory.meta.total})
+                  {t("providers.pageOfTotal", {
+                    page: fundingHistory.meta.page,
+                    totalPages: fundingHistory.meta.totalPages,
+                    total: fundingHistory.meta.total,
+                  })}
                 </span>
                 <div className="flex gap-2">
                   <button
@@ -1989,7 +1998,7 @@ export function ProviderFullDetailsView({
                     onClick={() => setFundingHistoryPage((p) => Math.max(1, p - 1))}
                     className="rounded border border-gray-300 px-2 py-1 disabled:opacity-50 dark:border-gray-600"
                   >
-                    Prev
+                    {t("common.actions.previous")}
                   </button>
                   <button
                     type="button"
@@ -2000,24 +2009,28 @@ export function ProviderFullDetailsView({
                     onClick={() => setFundingHistoryPage((p) => p + 1)}
                     className="rounded border border-gray-300 px-2 py-1 disabled:opacity-50 dark:border-gray-600"
                   >
-                    Next
+                    {t("common.actions.next")}
                   </button>
                 </div>
               </div>
             </>
           )}
         </DetailBlock>
-        <DetailBlock title="Salary (admin)">
+        <DetailBlock title={t("providers.salaryAdmin")}>
           <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
-            Set salary for salaried providers. New value replaces current.
+            {t("providers.salaryHelp")}
           </p>
           {salaryLoading ? (
-            <p className="text-gray-500 dark:text-gray-400">Loading…</p>
+            <p className="text-gray-500 dark:text-gray-400">{t("systemConfig.loading")}</p>
           ) : (
             <>
               {salaryHistory?.currentSalary && (
                 <p className="mb-2 text-sm text-gray-700 dark:text-gray-300">
-                  Current: {salaryHistory.currentSalary.amount} / {salaryHistory.currentSalary.frequency} (from {formatDate(salaryHistory.currentSalary.validFrom)})
+                  {t("providers.currentSalary", {
+                    amount: salaryHistory.currentSalary.amount,
+                    frequency: salaryHistory.currentSalary.frequency,
+                    date: formatDate(salaryHistory.currentSalary.validFrom),
+                  })}
                 </p>
               )}
               <div className="flex flex-wrap items-end gap-2">
@@ -2027,7 +2040,7 @@ export function ProviderFullDetailsView({
                   step={0.01}
                   value={salaryAmount}
                   onChange={(e) => setSalaryAmount(e.target.value)}
-                  placeholder="Amount"
+                  placeholder={t("providers.amount")}
                   className="w-28 rounded border border-gray-300 bg-white px-2 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
                 />
                 <select
@@ -2035,8 +2048,8 @@ export function ProviderFullDetailsView({
                   onChange={(e) => setSalaryFrequency(e.target.value as "MONTHLY" | "WEEKLY")}
                   className="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
                 >
-                  <option value="MONTHLY">Monthly</option>
-                  <option value="WEEKLY">Weekly</option>
+                  <option value="MONTHLY">{t("providers.monthly")}</option>
+                  <option value="WEEKLY">{t("providers.weekly")}</option>
                 </select>
                 <button
                   type="button"
@@ -2044,15 +2057,15 @@ export function ProviderFullDetailsView({
                   onClick={handleSetSalary}
                   className="rounded bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 dark:bg-brand-700 dark:hover:bg-brand-800"
                 >
-                  {salarySaving ? "Saving…" : "Set salary"}
+                  {salarySaving ? t("supervisor.saving") : t("providers.setSalary")}
                 </button>
               </div>
               {(salaryHistory?.history?.length ?? 0) > 0 && (
                 <div className="mt-3 max-h-32 overflow-auto">
-                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400">History</p>
+                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("providers.history")}</p>
                   <ul className="mt-1 list-inside list-disc text-xs text-gray-600 dark:text-gray-400">
                     {(salaryHistory?.history ?? []).slice(0, 10).map((r, i) => (
-                      <li key={i}>{r.amount} / {r.frequency} from {formatDate(r.validFrom)}{r.validTo ? ` to ${formatDate(r.validTo)}` : " (current)"}</li>
+                      <li key={i}>{r.amount} / {r.frequency} from {formatDate(r.validFrom)}{r.validTo ? ` to ${formatDate(r.validTo)}` : ` ${t("providers.currentMarker")}`}</li>
                     ))}
                   </ul>
                 </div>
@@ -2060,17 +2073,21 @@ export function ProviderFullDetailsView({
             </>
           )}
         </DetailBlock>
-        <DetailBlock title="Billing rate (admin)">
+        <DetailBlock title={t("providers.billingRateAdmin")}>
           <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
-            Set billing rate for this provider. New value replaces current.
+            {t("providers.billingRateHelp")}
           </p>
           {billingRateLoading ? (
-            <p className="text-gray-500 dark:text-gray-400">Loading…</p>
+            <p className="text-gray-500 dark:text-gray-400">{t("systemConfig.loading")}</p>
           ) : (
             <>
               {billingRateHistory?.currentRate && (
                 <p className="mb-2 text-sm text-gray-700 dark:text-gray-300">
-                  Current: {billingRateHistory.currentRate.amount} ({billingRateHistory.currentRate.type}) from {formatDate(billingRateHistory.currentRate.validFrom)}
+                  {t("providers.currentRate", {
+                    amount: billingRateHistory.currentRate.amount,
+                    type: billingRateHistory.currentRate.type,
+                    date: formatDate(billingRateHistory.currentRate.validFrom),
+                  })}
                 </p>
               )}
               <div className="flex flex-wrap items-end gap-2">
@@ -2080,7 +2097,7 @@ export function ProviderFullDetailsView({
                   step={0.01}
                   value={billingRateAmount}
                   onChange={(e) => setBillingRateAmount(e.target.value)}
-                  placeholder="Amount"
+                  placeholder={t("providers.amount")}
                   className="w-28 rounded border border-gray-300 bg-white px-2 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
                 />
                 <select
@@ -2088,8 +2105,8 @@ export function ProviderFullDetailsView({
                   onChange={(e) => setBillingRateType(e.target.value as "CONSULTATION" | "HOURLY")}
                   className="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
                 >
-                  <option value="CONSULTATION">Consultation</option>
-                  <option value="HOURLY">Hourly</option>
+                  <option value="CONSULTATION">{t("providers.consultation")}</option>
+                  <option value="HOURLY">{t("providers.hourly")}</option>
                 </select>
                 <button
                   type="button"
@@ -2097,15 +2114,15 @@ export function ProviderFullDetailsView({
                   onClick={handleSetBillingRate}
                   className="rounded bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 dark:bg-brand-700 dark:hover:bg-brand-800"
                 >
-                  {billingRateSaving ? "Saving…" : "Set rate"}
+                  {billingRateSaving ? t("supervisor.saving") : t("providers.setRate")}
                 </button>
               </div>
               {(billingRateHistory?.history?.length ?? 0) > 0 && (
                 <div className="mt-3 max-h-32 overflow-auto">
-                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400">History</p>
+                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("providers.history")}</p>
                   <ul className="mt-1 list-inside list-disc text-xs text-gray-600 dark:text-gray-400">
                     {(billingRateHistory?.history ?? []).slice(0, 10).map((r, i) => (
-                      <li key={i}>{r.amount} ({r.type}) from {formatDate(r.validFrom)}{r.validTo ? ` to ${formatDate(r.validTo)}` : " (current)"}</li>
+                      <li key={i}>{r.amount} ({r.type}) from {formatDate(r.validFrom)}{r.validTo ? ` to ${formatDate(r.validTo)}` : ` ${t("providers.currentMarker")}`}</li>
                     ))}
                   </ul>
                 </div>

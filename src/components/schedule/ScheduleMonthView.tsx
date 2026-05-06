@@ -1,3 +1,5 @@
+import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import {
   eachDayOfInterval,
   endOfMonth,
@@ -12,8 +14,6 @@ import {
 import type { ScheduleEventRecord } from "../../data/nurseScheduleSeed";
 import { parseEventRange } from "../../data/nurseScheduleSeed";
 import { eventTypeClasses, eventTypeDotClass } from "./scheduleEventStyles";
-
-const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 type Props = {
   visibleMonth: Date;
@@ -37,6 +37,20 @@ export function ScheduleMonthView({
   onSelectDay,
   onEventClick,
 }: Props) {
+  const { t } = useTranslation();
+  const weekdayLabels = useMemo(
+    () => [
+      t("scheduleCalendar.weekdayMon"),
+      t("scheduleCalendar.weekdayTue"),
+      t("scheduleCalendar.weekdayWed"),
+      t("scheduleCalendar.weekdayThu"),
+      t("scheduleCalendar.weekdayFri"),
+      t("scheduleCalendar.weekdaySat"),
+      t("scheduleCalendar.weekdaySun"),
+    ],
+    [t]
+  );
+
   const monthStart = startOfMonth(visibleMonth);
   const monthEnd = endOfMonth(visibleMonth);
   const gridStart = startOfWeek(monthStart, { weekStartsOn: 1 });
@@ -47,7 +61,7 @@ export function ScheduleMonthView({
     <div className="overflow-x-auto">
       <div className="min-w-[720px]">
         <div className="grid grid-cols-7 border-b-2 border-gray-300 dark:border-gray-600">
-          {WEEKDAYS.map((d) => (
+          {weekdayLabels.map((d) => (
             <div
               key={d}
               className="border-r border-gray-300 py-2 text-center text-xs font-semibold uppercase tracking-wide text-gray-500 last:border-r-0 dark:border-gray-600 dark:text-gray-400"
@@ -117,15 +131,22 @@ export function ScheduleMonthView({
                           onEventClick(e);
                         }
                       }}
-                      title={`${e.title} (${format(parseEventRange(e).start, "HH:mm")}–${format(parseEventRange(e).end, "HH:mm")})`}
-                      className={`truncate rounded px-1.5 py-0.5 text-[10px] font-medium leading-tight sm:text-xs cursor-pointer ${eventTypeClasses(e.type)}`}
+                      title={`${e.title}${e.feeLabel ? ` | ${t("scheduleCalendar.feeLine", { amount: e.feeLabel })}` : ""} (${format(parseEventRange(e).start, "HH:mm")}–${format(parseEventRange(e).end, "HH:mm")})`}
+                      className={`rounded px-1.5 py-0.5 text-[10px] font-medium leading-tight sm:text-xs cursor-pointer ${eventTypeClasses(e.type)}`}
                     >
-                      <span className={`mr-1 inline-block size-1.5 rounded-full align-middle ${eventTypeDotClass(e.type)}`} />
-                      {e.title}
+                      <div className="truncate">
+                        <span className={`mr-1 inline-block size-1.5 rounded-full align-middle ${eventTypeDotClass(e.type)}`} />
+                        {e.title}
+                      </div>
+                      {e.feeLabel ? (
+                        <div className="truncate">{t("scheduleCalendar.feeLine", { amount: e.feeLabel })}</div>
+                      ) : null}
                     </div>
                   ))}
                   {more > 0 && (
-                    <p className="pl-0.5 text-[10px] font-medium text-gray-500 dark:text-gray-400">+{more} more</p>
+                    <p className="pl-0.5 text-[10px] font-medium text-gray-500 dark:text-gray-400">
+                      {t("scheduleCalendar.moreCount", { count: more })}
+                    </p>
                   )}
                 </div>
               </div>

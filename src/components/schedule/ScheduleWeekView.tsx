@@ -1,4 +1,5 @@
 import { Fragment } from "react";
+import { useTranslation } from "react-i18next";
 import {
   eachDayOfInterval,
   endOfWeek,
@@ -6,6 +7,8 @@ import {
   isSameDay,
   startOfWeek,
 } from "date-fns";
+import { bn } from "date-fns/locale/bn";
+import { enUS } from "date-fns/locale/en-US";
 import type { ScheduleEventRecord } from "../../data/nurseScheduleSeed";
 import { parseEventRange } from "../../data/nurseScheduleSeed";
 import { eventTypeClasses } from "./scheduleEventStyles";
@@ -62,6 +65,9 @@ export function ScheduleWeekView({
   onSelectHour,
   onEventClick,
 }: Props) {
+  const { t, i18n } = useTranslation();
+  const dateLoc = i18n.language?.startsWith("bn") ? bn : enUS;
+
   const ws = startOfWeek(weekAnchor, { weekStartsOn: 1 });
   const we = endOfWeek(weekAnchor, { weekStartsOn: 1 });
   const days = eachDayOfInterval({ start: ws, end: we });
@@ -80,7 +86,7 @@ export function ScheduleWeekView({
                 className="border-r border-gray-300 px-1 py-2 text-center last:border-r-0 dark:border-gray-600"
               >
                 <p className="text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                  {format(d, "EEE")}
+                  {format(d, "EEE", { locale: dateLoc })}
                 </p>
                 <p className="mt-0.5 text-lg font-semibold text-gray-900 dark:text-white">{format(d, "d")}</p>
               </div>
@@ -100,7 +106,7 @@ export function ScheduleWeekView({
             {hours.map((h) => (
               <Fragment key={h}>
                 <div className={timeCellClass} style={{ height: PX_PER_HOUR, minHeight: PX_PER_HOUR }}>
-                  {format(new Date(2000, 0, 1, h), "h a")}
+                  {format(new Date(2000, 0, 1, h), "h a", { locale: dateLoc })}
                 </div>
                 {days.map((day, dayIdx) => {
                   const inRange = dayInRange(day);
@@ -119,7 +125,13 @@ export function ScheduleWeekView({
                           : "cursor-not-allowed border-dashed border-gray-400 bg-gray-200/90 opacity-100 dark:border-gray-500 dark:bg-gray-800/90"
                       }`}
                       style={{ height: PX_PER_HOUR, minHeight: PX_PER_HOUR }}
-                      title={inRange ? `Schedule from ${format(new Date(2000, 0, 1, h), "h a")}` : "Outside request window"}
+                      title={
+                        inRange
+                          ? t("scheduleCalendar.scheduleFrom", {
+                              time: format(new Date(2000, 0, 1, h), "h a", { locale: dateLoc }),
+                            })
+                          : t("scheduleCalendar.outsideWindow")
+                      }
                     />
                   );
                 })}
@@ -168,11 +180,17 @@ export function ScheduleWeekView({
                           height: `${layout.heightPct}%`,
                           minHeight: 22,
                         }}
-                        title={`${e.title} (${format(start, "h a")}–${format(endDisplay, "h a")})`}
+                        title={`${e.title}${e.feeLabel ? ` | ${t("scheduleCalendar.feeLine", { amount: e.feeLabel })}` : ""} (${format(start, "h a", { locale: dateLoc })}–${format(endDisplay, "h a", { locale: dateLoc })})`}
                       >
                         <p className="truncate font-semibold">{e.title}</p>
+                        {e.feeLabel ? (
+                          <p className="truncate text-[10px] opacity-90">
+                            {t("scheduleCalendar.feeLine", { amount: e.feeLabel })}
+                          </p>
+                        ) : null}
                         <p className="truncate text-[10px] opacity-90">
-                          {format(start, "h a")} – {format(endDisplay, "h a")}
+                          {format(start, "h a", { locale: dateLoc })} –{" "}
+                          {format(endDisplay, "h a", { locale: dateLoc })}
                         </p>
                       </div>
                     );

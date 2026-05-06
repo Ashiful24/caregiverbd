@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
+import { useTranslation } from "react-i18next";
 import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import PageMeta from "../components/common/PageMeta";
 import Badge from "../components/ui/badge/Badge";
@@ -16,6 +17,7 @@ import { formatDate } from "../utils/format";
 type StatusFilter = "PENDING" | "all";
 
 export default function UpgradeRequests() {
+  const { t } = useTranslation();
   const [list, setList] = useState<UpgradeRequestListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -35,13 +37,13 @@ export default function UpgradeRequests() {
       const message =
         err && typeof err === "object" && "message" in err
           ? String((err as { message: string }).message)
-          : "Failed to load upgrade requests.";
+          : t("upgradeRequests.failedLoadList");
       setError(message);
       setList([]);
     } finally {
       setLoading(false);
     }
-  }, [statusFilter]);
+  }, [statusFilter, t]);
 
   useEffect(() => {
     fetchList();
@@ -50,14 +52,14 @@ export default function UpgradeRequests() {
   return (
     <>
       <PageMeta
-        title="Upgrade Requests | Hope - BMQAS"
-        description="Review and approve or reject provider consultation type upgrade requests"
+        title={t("upgradeRequests.listMetaTitle")}
+        description={t("upgradeRequests.listMetaDescription")}
       />
-      <PageBreadcrumb pageTitle="Upgrade Requests" />
+      <PageBreadcrumb pageTitle={t("upgradeRequests.listPageTitle")} />
       <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] lg:p-6">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
-            Provider upgrade requests
+            {t("upgradeRequests.listHeading")}
           </h3>
           <div className="flex gap-2">
             <button
@@ -69,7 +71,7 @@ export default function UpgradeRequests() {
                   : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
               }`}
             >
-              Pending
+              {t("upgradeRequests.pending")}
             </button>
             <button
               type="button"
@@ -80,7 +82,7 @@ export default function UpgradeRequests() {
                   : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
               }`}
             >
-              All
+              {t("common.all")}
             </button>
           </div>
         </div>
@@ -93,25 +95,25 @@ export default function UpgradeRequests() {
 
         {loading ? (
           <div className="py-8 text-center text-gray-500 dark:text-gray-400">
-            Loading…
+            {t("systemConfig.loading")}
           </div>
         ) : list.length === 0 ? (
           <p className="py-8 text-center text-gray-500 dark:text-gray-400">
             {statusFilter === "PENDING"
-              ? "No pending upgrade requests."
-              : "No upgrade requests found."}
+              ? t("upgradeRequests.noPending")
+              : t("upgradeRequests.noRequests")}
           </p>
         ) : (
           <div className="overflow-x-auto">
             <Table>
               <TableHeader className="border-b border-gray-200 dark:border-gray-800">
                 <TableRow>
-                  <TableCell isHeader className="py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Provider</TableCell>
-                  <TableCell isHeader className="py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Current type</TableCell>
-                  <TableCell isHeader className="py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Target type</TableCell>
-                  <TableCell isHeader className="py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Status</TableCell>
-                  <TableCell isHeader className="py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Requested</TableCell>
-                  <TableCell isHeader className="py-3 text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Actions</TableCell>
+                  <TableCell isHeader className="py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">{t("upgradeRequests.provider")}</TableCell>
+                  <TableCell isHeader className="py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">{t("upgradeRequests.currentType")}</TableCell>
+                  <TableCell isHeader className="py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">{t("upgradeRequests.targetType")}</TableCell>
+                  <TableCell isHeader className="py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">{t("upgradeRequests.status")}</TableCell>
+                  <TableCell isHeader className="py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">{t("upgradeRequests.requested")}</TableCell>
+                  <TableCell isHeader className="py-3 text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400">{t("upgradeRequests.actions")}</TableCell>
                 </TableRow>
               </TableHeader>
               <TableBody className="divide-y divide-gray-100 dark:divide-gray-800">
@@ -121,10 +123,10 @@ export default function UpgradeRequests() {
                       {req.providerName ?? `Provider #${req.providerId}`}
                     </TableCell>
                     <TableCell className="py-3 text-sm text-gray-600 dark:text-gray-400">
-                      {req.currentConsultationTypeName ?? "—"}
+                      {req.currentConsultationTypeName ?? t("common.noValue")}
                     </TableCell>
                     <TableCell className="py-3 text-sm text-gray-600 dark:text-gray-400">
-                      {req.targetConsultationTypeName ?? "—"}
+                      {req.targetConsultationTypeName ?? t("common.noValue")}
                     </TableCell>
                     <TableCell className="py-3">
                       <Badge
@@ -141,14 +143,14 @@ export default function UpgradeRequests() {
                       </Badge>
                     </TableCell>
                     <TableCell className="py-3 text-sm text-gray-600 dark:text-gray-400">
-                      {req.createdAt ? formatDate(req.createdAt) : "—"}
+                      {req.createdAt ? formatDate(req.createdAt) : t("common.noValue")}
                     </TableCell>
                     <TableCell className="py-3 text-right">
                       <Link
                         to={`/upgrade-requests/${req.id}`}
                         className="rounded border border-brand-500 bg-brand-50 px-2 py-1 text-xs font-medium text-brand-700 hover:bg-brand-100 dark:bg-brand-900/30 dark:text-brand-300 dark:hover:bg-brand-900/50"
                       >
-                        View
+                        {t("common.actions.view")}
                       </Link>
                     </TableCell>
                   </TableRow>

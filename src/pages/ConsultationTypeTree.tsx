@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useDrag, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { DndProvider } from "react-dnd";
@@ -33,11 +34,7 @@ import {
 const TREE_NODE_TYPE = "CONSULTATION_TYPE_TREE_NODE";
 
 /** Employment type options for create/edit (Independent or Salaried). */
-const EMPLOYMENT_TYPE_OPTIONS = [
-  { value: "", label: "— Select —" },
-  { value: "INDEPENDENT", label: "Independent" },
-  { value: "SALARIED", label: "Salaried" },
-];
+const EMPLOYMENT_TYPE_OPTIONS = [{ value: "" }, { value: "INDEPENDENT" }, { value: "SALARIED" }];
 
 const IMAGE_FILE_INPUT_CLASS =
   "block w-full text-sm text-gray-600 file:mr-4 file:rounded-lg file:border-0 file:bg-brand-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-brand-700 hover:file:bg-brand-100 dark:text-gray-400 dark:file:bg-brand-500/10 dark:file:text-brand-300";
@@ -53,6 +50,7 @@ function ImagePickPreview({
   /** Shown under the image when showing a saved image and no new file is chosen. */
   existingCaption?: string | null;
 }) {
+  const { t } = useTranslation();
   return (
     <>
       {previewUrl ? (
@@ -65,7 +63,7 @@ function ImagePickPreview({
         </div>
       ) : null}
       {fileName ? (
-        <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">Selected: {fileName}</p>
+        <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">{t("consultationTypesTree.selectedFile", { name: fileName })}</p>
       ) : existingCaption && previewUrl ? (
         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{existingCaption}</p>
       ) : null}
@@ -159,6 +157,7 @@ function TreeRow({
   isLast,
   parentPath,
 }: TreeRowProps) {
+  const { t } = useTranslation();
   const hasChildren = Array.isArray(node.children) && node.children.length > 0;
   const isExpanded = expandedIds.has(node.id);
   const indentPx = 28 * depth;
@@ -217,7 +216,7 @@ function TreeRow({
           type="button"
           onClick={() => hasChildren && onToggle(node.id)}
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-gray-300"
-          aria-label={isExpanded ? "Collapse" : "Expand"}
+          aria-label={isExpanded ? t("consultationTypesTree.collapse") : t("consultationTypesTree.expand")}
         >
           {hasChildren ? (
             isExpanded ? (
@@ -264,24 +263,24 @@ function TreeRow({
           <Link
             to={`/consultation-types/config/${node.id}`}
             className="inline-flex h-9 min-w-[44px] items-center justify-center gap-1.5 rounded-md px-2.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-200 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-600 dark:hover:text-white"
-            title="Configure services & verification"
+            title={t("consultationTypesTree.configure")}
           >
-            Configure
+            {t("consultationTypesTree.configure")}
           </Link>
           <button
             type="button"
             onClick={() => onAddChild(node)}
             className="inline-flex h-9 min-w-[44px] items-center justify-center gap-1.5 rounded-md px-2.5 text-xs font-medium text-brand-600 transition-colors hover:bg-brand-500/10 dark:text-brand-400 dark:hover:bg-brand-500/20"
-            title="Add child"
+            title={t("consultationTypesTree.addChild")}
           >
             <PlusIcon className="h-4 w-4" />
-            <span className="hidden sm:inline">Add child</span>
+            <span className="hidden sm:inline">{t("consultationTypesTree.addChild")}</span>
           </button>
           <button
             type="button"
             onClick={() => onEdit(node)}
             className="inline-flex h-9 w-9 min-w-[44px] items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-gray-200 hover:text-gray-800 dark:hover:bg-gray-600 dark:hover:text-gray-200"
-            title="Edit"
+            title={t("common.actions.edit")}
           >
             <PencilIcon className="h-4 w-4" />
           </button>
@@ -289,7 +288,7 @@ function TreeRow({
             type="button"
             onClick={() => onDelete(node)}
             className="inline-flex h-9 w-9 min-w-[44px] items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400"
-            title="Remove"
+            title={t("consultationTypesTree.remove")}
           >
             <TrashBinIcon className="h-4 w-4" />
           </button>
@@ -344,6 +343,7 @@ function TreeSkeleton() {
 }
 
 export default function ConsultationTypeTree() {
+  const { t } = useTranslation();
   const [tree, setTree] = useState<ConsultationType[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -390,13 +390,13 @@ export default function ConsultationTypeTree() {
       const message =
         err && typeof err === "object" && "message" in err
           ? String((err as { message: string }).message)
-          : "Failed to load consultation types.";
+          : t("consultationTypesTree.failedLoad");
       if (!silent) setError(message);
       if (!silent) setTree([]);
     } finally {
       if (!aborted && !silent) setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -512,7 +512,7 @@ export default function ConsultationTypeTree() {
     if (!selectedNode) return;
     const name = formName.trim();
     if (!name) {
-      setFormError("Name is required.");
+      setFormError(t("consultationTypesTree.nameRequired"));
       return;
     }
     const commissionStr = formCommissionPercent.trim();
@@ -523,7 +523,7 @@ export default function ConsultationTypeTree() {
       commission < 0 ||
       commission > 100
     ) {
-      setFormError("Platform commission percent must be between 0 and 100.");
+      setFormError(t("consultationTypesTree.commissionRangeError"));
       return;
     }
     setFormError("");
@@ -537,7 +537,7 @@ export default function ConsultationTypeTree() {
           const msg =
             uploadErr && typeof uploadErr === "object" && "message" in uploadErr
               ? String((uploadErr as { message: string }).message)
-              : "Image upload failed.";
+              : t("consultationTypesTree.imageUploadFailed");
           setFormError(msg);
           return;
         }
@@ -558,7 +558,7 @@ export default function ConsultationTypeTree() {
       const message =
         err && typeof err === "object" && "message" in err
           ? String((err as { message: string }).message)
-          : "Update failed.";
+          : t("consultationTypesTree.updateFailed");
       setFormError(message);
     } finally {
       setSubmitting(false);
@@ -569,7 +569,7 @@ export default function ConsultationTypeTree() {
     if (!selectedNode) return;
     const name = formName.trim();
     if (!name) {
-      setFormError("Name is required.");
+      setFormError(t("consultationTypesTree.nameRequired"));
       return;
     }
     const commissionStr = formCommissionPercent.trim();
@@ -580,7 +580,7 @@ export default function ConsultationTypeTree() {
       commission < 0 ||
       commission > 100
     ) {
-      setFormError("Platform commission percent must be between 0 and 100.");
+      setFormError(t("consultationTypesTree.commissionRangeError"));
       return;
     }
     setFormError("");
@@ -594,7 +594,7 @@ export default function ConsultationTypeTree() {
           const msg =
             uploadErr && typeof uploadErr === "object" && "message" in uploadErr
               ? String((uploadErr as { message: string }).message)
-              : "Image upload failed.";
+              : t("consultationTypesTree.imageUploadFailed");
           setFormError(msg);
           return;
         }
@@ -616,7 +616,7 @@ export default function ConsultationTypeTree() {
       const message =
         err && typeof err === "object" && "message" in err
           ? String((err as { message: string }).message)
-          : "Create failed.";
+          : t("consultationTypesTree.createFailed");
       setFormError(message);
     } finally {
       setSubmitting(false);
@@ -626,7 +626,7 @@ export default function ConsultationTypeTree() {
   const handleSubmitAddRoot = async () => {
     const name = formName.trim();
     if (!name) {
-      setFormError("Name is required.");
+      setFormError(t("consultationTypesTree.nameRequired"));
       return;
     }
     const commissionStr = formCommissionPercent.trim();
@@ -637,7 +637,7 @@ export default function ConsultationTypeTree() {
       commission < 0 ||
       commission > 100
     ) {
-      setFormError("Platform commission percent must be between 0 and 100.");
+      setFormError(t("consultationTypesTree.commissionRangeError"));
       return;
     }
     setFormError("");
@@ -651,7 +651,7 @@ export default function ConsultationTypeTree() {
           const msg =
             uploadErr && typeof uploadErr === "object" && "message" in uploadErr
               ? String((uploadErr as { message: string }).message)
-              : "Image upload failed.";
+              : t("consultationTypesTree.imageUploadFailed");
           setFormError(msg);
           return;
         }
@@ -671,7 +671,7 @@ export default function ConsultationTypeTree() {
       const message =
         err && typeof err === "object" && "message" in err
           ? String((err as { message: string }).message)
-          : "Create failed.";
+          : t("consultationTypesTree.createFailed");
       setFormError(message);
     } finally {
       setSubmitting(false);
@@ -749,20 +749,20 @@ export default function ConsultationTypeTree() {
   return (
     <>
       <PageMeta
-        title="Consultation Type Tree | Hope - BMQAS"
-        description="Manage consultation type hierarchy"
+        title={t("consultationTypesTree.metaTitle")}
+        description={t("consultationTypesTree.metaDescription")}
       />
-      <PageBreadcrumb pageTitle="Consultation Type Tree" />
+      <PageBreadcrumb pageTitle={t("consultationTypesTree.pageTitle")} />
 
       <div className="min-w-0 max-w-full rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-white/[0.03]">
         {/* Header */}
         <div className="flex flex-col gap-4 border-b border-gray-200 p-4 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between sm:p-6">
           <div className="min-w-0 flex-1">
             <h1 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">
-              Consultation Types
+              {t("consultationTypesTree.heading")}
             </h1>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Add, edit, reorder, or remove types. Drag rows to change order, then Save order.
+              {t("consultationTypesTree.subheading")}
             </p>
           </div>
           <div className="flex w-full flex-shrink-0 flex-wrap items-center gap-3 sm:w-auto">
@@ -774,7 +774,7 @@ export default function ConsultationTypeTree() {
               disabled={loading}
               className="w-full rounded-xl shadow-sm transition-all duration-200 hover:shadow-md sm:w-auto"
             >
-              Add root type
+              {t("consultationTypesTree.addRootType")}
             </Button>
             <span className="hidden h-8 w-px shrink-0 bg-gray-200 dark:bg-gray-700 sm:inline-block" aria-hidden />
             <div className="flex items-center gap-1.5">
@@ -782,7 +782,7 @@ export default function ConsultationTypeTree() {
                 type="button"
                 onClick={expandAll}
                 disabled={loading || tree.length === 0}
-                title="Expand all"
+                title={t("consultationTypesTree.expandAll")}
                 className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-600 transition-colors duration-200 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-600 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:border-brand-600 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"
               >
                 <ChevronDownIcon className="h-5 w-5" />
@@ -791,7 +791,7 @@ export default function ConsultationTypeTree() {
                 type="button"
                 onClick={collapseAll}
                 disabled={loading || tree.length === 0}
-                title="Collapse all"
+                title={t("consultationTypesTree.collapseAll")}
                 className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-600 transition-colors duration-200 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-600 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:border-brand-600 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"
               >
                 <ChevronUpIcon className="h-5 w-5" />
@@ -805,7 +805,7 @@ export default function ConsultationTypeTree() {
               disabled={loading}
               className="rounded-xl transition-colors duration-200"
             >
-              Refresh
+              {t("consultationTypesTree.refresh")}
             </Button>
             {pendingReorder.size > 0 && (
               <>
@@ -817,7 +817,7 @@ export default function ConsultationTypeTree() {
                   disabled={savingOrder}
                   className="rounded-xl transition-colors duration-200"
                 >
-                  {savingOrder ? "Saving…" : `Save order (${pendingReorder.size})`}
+                  {savingOrder ? t("consultationTypesTree.saving") : `${t("consultationTypesTree.saveOrder")} (${pendingReorder.size})`}
                 </Button>
               </>
             )}
@@ -836,7 +836,7 @@ export default function ConsultationTypeTree() {
               {(error.includes("Failed query") || error.includes("consultation_types")) && (
                 <p className="text-sm text-gray-600 dark:text-gray-400">
                   This error is from the backend. Fix the GET /consultation-types endpoint so the
-                  database query runs with correct parameters.
+                  {t("consultationTypesTree.backendErrorHint")}
                 </p>
               )}
             </div>
@@ -848,10 +848,10 @@ export default function ConsultationTypeTree() {
                 <FolderIcon className="h-10 w-10" />
               </div>
               <h3 className="mt-4 text-lg font-semibold text-gray-900 dark:text-white">
-                No consultation types yet
+                {t("consultationTypesTree.emptyTitle")}
               </h3>
               <p className="mt-1 max-w-sm text-center text-sm text-gray-500 dark:text-gray-400">
-                Add your first root type to start building the tree. You can then add children to any node.
+                {t("consultationTypesTree.emptySubtitle")}
               </p>
               <Button
                 variant="primary"
@@ -859,7 +859,7 @@ export default function ConsultationTypeTree() {
                 startIcon={<PlusIcon className="h-4 w-4" />}
                 onClick={openAddRoot}
               >
-                Add root type
+                {t("consultationTypesTree.addRootType")}
               </Button>
             </div>
           )}
@@ -893,41 +893,41 @@ export default function ConsultationTypeTree() {
 
       {/* Edit modal */}
       <Modal isOpen={modalMode === "edit"} onClose={closeModal} className="max-w-lg p-6 sm:p-8">
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Edit type</h2>
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{t("consultationTypesTree.editType")}</h2>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">ID: {selectedNode?.id}</p>
         <div className="mt-5 space-y-4">
           <div>
-            <Label htmlFor="edit-name">Name</Label>
+            <Label htmlFor="edit-name">{t("consultationTypesTree.name")}</Label>
             <Input
               id="edit-name"
               value={formName}
               onChange={(e) => setFormName(e.target.value)}
-              placeholder="Type name"
+              placeholder={t("consultationTypesTree.typeNamePlaceholder")}
               error={!!formError}
               hint={formError}
             />
           </div>
           <div>
-            <Label htmlFor="edit-desc">Description (optional)</Label>
+            <Label htmlFor="edit-desc">{t("consultationTypesTree.descriptionOptional")}</Label>
             <TextArea
               id="edit-desc"
               rows={2}
               value={formDescription}
               onChange={setFormDescription}
-              placeholder="Short description"
+              placeholder={t("consultationTypesTree.shortDescriptionPlaceholder")}
             />
           </div>
           <div>
-            <Label htmlFor="edit-code">Code (optional, unique)</Label>
+            <Label htmlFor="edit-code">{t("consultationTypesTree.codeOptional")}</Label>
             <Input
               id="edit-code"
               value={formCode}
               onChange={(e) => setFormCode(e.target.value)}
-              placeholder="e.g. DOCTORS"
+              placeholder={t("consultationTypesTree.codeDoctorsPlaceholder")}
             />
           </div>
           <div>
-            <Label htmlFor="edit-employment">Employment type</Label>
+            <Label htmlFor="edit-employment">{t("consultationTypesTree.employmentType")}</Label>
             <select
               id="edit-employment"
               value={formEmploymentType}
@@ -936,13 +936,17 @@ export default function ConsultationTypeTree() {
             >
               {EMPLOYMENT_TYPE_OPTIONS.map((opt) => (
                 <option key={opt.value || "empty"} value={opt.value}>
-                  {opt.label}
+                  {opt.value === ""
+                    ? t("consultationTypesTree.selectPlaceholder")
+                    : opt.value === "INDEPENDENT"
+                    ? t("consultationTypesTree.independent")
+                    : t("consultationTypesTree.salaried")}
                 </option>
               ))}
             </select>
           </div>
           <div>
-            <Label htmlFor="edit-commission">Platform commission %</Label>
+            <Label htmlFor="edit-commission">{t("consultationTypesTree.platformCommission")}</Label>
             <Input
               id="edit-commission"
               type="number"
@@ -951,11 +955,11 @@ export default function ConsultationTypeTree() {
               step={0.01}
               value={formCommissionPercent}
               onChange={(e) => setFormCommissionPercent(e.target.value)}
-              placeholder="e.g. 10"
+              placeholder={t("consultationTypesTree.commissionPlaceholder")}
             />
           </div>
           <div>
-            <Label htmlFor="edit-image">Image (optional)</Label>
+            <Label htmlFor="edit-image">{t("consultationTypesTree.imageOptional")}</Label>
             <input
               key={`edit-image-${imageFieldKey}`}
               id="edit-image"
@@ -969,20 +973,20 @@ export default function ConsultationTypeTree() {
               fileName={formImageFile?.name ?? null}
               existingCaption={
                 !formImageFile && selectedNode?.imageUrl?.trim()
-                  ? "Current image — choose a new file to replace"
+                  ? t("consultationTypesTree.currentImageHint")
                   : null
               }
             />
           </div>
           <div>
-            <Label htmlFor="edit-parent">Parent (move type)</Label>
+            <Label htmlFor="edit-parent">{t("consultationTypesTree.parentMove")}</Label>
             <select
               id="edit-parent"
               value={formParentId ?? ""}
               onChange={(e) => setFormParentId(e.target.value === "" ? null : Number(e.target.value))}
               className="h-11 w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white dark:focus:border-brand-700"
             >
-              <option value="">— Root (no parent) —</option>
+              <option value="">{t("consultationTypesTree.rootNoParent")}</option>
               {parentOptions.map((opt) => (
                 <option key={opt.id} value={opt.id}>
                   {"—".repeat(opt.depth)} {opt.name} (#{opt.id})
@@ -996,50 +1000,50 @@ export default function ConsultationTypeTree() {
             Cancel
           </Button>
           <Button onClick={handleSubmitEdit} disabled={submitting}>
-            {submitting ? "Saving…" : "Save"}
+            {submitting ? t("consultationTypesTree.saving") : t("consultationTypesTree.save")}
           </Button>
         </div>
       </Modal>
 
       {/* Add child modal */}
       <Modal isOpen={modalMode === "addChild"} onClose={closeModal} className="max-w-lg p-6 sm:p-8">
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Add child type</h2>
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{t("consultationTypesTree.addChildType")}</h2>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
           Parent: {selectedNode?.name} (#{selectedNode?.id})
         </p>
         <div className="mt-5 space-y-4">
           <div>
-            <Label htmlFor="add-name">Name</Label>
+            <Label htmlFor="add-name">{t("consultationTypesTree.name")}</Label>
             <Input
               id="add-name"
               value={formName}
               onChange={(e) => setFormName(e.target.value)}
-              placeholder="New type name"
+              placeholder={t("consultationTypesTree.newTypeNamePlaceholder")}
               error={!!formError}
               hint={formError}
             />
           </div>
           <div>
-            <Label htmlFor="add-desc">Description (optional)</Label>
+            <Label htmlFor="add-desc">{t("consultationTypesTree.descriptionOptional")}</Label>
             <TextArea
               id="add-desc"
               rows={2}
               value={formDescription}
               onChange={setFormDescription}
-              placeholder="Short description"
+              placeholder={t("consultationTypesTree.shortDescriptionPlaceholder")}
             />
           </div>
           <div>
-            <Label htmlFor="add-code">Code (optional, unique)</Label>
+            <Label htmlFor="add-code">{t("consultationTypesTree.codeOptional")}</Label>
             <Input
               id="add-code"
               value={formCode}
               onChange={(e) => setFormCode(e.target.value)}
-              placeholder="e.g. GENERAL_PHYSICIAN"
+              placeholder={t("consultationTypesTree.codeGeneralPhysicianPlaceholder")}
             />
           </div>
           <div>
-            <Label htmlFor="add-employment">Employment type</Label>
+            <Label htmlFor="add-employment">{t("consultationTypesTree.employmentType")}</Label>
             <select
               id="add-employment"
               value={formEmploymentType}
@@ -1048,13 +1052,17 @@ export default function ConsultationTypeTree() {
             >
               {EMPLOYMENT_TYPE_OPTIONS.map((opt) => (
                 <option key={opt.value || "empty"} value={opt.value}>
-                  {opt.label}
+                  {opt.value === ""
+                    ? t("consultationTypesTree.selectPlaceholder")
+                    : opt.value === "INDEPENDENT"
+                    ? t("consultationTypesTree.independent")
+                    : t("consultationTypesTree.salaried")}
                 </option>
               ))}
             </select>
           </div>
           <div>
-            <Label htmlFor="add-commission">Platform commission %</Label>
+            <Label htmlFor="add-commission">{t("consultationTypesTree.platformCommission")}</Label>
             <Input
               id="add-commission"
               type="number"
@@ -1063,11 +1071,11 @@ export default function ConsultationTypeTree() {
               step={0.01}
               value={formCommissionPercent}
               onChange={(e) => setFormCommissionPercent(e.target.value)}
-              placeholder="e.g. 10"
+              placeholder={t("consultationTypesTree.commissionPlaceholder")}
             />
           </div>
           <div>
-            <Label htmlFor="add-image">Image (optional)</Label>
+            <Label htmlFor="add-image">{t("consultationTypesTree.imageOptional")}</Label>
             <input
               key={`add-image-${imageFieldKey}`}
               id="add-image"
@@ -1087,50 +1095,50 @@ export default function ConsultationTypeTree() {
             Cancel
           </Button>
           <Button onClick={handleSubmitAddChild} disabled={submitting}>
-            {submitting ? "Adding…" : "Add child"}
+            {submitting ? t("consultationTypesTree.adding") : t("consultationTypesTree.addChild")}
           </Button>
         </div>
       </Modal>
 
       {/* Add root modal */}
       <Modal isOpen={modalMode === "addRoot"} onClose={closeModal} className="max-w-lg p-6 sm:p-8">
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Add root type</h2>
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{t("consultationTypesTree.addRootTypeTitle")}</h2>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          New top-level consultation type (no parent).
+          {t("consultationTypesTree.newTopLevelHelp")}
         </p>
         <div className="mt-5 space-y-4">
           <div>
-            <Label htmlFor="root-name">Name</Label>
+            <Label htmlFor="root-name">{t("consultationTypesTree.name")}</Label>
             <Input
               id="root-name"
               value={formName}
               onChange={(e) => setFormName(e.target.value)}
-              placeholder="Type name"
+              placeholder={t("consultationTypesTree.typeNamePlaceholder")}
               error={!!formError}
               hint={formError}
             />
           </div>
           <div>
-            <Label htmlFor="root-desc">Description (optional)</Label>
+            <Label htmlFor="root-desc">{t("consultationTypesTree.descriptionOptional")}</Label>
             <TextArea
               id="root-desc"
               rows={2}
               value={formDescription}
               onChange={setFormDescription}
-              placeholder="Short description"
+              placeholder={t("consultationTypesTree.shortDescriptionPlaceholder")}
             />
           </div>
           <div>
-            <Label htmlFor="root-code">Code (optional, unique)</Label>
+            <Label htmlFor="root-code">{t("consultationTypesTree.codeOptional")}</Label>
             <Input
               id="root-code"
               value={formCode}
               onChange={(e) => setFormCode(e.target.value)}
-              placeholder="e.g. DOCTORS"
+              placeholder={t("consultationTypesTree.codeDoctorsPlaceholder")}
             />
           </div>
           <div>
-            <Label htmlFor="root-employment">Employment type</Label>
+            <Label htmlFor="root-employment">{t("consultationTypesTree.employmentType")}</Label>
             <select
               id="root-employment"
               value={formEmploymentType}
@@ -1139,13 +1147,17 @@ export default function ConsultationTypeTree() {
             >
               {EMPLOYMENT_TYPE_OPTIONS.map((opt) => (
                 <option key={opt.value || "empty"} value={opt.value}>
-                  {opt.label}
+                  {opt.value === ""
+                    ? t("consultationTypesTree.selectPlaceholder")
+                    : opt.value === "INDEPENDENT"
+                    ? t("consultationTypesTree.independent")
+                    : t("consultationTypesTree.salaried")}
                 </option>
               ))}
             </select>
           </div>
           <div>
-            <Label htmlFor="root-commission">Platform commission %</Label>
+            <Label htmlFor="root-commission">{t("consultationTypesTree.platformCommission")}</Label>
             <Input
               id="root-commission"
               type="number"
@@ -1154,11 +1166,11 @@ export default function ConsultationTypeTree() {
               step={0.01}
               value={formCommissionPercent}
               onChange={(e) => setFormCommissionPercent(e.target.value)}
-              placeholder="e.g. 10"
+              placeholder={t("consultationTypesTree.commissionPlaceholder")}
             />
           </div>
           <div>
-            <Label htmlFor="root-image">Image (optional)</Label>
+            <Label htmlFor="root-image">{t("consultationTypesTree.imageOptional")}</Label>
             <input
               key={`root-image-${imageFieldKey}`}
               id="root-image"
@@ -1178,7 +1190,7 @@ export default function ConsultationTypeTree() {
             Cancel
           </Button>
           <Button onClick={handleSubmitAddRoot} disabled={submitting}>
-            {submitting ? "Adding…" : "Add root type"}
+            {submitting ? t("consultationTypesTree.adding") : t("consultationTypesTree.addRootType")}
           </Button>
         </div>
       </Modal>
@@ -1186,18 +1198,17 @@ export default function ConsultationTypeTree() {
       <ConfirmModal
         isOpen={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
-        title="Remove consultation type"
+        title={t("consultationTypesTree.removeTitle")}
         message={
           deleteTarget ? (
             <>
-              Remove &quot;{deleteTarget.name}&quot; (#{deleteTarget.id})? This may fail if the type
-              is in use. Children (if any) may need to be moved or removed first.
+              {t("consultationTypesTree.removeConfirm", { name: deleteTarget.name, id: deleteTarget.id })}
             </>
           ) : (
             ""
           )
         }
-        confirmLabel="Remove"
+        confirmLabel={t("consultationTypesTree.remove")}
         confirmVariant="danger"
         onConfirm={handleDelete}
       />
