@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import PageMeta from "../../components/common/PageMeta";
 import {
   DashboardKpiCards,
@@ -21,6 +22,7 @@ interface DashboardData {
 }
 
 export default function Home() {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<DashboardData>({
@@ -60,11 +62,11 @@ export default function Home() {
         aborted = true; // Strict Mode or navigation: first request was aborted
         return;
       }
-      setError("Failed to load dashboard.");
+      setError(t("dashboard.loadError"));
     } finally {
       if (!aborted) setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     const ac = new AbortController();
@@ -78,10 +80,15 @@ export default function Home() {
   return (
     <>
       <PageMeta
-        title="Dashboard | Hope - BMQAS"
-        description="Dashboard page for Hope Pro by Bengal Mobile QA Solution"
+        title={t("dashboard.metaTitle")}
+        description={t("dashboard.metaDescription")}
       />
       <div className="space-y-6">
+        <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900/80 md:p-6">
+          <h1 className="text-xl font-semibold text-gray-900 dark:text-white">{t("dashboard.metaTitle")}</h1>
+          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">{t("dashboard.metaDescription")}</p>
+        </section>
+
         {error && (
           <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-900/20 dark:text-red-200">
             {error}

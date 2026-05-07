@@ -2,7 +2,8 @@ import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-const DROPDOWN_PORTAL_Z_INDEX = 10050;
+// Must be above modal overlay (99999) so dropdowns inside modals remain visible.
+const DROPDOWN_PORTAL_Z_INDEX = 100100;
 
 interface DropdownProps {
   isOpen: boolean;

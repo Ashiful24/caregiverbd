@@ -346,6 +346,63 @@ export interface ClaimBalanceRequest {
   amount?: number; // optional; if omitted, claim all
 }
 
+export type WithdrawalRequestStatus =
+  | "PENDING"
+  | "APPROVED"
+  | "COMPLETED"
+  | "REJECTED"
+  | "CANCELLED";
+
+export interface WithdrawalRequestListItem {
+  id: number;
+  providerId?: number | null;
+  providerName?: string | null;
+  amount?: string | number | null;
+  status: WithdrawalRequestStatus | string;
+  createdAt?: string | null;
+  requestedAt?: string | null;
+  updatedAt?: string | null;
+  approvedAt?: string | null;
+  completedAt?: string | null;
+  method?: string | null;
+  reference?: string | null;
+}
+
+export interface WithdrawalRequestListResponse {
+  data: WithdrawalRequestListItem[];
+  meta?: {
+    total?: number;
+    page?: number;
+    limit?: number;
+    totalPages?: number;
+  };
+  total?: number;
+  page?: number;
+  limit?: number;
+  totalPages?: number;
+}
+
+export interface WithdrawalRequestDetail extends WithdrawalRequestListItem {
+  walletId?: number | null;
+  userId?: number | null;
+  method?: string | null;
+  accountName?: string | null;
+  accountNumber?: string | null;
+  bankName?: string | null;
+  mobileNumber?: string | null;
+  proofUrl?: string | null;
+  adminNote?: string | null;
+  [key: string]: unknown;
+}
+
+export interface WithdrawalReviewPayload {
+  adminNote?: string;
+}
+
+export interface WithdrawalCompletePayload extends WithdrawalReviewPayload {
+  proofUrl?: string;
+}
+
 // ============== Verification Documents ==============
 
 /** Single verification document (upload response or in list). */
@@ -567,39 +624,47 @@ export const consultationTypesApi = {
     return httpService.post<ConsultationType[]>("/admin/consultation-types/reorder", data);
   },
 
-  // --- Admin: Checklist services per consultation type ---
-  /** GET /admin/consultation-types/:id/services */
+  // --- Admin: Service category checklists per consultation type ---
+  /** GET /admin/consultation-types/:id/service-category-checklists */
   getServices: async (consultationTypeId: number) => {
-    return httpService.get<ConsultationTypeServiceItem[]>(
-      `/admin/consultation-types/${consultationTypeId}/services`
+    return httpService.get<ServiceCategoryChecklistItem[]>(
+      `/admin/consultation-types/${consultationTypeId}/service-category-checklists`
     );
   },
-  /** POST /admin/consultation-types/:id/services */
+  /** POST /admin/consultation-types/:id/service-category-checklists */
   createService: async (
     consultationTypeId: number,
-    data: { label: string; displayOrder?: number }
+    data: {
+      name: string;
+      description?: string | null;
+      isActive?: boolean;
+      displayOrder?: number;
+    }
   ) => {
-    return httpService.post<ConsultationTypeServiceItem>(
-      `/admin/consultation-types/${consultationTypeId}/services`,
+    return httpService.post<ServiceCategoryChecklistItem>(
+      `/admin/consultation-types/${consultationTypeId}/service-category-checklists`,
       data
     );
   },
-  /** PATCH /admin/consultation-types/:id/services/:serviceId */
+  /** PATCH /admin/service-category-checklists/:serviceId */
   updateService: async (
-    consultationTypeId: number,
+    _consultationTypeId: number,
     serviceId: number,
-    data: { label?: string; displayOrder?: number }
+    data: {
+      name?: string;
+      description?: string | null;
+      isActive?: boolean;
+      displayOrder?: number;
+    }
   ) => {
-    return httpService.patch<ConsultationTypeServiceItem>(
-      `/admin/consultation-types/${consultationTypeId}/services/${serviceId}`,
+    return httpService.patch<ServiceCategoryChecklistItem>(
+      `/admin/service-category-checklists/${serviceId}`,
       data
     );
   },
-  /** DELETE /admin/consultation-types/:id/services/:serviceId */
-  deleteService: async (consultationTypeId: number, serviceId: number) => {
-    return httpService.delete(
-      `/admin/consultation-types/${consultationTypeId}/services/${serviceId}`
-    );
+  /** DELETE /admin/service-category-checklists/:serviceId */
+  deleteService: async (_consultationTypeId: number, serviceId: number) => {
+    return httpService.delete(`/admin/service-category-checklists/${serviceId}`);
   },
 
   // --- Admin: Verification requirements per consultation type ---
@@ -641,10 +706,12 @@ export const consultationTypesApi = {
   },
 };
 
-/** Checklist service item (consultation type services). */
-export interface ConsultationTypeServiceItem {
+/** Service category checklist row (admin; per consultation type). */
+export interface ServiceCategoryChecklistItem {
   id: number;
-  label: string;
+  name: string;
+  description?: string | null;
+  isActive: boolean;
   displayOrder: number;
 }
 
@@ -714,6 +781,104 @@ export const verificationDocumentTypesApi = {
     return httpService.patch<VerificationDocumentTypeItem>(
       `/admin/verification-document-types/${id}/active`,
       { isActive }
+    );
+  },
+};
+
+// ============== Admin: Consultation type levels ==============
+
+export type ConsultationTypeLevelCategory = "DOCTOR" | "CAREGIVER";
+
+export interface ConsultationTypeLevel {
+  id: number;
+  name: string;
+  levelNumber: number;
+  category: ConsultationTypeLevelCategory;
+  minSalary: number;
+  maxSalary: number;
+}
+
+export type ConsultationTypeLevelPayload = {
+  name: string;
+  levelNumber: number;
+  category: ConsultationTypeLevelCategory;
+  minSalary: number;
+  maxSalary: number;
+};
+
+/**
+ * PATCH body for consultation-type-levels. The admin API update DTO typically expects
+ * snake_case JSON keys; POST create still accepts camelCase (common Nest/class-validator setup).
+ */
+function toConsultationTypeLevelPatchBody(
+  data: Partial<ConsultationTypeLevelPayload>
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (data.name !== undefined) out.name = data.name;
+  if (data.levelNumber !== undefined) out.level_number = data.levelNumber;
+  if (data.category !== undefined) out.category = data.category;
+  if (data.minSalary !== undefined) out.min_salary = data.minSalary;
+  if (data.maxSalary !== undefined) out.max_salary = data.maxSalary;
+  return out;
+}
+
+export const consultationTypeLevelsApi = {
+  /** GET /admin/consultation-type-levels?category=DOCTOR|CAREGIVER */
+  list: async (params: { category: ConsultationTypeLevelCategory }) => {
+    return httpService.get<ConsultationTypeLevel[]>("/admin/consultation-type-levels", {
+      params: { category: params.category },
+    });
+  },
+  /** GET /admin/consultation-type-levels/:id */
+  getById: async (id: number) => {
+    return httpService.get<ConsultationTypeLevel>(`/admin/consultation-type-levels/${id}`);
+  },
+  /** POST /admin/consultation-type-levels */
+  create: async (data: ConsultationTypeLevelPayload) => {
+    return httpService.post<ConsultationTypeLevel>("/admin/consultation-type-levels", data);
+  },
+  /** PATCH /admin/consultation-type-levels/:id (snake_case body per update DTO) */
+  update: async (id: number, data: Partial<ConsultationTypeLevelPayload>) => {
+    return httpService.patch<ConsultationTypeLevel>(
+      `/admin/consultation-type-levels/${id}`,
+      toConsultationTypeLevelPatchBody(data)
+    );
+  },
+  /** DELETE /admin/consultation-type-levels/:id */
+  delete: async (id: number) => {
+    return httpService.delete(`/admin/consultation-type-levels/${id}`);
+  },
+};
+
+// ============== Admin: Level-checklist mappings ==============
+
+export interface CreateLevelChecklistMappingRequest {
+  consultationTypeId: number;
+  levelId: number;
+  checklistIds: number[];
+}
+
+export const levelChecklistMappingsApi = {
+  /** GET /admin/consultation-types/:consultationTypeId/levels/:levelId/mapped-checklists */
+  getMappedChecklists: async (consultationTypeId: number, levelId: number) => {
+    return httpService.get<
+      | { checklistIds?: number[]; mappedChecklistIds?: number[]; checklists?: Array<{ id?: number }> }
+      | number[]
+      | Array<{ id?: number }>
+    >(`/admin/consultation-types/${consultationTypeId}/levels/${levelId}/mapped-checklists`);
+  },
+  /** POST /admin/level-checklist-mappings */
+  create: async (data: CreateLevelChecklistMappingRequest) => {
+    return httpService.post<{ id?: number; message?: string }>(
+      "/admin/level-checklist-mappings",
+      data
+    );
+  },
+  /** PATCH /admin/level-checklist-mappings */
+  update: async (data: CreateLevelChecklistMappingRequest) => {
+    return httpService.patch<{ id?: number; message?: string }>(
+      "/admin/level-checklist-mappings",
+      data
     );
   },
 };
@@ -812,6 +977,8 @@ export interface ProviderListItem {
   status: ProviderStatus;
   consultationTypeId?: number | null;
   consultationTypeName?: string | null;
+  rate?: string | null;
+  billingRateType?: string | null;
   createdAt: string;
   updatedAt?: string;
   /** Availability window when listing AVAILABLE providers (admin list). */
@@ -894,6 +1061,8 @@ export function normalizeProviderListItem(raw: unknown): ProviderListItem {
   const consultationTypeId = Number(o.consultationTypeId ?? o.consultation_type_id);
   const consultationTypeName =
     str(o.consultationTypeName) || str(o.consultation_type_name) || undefined;
+  const rate = str(o.rate) || undefined;
+  const billingRateType = str(o.billingRateType) || str(o.billing_rate_type) || undefined;
   const updatedAt = str(o.updatedAt) || undefined;
   const startDate = str(o.startDate) || str(o.start_date) || undefined;
   const endDate = str(o.endDate) || str(o.end_date) || undefined;
@@ -918,6 +1087,8 @@ export function normalizeProviderListItem(raw: unknown): ProviderListItem {
     status,
     consultationTypeId: Number.isFinite(consultationTypeId) ? consultationTypeId : undefined,
     consultationTypeName,
+    rate,
+    billingRateType,
     createdAt: str(o.createdAt) || new Date().toISOString(),
     updatedAt,
     startDate,
@@ -1693,6 +1864,79 @@ export const financialApi = {
       data
     );
   },
+
+  /**
+   * GET /financial/withdrawal/admin/list
+   * Query: page, limit, status, startDate, endDate
+   */
+  getWithdrawalAdminList: async (
+    params?: {
+      page?: number;
+      limit?: number;
+      status?: WithdrawalRequestStatus;
+      startDate?: string;
+      endDate?: string;
+    },
+    config?: { signal?: AbortSignal }
+  ) => {
+    const query: Record<string, string | number> = {
+      page: params?.page ?? 1,
+      limit: params?.limit ?? 10,
+    };
+    if (params?.status) query.status = params.status;
+    if (params?.startDate) query.startDate = params.startDate;
+    if (params?.endDate) query.endDate = params.endDate;
+    return httpService.get<WithdrawalRequestListResponse>("/financial/withdrawal/admin/list", {
+      params: query,
+      signal: config?.signal,
+    });
+  },
+
+  /** GET /financial/withdrawal/admin/:id */
+  getWithdrawalAdminById: async (id: number, config?: { signal?: AbortSignal }) => {
+    return httpService.get<WithdrawalRequestDetail>(`/financial/withdrawal/admin/${id}`, {
+      signal: config?.signal,
+    });
+  },
+
+  /** PATCH /financial/withdrawal/admin/:id/approve */
+  approveWithdrawalAdmin: async (
+    id: number,
+    data?: WithdrawalReviewPayload,
+    config?: { signal?: AbortSignal }
+  ) => {
+    return httpService.patch<WithdrawalRequestDetail>(
+      `/financial/withdrawal/admin/${id}/approve`,
+      data ?? {},
+      config
+    );
+  },
+
+  /** PATCH /financial/withdrawal/admin/:id/reject */
+  rejectWithdrawalAdmin: async (
+    id: number,
+    data?: WithdrawalReviewPayload,
+    config?: { signal?: AbortSignal }
+  ) => {
+    return httpService.patch<WithdrawalRequestDetail>(
+      `/financial/withdrawal/admin/${id}/reject`,
+      data ?? {},
+      config
+    );
+  },
+
+  /** PATCH /financial/withdrawal/admin/:id/complete */
+  completeWithdrawalAdmin: async (
+    id: number,
+    data?: WithdrawalCompletePayload,
+    config?: { signal?: AbortSignal }
+  ) => {
+    return httpService.patch<WithdrawalRequestDetail>(
+      `/financial/withdrawal/admin/${id}/complete`,
+      data ?? {},
+      config
+    );
+  },
 };
 
 // ============== Patients API (admin / list) ==============
@@ -1829,9 +2073,13 @@ export type LongTermOpportunityStatusFilter =
   | "REQUESTED"
   | "SCHEDULE_PROPOSED"
   | "CHANGE_REQUESTED"
-  | "SCHEDULE_CONFIRMED"
-  | "PAYMENT_COMPLETED"
-  | "IN_PROGRESS";
+  | "IN_PROGRESS"
+  | "PAYMENT_PENDING"
+  | "PAID"
+  | "COMPLETED"
+  | "REJECTED"
+  | "CANCELLED"
+  | "EXPIRED";
 
 export interface LongTermOpportunityListItem {
   id: number;
@@ -2462,16 +2710,51 @@ export interface GlWalletReconciliationDto {
   totalCredit: string;
   totalDebit: string;
   netChange: string;
+  /** balance − netChange, must be 0 */
+  drift: string;
+  isHealthy: boolean;
 }
 
 export interface GlProfitSummaryDto {
   commissionBalance: string;
-  commissionNetChange: string;
+  taxBalance: string;
+  totalPlatformEarnings: string;
+  totalPayoutsProcessed: string;
+}
+
+export interface GlCrossSystemValidationDto {
+  srCommissionTotal: string;
+  glCommissionBalance: string;
+  commissionDrift: string;
+  commissionInSync: boolean;
+  srTaxTotal: string;
+  glTaxBalance: string;
+  taxDrift: string;
+  taxInSync: boolean;
+}
+
+export interface GlOverallHealthDto {
+  healthy: boolean;
+  walletsDriftFree: boolean;
+  crossSystemInSync: boolean;
+  driftedWallets: string[];
+}
+
+export interface GlReconciliationHealthDto {
+  balanced: boolean;
+  driftedRowCount: number;
+  imbalancedTransactionCount: number;
+  strictModeCutoverAt: string | null;
+  legacyDriftedRowCount: number;
+  legacyImbalancedTransactionCount: number;
 }
 
 export interface GlReconciliationSummaryResponseDto {
   wallets: GlWalletReconciliationDto[];
   profitSummary: GlProfitSummaryDto;
+  crossSystemValidation: GlCrossSystemValidationDto;
+  overallHealth: GlOverallHealthDto;
+  reconciliationHealth: GlReconciliationHealthDto;
 }
 
 export interface GlDailyFlowEntryDto {
@@ -2479,7 +2762,15 @@ export interface GlDailyFlowEntryDto {
   totalCredit: string;
   totalDebit: string;
   netChange: string;
-  wallets: GlWalletReconciliationDto[];
+  wallets: Array<{
+    walletType: string;
+    walletId: number | null;
+    balance: string;
+    currency: string;
+    totalCredit: string;
+    totalDebit: string;
+    netChange: string;
+  }>;
 }
 
 export interface GlDailyFlowResponseDto {
@@ -2487,6 +2778,157 @@ export interface GlDailyFlowResponseDto {
   endDate: string;
   days: GlDailyFlowEntryDto[];
   total: { totalCredit: string; totalDebit: string; netChange: string };
+}
+
+// ============== Admin Financial Report (combined) ==============
+
+export type FinancialTxType =
+  | "CONSULTATION_PAYMENT"
+  | "WITHDRAWAL"
+  | "REFUND"
+  | "COMMISSION"
+  | "ADJUSTMENT";
+export type FinancialPaymentMethod = "ONLINE" | "CASH";
+export type FinancialServiceType = "SHORT_TERM" | "LONG_TERM";
+export type FinancialTxStatus = "PENDING" | "COMPLETED" | "FAILED" | "CANCELLED";
+
+export interface FinancialReportFiltersDto {
+  startDate: string;
+  endDate: string;
+  providerId: number | null;
+  patientId: number | null;
+  type: FinancialTxType | null;
+  paymentMethod: FinancialPaymentMethod | null;
+  serviceType: FinancialServiceType | null;
+  status: FinancialTxStatus | null;
+}
+
+export interface FinancialReportTotalsDto {
+  onlinePayments: string;
+  cashPayments: string;
+  totalInflow: string;
+  totalProviderFee: string;
+  totalCommission: string;
+  totalTax: string;
+  totalWithdrawals: string;
+  netPlatformEarnings: string;
+  consultationCount: number;
+  withdrawalCount: number;
+}
+
+export interface FinancialReportDayDto {
+  date: string;
+  inflow: { onlinePayments: string; cashPayments: string; total: string };
+  distribution: { providerFee: string; commission: string; tax: string };
+  outflow: { withdrawals: string };
+  transactionCount: number;
+}
+
+export interface FinancialReportSummaryDto {
+  totals: FinancialReportTotalsDto;
+  byDay: FinancialReportDayDto[];
+}
+
+export interface FinancialReportTxItemDto {
+  transactionId: number;
+  date: string;
+  type: FinancialTxType;
+  status: FinancialTxStatus;
+  paymentMethod: FinancialPaymentMethod | null;
+  serviceType: FinancialServiceType | null;
+  longTermOpportunityId: number | null;
+  consultationTypeName: string | null;
+  scheduledDate: string | null;
+  providerId: number | null;
+  providerName: string | null;
+  patientId: number | null;
+  patientName: string | null;
+  totalFee: string | null;
+  providerFee: string | null;
+  commission: string | null;
+  tax: string | null;
+}
+
+export interface FinancialReportPaginationDto {
+  page: number;
+  limit: number;
+  hasMore: boolean;
+  total: number | null;
+}
+
+export interface FinancialReportTxListDto {
+  data: FinancialReportTxItemDto[];
+  pagination: FinancialReportPaginationDto;
+}
+
+export interface FinancialReportResponseDto {
+  filters: FinancialReportFiltersDto;
+  summary: FinancialReportSummaryDto | null;
+  transactions: FinancialReportTxListDto;
+}
+
+// ===== transaction detail =====
+
+export interface FinancialTxDetailBreakdownPart {
+  amount: string;
+  percent: string;
+  inclusive: boolean;
+}
+
+export interface FinancialTxDetailBreakdownDto {
+  totalFee: string;
+  commission: FinancialTxDetailBreakdownPart;
+  tax: FinancialTxDetailBreakdownPart;
+  providerFee: string;
+}
+
+export interface FinancialTxDetailServiceRequestDto {
+  id: number;
+  status: string;
+  scheduledDate: string | null;
+  rateType: string | null;
+  rate: string | null;
+  shiftDuration: number | null;
+  referenceType: FinancialServiceType | null;
+  longTermOpportunityId: number | null;
+}
+
+export interface FinancialTxDetailPartyDto {
+  id: number;
+  name: string | null;
+  phone: string | null;
+  email: string | null;
+}
+
+export interface FinancialTxDetailLedgerEntryDto {
+  ledgerId: number;
+  debitWalletType: string;
+  creditWalletType: string;
+  debitWalletId: number;
+  creditWalletId: number;
+  amount: string;
+  debitBalanceBefore: string | null;
+  debitBalanceAfter: string;
+  creditBalanceBefore: string | null;
+  creditBalanceAfter: string;
+  description: string | null;
+  createdAt: string | null;
+}
+
+export interface FinancialTxDetailResponseDto {
+  transactionId: number;
+  type: FinancialTxType;
+  status: FinancialTxStatus;
+  paymentMethod: FinancialPaymentMethod | null;
+  amount: string;
+  createdAt: string;
+  serviceRequest: FinancialTxDetailServiceRequestDto | null;
+  consultationTypeName: string | null;
+  patient: FinancialTxDetailPartyDto | null;
+  provider: FinancialTxDetailPartyDto | null;
+  breakdown: FinancialTxDetailBreakdownDto | null;
+  ledgerEntries: FinancialTxDetailLedgerEntryDto[];
+  metadata: Record<string, unknown> | null;
 }
 
 export interface ProviderTransactionLedgerEntryDto {
@@ -2534,6 +2976,57 @@ export const adminFinancialApi = {
     return httpService.get<ProviderTransactionHistoryResponseDto>(
       `/admin/financial/providers/${providerId}/transactions`,
       { params: query, signal: config?.signal }
+    );
+  },
+  /**
+   * Combined admin financial report (summary + paginated transaction list).
+   * Mandatory date range, max 90 days. Pass `paginationOnly: true` on page 2+
+   * to skip the summary recomputation (significant cost saver at scale).
+   * Pass `includeTotal: true` to opt into the COUNT(*) query.
+   */
+  getFinancialReport: async (
+    params: {
+      startDate: string;
+      endDate: string;
+      providerId?: number;
+      patientId?: number;
+      type?: FinancialTxType;
+      paymentMethod?: FinancialPaymentMethod;
+      serviceType?: FinancialServiceType;
+      status?: FinancialTxStatus;
+      page?: number;
+      limit?: number;
+      paginationOnly?: boolean;
+      includeTotal?: boolean;
+    },
+    config?: { signal?: AbortSignal }
+  ) => {
+    const query: Record<string, string | number | boolean> = {
+      startDate: params.startDate,
+      endDate: params.endDate,
+    };
+    if (params.providerId != null)    query.providerId    = params.providerId;
+    if (params.patientId != null)     query.patientId     = params.patientId;
+    if (params.type)                  query.type          = params.type;
+    if (params.paymentMethod)         query.paymentMethod = params.paymentMethod;
+    if (params.serviceType)           query.serviceType   = params.serviceType;
+    if (params.status)                query.status        = params.status;
+    if (params.page != null)          query.page          = params.page;
+    if (params.limit != null)         query.limit         = params.limit;
+    if (params.paginationOnly)        query.paginationOnly = true;
+    if (params.includeTotal)          query.includeTotal   = true;
+    return httpService.get<FinancialReportResponseDto>("/admin/financial/report", {
+      params: query,
+      signal: config?.signal,
+    });
+  },
+  getFinancialTransactionDetail: async (
+    transactionId: number,
+    config?: { signal?: AbortSignal }
+  ) => {
+    return httpService.get<FinancialTxDetailResponseDto>(
+      `/admin/financial/transactions/${transactionId}`,
+      { signal: config?.signal }
     );
   },
 };

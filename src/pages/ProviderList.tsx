@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import PageMeta from "../components/common/PageMeta";
+import ThemedSelect from "../components/form/ThemedSelect";
 import { ActionsMenu } from "../components/common/ActionsMenu";
 import { DetailModal } from "../components/common/DetailModal";
 import { ProviderFullDetailsView } from "../components/common/ProfileDetailBlocks";
@@ -23,19 +25,19 @@ import {
   type ProviderListStatusFilter,
   type VerificationDocumentTypeItem,
 } from "../services/api";
-import { formatDate } from "../utils/format";
+import { formatDate, formatStatusLabel } from "../utils/format";
 import { useAuth } from "../context/AuthContext";
 
 const LIMIT_OPTIONS = [10, 20, 50];
 
 /** Status tabs: All | Pending | Rejected | Active | Deactivated | Archived (matches backend enum) */
-const STATUS_TABS: { value: ProviderListStatusFilter; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "pending", label: "Pending" },
-  { value: "rejected", label: "Rejected" },
-  { value: "active", label: "Active" },
-  { value: "deactivated", label: "Deactivated" },
-  { value: "archived", label: "Archived" },
+const STATUS_TABS: { value: ProviderListStatusFilter }[] = [
+  { value: "all" },
+  { value: "pending" },
+  { value: "rejected" },
+  { value: "active" },
+  { value: "deactivated" },
+  { value: "archived" },
 ];
 
 function normalizeTree(
@@ -78,6 +80,7 @@ function providerStatusBadgeColor(status: string): "success" | "warning" | "erro
 }
 
 export default function ProviderList() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const currentRole = String(user?.role ?? "").toUpperCase();
   const supervisorId =
@@ -184,7 +187,7 @@ export default function ProviderList() {
       const message =
         err && typeof err === "object" && "message" in err
           ? String((err as { message: string }).message)
-          : "Failed to load providers.";
+          : t("providers.failedLoad");
       if (!silent) setError(message);
       if (!silent) {
         setProviders([]);
@@ -248,24 +251,24 @@ export default function ProviderList() {
   return (
     <>
       <PageMeta
-        title="Providers List | Hope - BMQAS"
-        description="Provider profiles (providers table) for Hope Pro by BMQAS"
+        title={t("providers.metaTitle")}
+        description={t("providers.metaDescription")}
       />
-      <PageBreadcrumb pageTitle="Providers" />
+      <PageBreadcrumb pageTitle={t("providers.pageTitle")} />
       <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
         <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-6">
           <div>
             <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
-              Providers
+              {t("providers.heading")}
             </h3>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Provider profiles from the providers table (not user accounts)
+              {t("providers.subheading")}
             </p>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-3 sm:ml-auto">
             <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-              <span className="shrink-0">Consultation type</span>
-              <select
+              <span className="shrink-0">{t("providers.consultationType")}</span>
+              <ThemedSelect
                 value={consultationTypeFilterId}
                 onChange={(e) => {
                   const v = e.target.value;
@@ -274,18 +277,18 @@ export default function ProviderList() {
                 }}
                 className="min-w-[180px] rounded-lg border border-gray-300 bg-white py-2 pl-3 pr-8 text-sm text-gray-800 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
               >
-                <option value="">All types</option>
+                <option value="">{t("providers.allTypes")}</option>
                 {consultationTypeOptions.map((opt) => (
                   <option key={opt.id} value={opt.id}>
                     {opt.depth > 0 ? "—".repeat(opt.depth) + " " : ""}
                     {opt.name}
                   </option>
                 ))}
-              </select>
+              </ThemedSelect>
             </label>
             <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-              <span className="shrink-0">Verification document</span>
-              <select
+              <span className="shrink-0">{t("providers.verificationDocument")}</span>
+              <ThemedSelect
                 value={documentTypeFilterCode}
                 onChange={(e) => {
                   setDocumentTypeFilterCode(e.target.value);
@@ -293,35 +296,45 @@ export default function ProviderList() {
                 }}
                 className="min-w-[180px] rounded-lg border border-gray-300 bg-white py-2 pl-3 pr-8 text-sm text-gray-800 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
               >
-                <option value="">All documents</option>
+                <option value="">{t("providers.allDocuments")}</option>
                 {documentTypes.map((opt) => (
                   <option key={opt.id} value={opt.code}>
                     {opt.label}
                   </option>
                 ))}
-              </select>
+              </ThemedSelect>
             </label>
           </div>
         </div>
 
         {/* Status tabs */}
         <div className="border-b border-gray-200 px-4 dark:border-gray-800 sm:px-6">
-          <nav className="-mb-px flex gap-6 sm:gap-8" aria-label="Status filter">
-            {STATUS_TABS.map((t) => (
+          <nav className="-mb-px flex gap-6 sm:gap-8" aria-label={t("providers.statusFilter")}>
+            {STATUS_TABS.map((tab) => (
               <button
-                key={t.value}
+                key={tab.value}
                 type="button"
                 onClick={() => {
-                  setStatusTab(t.value);
+                  setStatusTab(tab.value);
                   setPage(1);
                 }}
                 className={`whitespace-nowrap border-b-2 py-4 text-sm font-medium transition-colors ${
-                  statusTab === t.value
+                  statusTab === tab.value
                     ? "border-brand-500 text-brand-500 dark:border-brand-500 dark:text-brand-500"
                     : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:border-gray-600 dark:hover:text-gray-300"
                 }`}
               >
-                {t.label}
+                {tab.value === "all"
+                  ? t("providers.statusAll")
+                  : tab.value === "pending"
+                  ? t("providers.statusPending")
+                  : tab.value === "rejected"
+                  ? t("providers.statusRejected")
+                  : tab.value === "active"
+                  ? t("providers.statusActive")
+                  : tab.value === "deactivated"
+                  ? t("providers.statusDeactivated")
+                  : t("providers.statusArchived")}
               </button>
             ))}
           </nav>
@@ -340,12 +353,12 @@ export default function ProviderList() {
             </div>
           ) : providers.length === 0 ? (
             <div className="py-16 text-center text-gray-500 dark:text-gray-400">
-              {statusTab === "all" && "No providers found."}
-              {statusTab === "pending" && "No pending providers found."}
-              {statusTab === "active" && "No active providers found."}
-              {statusTab === "rejected" && "No rejected providers found."}
-              {statusTab === "deactivated" && "No deactivated providers found."}
-              {statusTab === "archived" && "No archived providers found."}
+              {statusTab === "all" && t("providers.noProvidersFound")}
+              {statusTab === "pending" && t("providers.noPendingProvidersFound")}
+              {statusTab === "active" && t("providers.noActiveProvidersFound")}
+              {statusTab === "rejected" && t("providers.noRejectedProvidersFound")}
+              {statusTab === "deactivated" && t("providers.noDeactivatedProvidersFound")}
+              {statusTab === "archived" && t("providers.noArchivedProvidersFound")}
             </div>
           ) : (
             <>
@@ -361,7 +374,7 @@ export default function ProviderList() {
                       </span>
                       <div className="flex items-center gap-2">
                         <Badge size="sm" color={providerStatusBadgeColor(provider.status)}>
-                          {provider.status}
+                          {formatStatusLabel(provider.status)}
                         </Badge>
                         <ActionsMenu
                           isOpen={openActionsId === provider.id}
@@ -377,7 +390,7 @@ export default function ProviderList() {
                             }}
                             className="dark:hover:bg-gray-700 dark:text-gray-200"
                           >
-                            View full details
+                            {t("providers.viewFullDetails")}
                           </DropdownItem>
                         </ActionsMenu>
                       </div>
@@ -388,20 +401,20 @@ export default function ProviderList() {
                         <dd className="text-gray-800 dark:text-gray-200">{(page - 1) * limit + index + 1}</dd>
                       </div>
                       <div className="flex justify-between gap-2">
-                        <dt className="text-gray-500 dark:text-gray-400">Consultation type</dt>
+                        <dt className="text-gray-500 dark:text-gray-400">{t("providers.consultationType")}</dt>
                         <dd className="text-gray-800 dark:text-gray-200">{provider.consultationTypeName ?? "—"}</dd>
                       </div>
                       <div className="flex justify-between gap-2">
-                        <dt className="text-gray-500 dark:text-gray-400">Email</dt>
+                        <dt className="text-gray-500 dark:text-gray-400">{t("providers.email")}</dt>
                         <dd className="truncate text-right text-gray-800 dark:text-gray-200">{provider.email ?? "—"}</dd>
                       </div>
                       <div className="flex justify-between gap-2">
-                        <dt className="text-gray-500 dark:text-gray-400">Phone</dt>
+                        <dt className="text-gray-500 dark:text-gray-400">{t("providers.phone")}</dt>
                         <dd className="truncate text-right text-gray-800 dark:text-gray-200">{provider.username ?? "—"}</dd>
                       </div>
                       {provider.createdAt && (
                         <div className="flex justify-between gap-2">
-                          <dt className="text-gray-500 dark:text-gray-400">Created</dt>
+                          <dt className="text-gray-500 dark:text-gray-400">{t("providers.created")}</dt>
                           <dd className="text-gray-800 dark:text-gray-200">{formatDate(provider.createdAt)}</dd>
                         </div>
                       )}
@@ -415,13 +428,13 @@ export default function ProviderList() {
                   <TableHeader className="border-b border-gray-200 dark:border-gray-800">
                     <TableRow>
                       <TableCell isHeader className="w-[5%] py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">#</TableCell>
-                      <TableCell isHeader className="w-[16%] py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Provider name</TableCell>
-                      <TableCell isHeader className="w-[10%] py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Status</TableCell>
-                      <TableCell isHeader className="w-[14%] py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Consultation type</TableCell>
-                      <TableCell isHeader className="w-[16%] py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Email</TableCell>
-                      <TableCell isHeader className="w-[12%] py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Phone</TableCell>
-                      <TableCell isHeader className="w-[12%] py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Created</TableCell>
-                      <TableCell isHeader className="w-[8%] py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Actions</TableCell>
+                      <TableCell isHeader className="w-[16%] py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">{t("providers.providerName")}</TableCell>
+                      <TableCell isHeader className="w-[10%] py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">{t("users.status")}</TableCell>
+                      <TableCell isHeader className="w-[14%] py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">{t("providers.consultationType")}</TableCell>
+                      <TableCell isHeader className="w-[16%] py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">{t("providers.email")}</TableCell>
+                      <TableCell isHeader className="w-[12%] py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">{t("providers.phone")}</TableCell>
+                      <TableCell isHeader className="w-[12%] py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">{t("providers.created")}</TableCell>
+                      <TableCell isHeader className="w-[8%] py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">{t("providers.actions")}</TableCell>
                     </TableRow>
                   </TableHeader>
                   <TableBody className="divide-y divide-gray-100 dark:divide-gray-800">
@@ -433,7 +446,7 @@ export default function ProviderList() {
                         </TableCell>
                         <TableCell className="py-3">
                           <Badge size="sm" color={providerStatusBadgeColor(provider.status)}>
-                            {provider.status}
+                            {formatStatusLabel(provider.status)}
                           </Badge>
                         </TableCell>
                         <TableCell className="py-3 text-theme-sm text-gray-600 dark:text-gray-400">{provider.consultationTypeName ?? "—"}</TableCell>
@@ -457,7 +470,7 @@ export default function ProviderList() {
                               }}
                               className="dark:hover:bg-gray-700 dark:text-gray-200"
                             >
-                              View full details
+                              {t("providers.viewFullDetails")}
                             </DropdownItem>
                           </ActionsMenu>
                         </TableCell>
@@ -474,8 +487,8 @@ export default function ProviderList() {
           <div className="flex flex-col gap-4 border-t border-gray-200 px-4 py-4 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <div className="flex flex-wrap items-center gap-4">
               <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                Rows per page
-                <select
+                {t("pagination.rowsPerPage")}
+                <ThemedSelect
                   className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
                   value={limit}
                   onChange={(e) => {
@@ -488,12 +501,15 @@ export default function ProviderList() {
                       {n}
                     </option>
                   ))}
-                </select>
+                </ThemedSelect>
               </label>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                Showing <span className="font-medium">{from}</span> to{" "}
-                <span className="font-medium">{to}</span> of{" "}
-                <span className="font-medium">{total}</span> providers
+                {t("pagination.showingRangeOf", {
+                  from,
+                  to,
+                  total,
+                  entity: t("providers.providersEntity"),
+                })}
               </p>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-end">
@@ -503,10 +519,10 @@ export default function ProviderList() {
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page <= 1}
               >
-                Previous
+                {t("common.actions.previous")}
               </button>
               <span className="px-3 py-2 text-sm text-gray-600 dark:text-gray-400">
-                Page {page} of {totalPages}
+                {t("pagination.pageOf", { page, totalPages })}
               </span>
               <button
                 type="button"
@@ -514,7 +530,7 @@ export default function ProviderList() {
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page >= totalPages}
               >
-                Next
+                {t("common.actions.next")}
               </button>
             </div>
           </div>
@@ -522,11 +538,11 @@ export default function ProviderList() {
       </div>
 
       <DetailModal
-        title="Provider details"
+        title={t("providers.detailsTitle")}
         isOpen={detailModalOpen}
         onClose={closeDetailModal}
         loading={detailLoading}
-        errorMessage={!detailLoading && !detailData ? "Could not load provider details." : null}
+        errorMessage={!detailLoading && !detailData ? t("providers.detailsLoadError") : null}
       >
         {detailData && (
           <ProviderFullDetailsView

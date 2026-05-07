@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import PageMeta from "../components/common/PageMeta";
+import ThemedSelect from "../components/form/ThemedSelect";
 import {
   Table,
   TableBody,
@@ -17,19 +19,23 @@ import {
   type LongTermOpportunityListItem,
   type LongTermOpportunityStatusFilter,
 } from "../services/api";
-import { formatDate } from "../utils/format";
+import { formatDate, formatStatusLabel } from "../utils/format";
 import { Modal } from "../components/ui/modal";
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50];
 
-const STATUS_TABS: { value: "all" | LongTermOpportunityStatusFilter; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "REQUESTED", label: "Requested" },
-  { value: "SCHEDULE_PROPOSED", label: "Schedule proposed" },
-  { value: "CHANGE_REQUESTED", label: "Change requested" },
-  { value: "SCHEDULE_CONFIRMED", label: "Schedule confirmed" },
-  { value: "PAYMENT_COMPLETED", label: "Payment completed" },
-  { value: "IN_PROGRESS", label: "In progress" },
+const STATUS_TABS: { value: "all" | LongTermOpportunityStatusFilter }[] = [
+  { value: "all" },
+  { value: "REQUESTED" },
+  { value: "SCHEDULE_PROPOSED" },
+  { value: "CHANGE_REQUESTED" },
+  { value: "IN_PROGRESS" },
+  { value: "PAYMENT_PENDING" },
+  { value: "PAID" },
+  { value: "COMPLETED" },
+  { value: "REJECTED" },
+  { value: "CANCELLED" },
+  { value: "EXPIRED" },
 ];
 
 function formatRequestWindow(row: LongTermOpportunityListItem): string {
@@ -126,6 +132,7 @@ function extractAssignedProviderNames(data: unknown): string | null {
 }
 
 export default function NurseScheduleList() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [items, setItems] = useState<LongTermOpportunityListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -170,7 +177,7 @@ export default function NurseScheduleList() {
         const message =
           err && typeof err === "object" && "message" in err
             ? String((err as { message: string }).message)
-            : "Failed to load service requests.";
+            : t("schedule.failedToLoad");
         setError(message);
         setItems([]);
         setTotal(0);
@@ -179,7 +186,7 @@ export default function NurseScheduleList() {
         setLoading(false);
       }
     },
-    [page, limit, statusTab]
+    [page, limit, statusTab, t]
   );
 
   useEffect(() => {
@@ -284,7 +291,7 @@ export default function NurseScheduleList() {
       const message =
         err && typeof err === "object" && "message" in err
           ? String((err as { message: string }).message)
-          : "Failed to update service request.";
+          : t("schedule.failedToUpdate");
       setUpdateError(message);
     } finally {
       setUpdateSaving(false);
@@ -297,10 +304,10 @@ export default function NurseScheduleList() {
   return (
     <>
       <PageMeta
-        title="Service requests | Hope - BMQAS"
-        description="Long-term service requests — Hope Pro"
+        title={t("schedule.metaTitle")}
+        description={t("schedule.metaDescription")}
       />
-      <PageBreadcrumb pageTitle="Service request" />
+      <PageBreadcrumb pageTitle={t("schedule.pageTitle")} />
       <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
         <div className="flex flex-col gap-4 border-b border-gray-200 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-6 dark:border-gray-800">
           <div className="flex items-start gap-3">
@@ -308,9 +315,9 @@ export default function NurseScheduleList() {
               <CalenderIcon className="size-5" />
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">Service requests</h3>
+              <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">{t("schedule.heading")}</h3>
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                Long-term opportunities and scheduling workflow. Open a row to view the calendar.
+                {t("schedule.subheading")}
               </p>
             </div>
           </div>
@@ -318,22 +325,22 @@ export default function NurseScheduleList() {
 
         {/* Status tabs */}
         <div className="border-b border-gray-200 px-4 dark:border-gray-800 sm:px-6">
-          <nav className="-mb-px flex gap-4 overflow-x-auto pb-px sm:gap-6" aria-label="Status filter">
-            {STATUS_TABS.map((t) => (
+          <nav className="-mb-px flex gap-4 overflow-x-auto pb-px sm:gap-6" aria-label={t("schedule.statusFilter")}>
+            {STATUS_TABS.map((tab) => (
               <button
-                key={t.value}
+                key={tab.value}
                 type="button"
                 onClick={() => {
-                  setStatusTab(t.value);
+                  setStatusTab(tab.value);
                   setPage(1);
                 }}
                 className={`shrink-0 whitespace-nowrap border-b-2 py-4 text-sm font-medium transition-colors ${
-                  statusTab === t.value
+                  statusTab === tab.value
                     ? "border-brand-500 text-brand-500 dark:border-brand-500 dark:text-brand-500"
                     : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:border-gray-600 dark:hover:text-gray-300"
                 }`}
               >
-                {t.label}
+                {tab.value === "all" ? t("common.all") : formatStatusLabel(tab.value)}
               </button>
             ))}
           </nav>
@@ -352,7 +359,7 @@ export default function NurseScheduleList() {
             </div>
           ) : items.length === 0 ? (
             <p className="py-12 text-center text-sm text-gray-500 dark:text-gray-400">
-              No service requests found for this filter.
+              {t("schedule.noItemsForFilter")}
             </p>
           ) : (
             <>
@@ -366,7 +373,7 @@ export default function NurseScheduleList() {
                       <div>
                         <p className="font-semibold text-gray-800 dark:text-white/90">{rowTitle(request)}</p>
                         <p className="mt-0.5 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                          {request.status || "—"}
+                          {request.status?.trim() ? formatStatusLabel(request.status) : "—"}
                         </p>
                         {request.location ? (
                           <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">{request.location}</p>
@@ -375,8 +382,8 @@ export default function NurseScheduleList() {
                       <div className="flex items-center gap-1">
                         <button
                           type="button"
-                          title="View calendar"
-                          aria-label="View calendar"
+                          title={t("schedule.viewCalendar")}
+                          aria-label={t("schedule.viewCalendar")}
                           disabled={actionLoadingId === request.id}
                           onClick={() => void goToCalendar(request)}
                           className="rounded-md border border-gray-200 bg-white p-2 text-gray-600 hover:bg-gray-100 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
@@ -385,8 +392,8 @@ export default function NurseScheduleList() {
                         </button>
                         <button
                           type="button"
-                          title="Details"
-                          aria-label="Details"
+                          title={t("common.actions.details")}
+                          aria-label={t("common.actions.details")}
                           disabled={actionLoadingId === request.id}
                           onClick={() => void openDetails(request)}
                           className="rounded-md border border-gray-200 bg-white p-2 text-gray-600 hover:bg-gray-100 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
@@ -395,8 +402,8 @@ export default function NurseScheduleList() {
                         </button>
                         <button
                           type="button"
-                          title="Update"
-                          aria-label="Update"
+                          title={t("common.actions.update")}
+                          aria-label={t("common.actions.update")}
                           disabled={actionLoadingId === request.id}
                           onClick={() => void openUpdate(request)}
                           className="rounded-md border border-gray-200 bg-white p-2 text-gray-600 hover:bg-gray-100 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
@@ -407,15 +414,15 @@ export default function NurseScheduleList() {
                     </div>
                     <dl className="mt-3 grid grid-cols-1 gap-2 text-sm">
                       <div className="flex justify-between gap-2">
-                        <dt className="text-gray-500 dark:text-gray-400">Amount</dt>
+                        <dt className="text-gray-500 dark:text-gray-400">{t("schedule.amount")}</dt>
                         <dd className="text-gray-800 dark:text-gray-200">{formatAmount(request)}</dd>
                       </div>
                       <div className="flex justify-between gap-2">
-                        <dt className="text-gray-500 dark:text-gray-400">Time range</dt>
+                        <dt className="text-gray-500 dark:text-gray-400">{t("schedule.timeRange")}</dt>
                         <dd className="text-gray-800 dark:text-gray-200">{formatTimeRange(request)}</dd>
                       </div>
                       <div className="flex justify-between gap-2">
-                        <dt className="text-gray-500 dark:text-gray-400">Requested window</dt>
+                        <dt className="text-gray-500 dark:text-gray-400">{t("schedule.requestedWindow")}</dt>
                         <dd className="text-gray-800 dark:text-gray-200">{formatRequestWindow(request)}</dd>
                       </div>
                     </dl>
@@ -431,49 +438,49 @@ export default function NurseScheduleList() {
                         isHeader
                         className="py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
                       >
-                        Request no
+                        {t("schedule.requestNo")}
                       </TableCell>
                       <TableCell
                         isHeader
                         className="py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
                       >
-                        Patient
+                        {t("schedule.patient")}
                       </TableCell>
                       <TableCell
                         isHeader
                         className="py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
                       >
-                        Location
+                        {t("schedule.location")}
                       </TableCell>
                       <TableCell
                         isHeader
                         className="w-[140px] py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
                       >
-                        Status
+                        {t("dashboard.status")}
                       </TableCell>
                       <TableCell
                         isHeader
                         className="w-[120px] py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
                       >
-                        Amount
+                        {t("schedule.amount")}
                       </TableCell>
                       <TableCell
                         isHeader
                         className="py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
                       >
-                        Time range
+                        {t("schedule.timeRange")}
                       </TableCell>
                       <TableCell
                         isHeader
                         className="py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
                       >
-                        Requested window
+                        {t("schedule.requestedWindow")}
                       </TableCell>
                       <TableCell
                         isHeader
                         className="w-[120px] py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
                       >
-                        Actions
+                        {t("supervisor.actions")}
                       </TableCell>
                     </TableRow>
                   </TableHeader>
@@ -490,7 +497,7 @@ export default function NurseScheduleList() {
                           {request.location?.trim() || "—"}
                         </TableCell>
                         <TableCell className="py-3 text-theme-sm leading-snug text-gray-600 dark:text-gray-400">
-                          {request.status || "—"}
+                          {request.status?.trim() ? formatStatusLabel(request.status) : "—"}
                         </TableCell>
                         <TableCell className="py-3 text-right text-theme-sm whitespace-nowrap text-gray-600 dark:text-gray-400">
                           {formatAmount(request)}
@@ -505,8 +512,8 @@ export default function NurseScheduleList() {
                           <div className="inline-flex items-center gap-1">
                             <button
                               type="button"
-                              title="View calendar"
-                              aria-label="View calendar"
+                              title={t("schedule.viewCalendar")}
+                              aria-label={t("schedule.viewCalendar")}
                               disabled={actionLoadingId === request.id}
                               onClick={() => void goToCalendar(request)}
                               className="rounded-md border border-gray-200 bg-white p-2 text-gray-600 hover:bg-gray-100 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
@@ -515,8 +522,8 @@ export default function NurseScheduleList() {
                             </button>
                             <button
                               type="button"
-                              title="Details"
-                              aria-label="Details"
+                              title={t("common.actions.details")}
+                              aria-label={t("common.actions.details")}
                               disabled={actionLoadingId === request.id}
                               onClick={() => void openDetails(request)}
                               className="rounded-md border border-gray-200 bg-white p-2 text-gray-600 hover:bg-gray-100 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
@@ -525,8 +532,8 @@ export default function NurseScheduleList() {
                             </button>
                             <button
                               type="button"
-                              title="Update"
-                              aria-label="Update"
+                              title={t("common.actions.update")}
+                              aria-label={t("common.actions.update")}
                               disabled={actionLoadingId === request.id}
                               onClick={() => void openUpdate(request)}
                               className="rounded-md border border-gray-200 bg-white p-2 text-gray-600 hover:bg-gray-100 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
@@ -548,8 +555,8 @@ export default function NurseScheduleList() {
           <div className="flex flex-col gap-4 border-t border-gray-200 px-4 py-4 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <div className="flex flex-wrap items-center gap-4">
               <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                Rows per page
-                <select
+                {t("pagination.rowsPerPage")}
+                <ThemedSelect
                   className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
                   value={limit}
                   onChange={(e) => {
@@ -562,11 +569,15 @@ export default function NurseScheduleList() {
                       {n}
                     </option>
                   ))}
-                </select>
+                </ThemedSelect>
               </label>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                Showing <span className="font-medium">{from}</span> to <span className="font-medium">{to}</span> of{" "}
-                <span className="font-medium">{total}</span> service requests
+                {t("pagination.showingRangeOf", {
+                  from,
+                  to,
+                  total,
+                  entity: t("schedule.pageTitle").toLowerCase(),
+                })}
               </p>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-end">
@@ -576,10 +587,10 @@ export default function NurseScheduleList() {
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page <= 1}
               >
-                Previous
+                {t("common.actions.previous")}
               </button>
               <span className="px-3 py-2 text-sm text-gray-600 dark:text-gray-400">
-                Page {page} of {totalPages}
+                {t("pagination.pageOf", { page, totalPages })}
               </span>
               <button
                 type="button"
@@ -587,7 +598,7 @@ export default function NurseScheduleList() {
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page >= totalPages}
               >
-                Next
+                {t("common.actions.next")}
               </button>
             </div>
           </div>
@@ -597,56 +608,56 @@ export default function NurseScheduleList() {
       <Modal
         isOpen={detailsItem !== null}
         onClose={() => setDetailsItem(null)}
-        title="Long-term opportunity details"
+        title={t("schedule.longTermOpportunityDetails")}
         className="max-h-[90vh] max-w-3xl overflow-y-auto p-0"
       >
         {detailsItem ? (
           <div className="space-y-4 pt-4">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-800/40">
-                <p className="text-xs text-gray-500 dark:text-gray-400">Request no</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{t("schedule.requestNo")}</p>
                 <p className="mt-1 text-sm font-semibold text-gray-800 dark:text-white/90">
                   {detailsItem.requestNo?.trim() || `SR-${detailsItem.id}`}
                 </p>
               </div>
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-800/40">
-                <p className="text-xs text-gray-500 dark:text-gray-400">Status</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{t("dashboard.status")}</p>
                 <p className="mt-1 text-sm font-medium text-gray-800 dark:text-gray-200">
-                  {detailsItem.status || "—"}
+                  {detailsItem.status?.trim() || "—"}
                 </p>
               </div>
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-800/40">
-                <p className="text-xs text-gray-500 dark:text-gray-400">Patient</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{t("schedule.patient")}</p>
                 <p className="mt-1 text-sm font-medium text-gray-800 dark:text-gray-200">
                   {detailsItem.patientName?.trim() || "—"}
                 </p>
               </div>
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-800/40">
-                <p className="text-xs text-gray-500 dark:text-gray-400">Location</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{t("schedule.location")}</p>
                 <p className="mt-1 text-sm font-medium text-gray-800 dark:text-gray-200">
                   {detailsItem.location?.trim() || "—"}
                 </p>
               </div>
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-800/40">
-                <p className="text-xs text-gray-500 dark:text-gray-400">Amount</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{t("schedule.amount")}</p>
                 <p className="mt-1 text-sm font-medium text-gray-800 dark:text-gray-200">
                   {formatAmount(detailsItem)}
                 </p>
               </div>
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-800/40">
-                <p className="text-xs text-gray-500 dark:text-gray-400">Time range</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{t("schedule.timeRange")}</p>
                 <p className="mt-1 text-sm font-medium text-gray-800 dark:text-gray-200">
                   {formatTimeRange(detailsItem)}
                 </p>
               </div>
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-800/40">
-                <p className="text-xs text-gray-500 dark:text-gray-400">Requested window</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{t("schedule.requestedWindow")}</p>
                 <p className="mt-1 text-sm font-medium text-gray-800 dark:text-gray-200">
                   {formatRequestWindow(detailsItem)}
                 </p>
               </div>
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-800/40">
-                <p className="text-xs text-gray-500 dark:text-gray-400">Assigned nurses</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{t("schedule.assignedNurses")}</p>
                 <p className="mt-1 text-sm font-medium text-gray-800 dark:text-gray-200">
                   {detailsItem.assignedNursesLabel ?? "—"}
                 </p>
@@ -659,7 +670,7 @@ export default function NurseScheduleList() {
       <Modal
         isOpen={updateItem !== null}
         onClose={closeUpdate}
-        title="Update long-term opportunity"
+        title={t("schedule.updateLongTermOpportunity")}
         className="max-h-[90vh] max-w-2xl overflow-y-auto p-0"
       >
         {updateItem ? (
@@ -671,12 +682,12 @@ export default function NurseScheduleList() {
             }}
           >
             <div className="rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-xs text-brand-800 dark:border-brand-800/40 dark:bg-brand-900/20 dark:text-brand-200">
-              Save will update this long-term opportunity via API.
+              {t("schedule.saveUpdatesHint")}
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <label className="text-sm text-gray-700 dark:text-gray-300">
-                Status
-                <select
+                {t("dashboard.status")}
+                <ThemedSelect
                   value={updateStatus}
                   onChange={(e) => setUpdateStatus(e.target.value)}
                   className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
@@ -685,22 +696,22 @@ export default function NurseScheduleList() {
                     "REQUESTED",
                     "SCHEDULE_PROPOSED",
                     "CHANGE_REQUESTED",
-                    "SCHEDULE_CONFIRMED",
-                    "PAYMENT_COMPLETED",
                     "IN_PROGRESS",
+                    "PAYMENT_PENDING",
+                    "PAID",
                     "COMPLETED",
+                    "REJECTED",
                     "CANCELLED",
                     "EXPIRED",
-                    "PAYMENT_PENDING",
                   ].map((status) => (
                     <option key={status} value={status}>
-                      {status}
+                      {formatStatusLabel(status)}
                     </option>
                   ))}
-                </select>
+                </ThemedSelect>
               </label>
               <label className="text-sm text-gray-700 dark:text-gray-300">
-                Amount
+                {t("schedule.amount")}
                 <input
                   type="text"
                   value={updateAmount}
@@ -709,7 +720,7 @@ export default function NurseScheduleList() {
                 />
               </label>
               <label className="text-sm text-gray-700 dark:text-gray-300">
-                Preferred start time
+                {t("schedule.preferredStartTime")}
                 <input
                   type="text"
                   value={updatePreferredStartTime}
@@ -718,7 +729,7 @@ export default function NurseScheduleList() {
                 />
               </label>
               <label className="text-sm text-gray-700 dark:text-gray-300">
-                Shift duration (hours)
+                {t("schedule.shiftDurationHours")}
                 <input
                   type="number"
                   value={updateShiftDurationHours}
@@ -727,7 +738,7 @@ export default function NurseScheduleList() {
                 />
               </label>
               <label className="text-sm text-gray-700 dark:text-gray-300">
-                Start date
+                {t("schedule.startDate")}
                 <input
                   type="date"
                   value={updateStartDate}
@@ -736,7 +747,7 @@ export default function NurseScheduleList() {
                 />
               </label>
               <label className="text-sm text-gray-700 dark:text-gray-300">
-                End date
+                {t("schedule.endDate")}
                 <input
                   type="date"
                   value={updateEndDate}
@@ -755,14 +766,14 @@ export default function NurseScheduleList() {
                 disabled={updateSaving}
                 className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
               >
-                Cancel
+                {t("common.actions.cancel")}
               </button>
               <button
                 type="submit"
                 disabled={updateSaving}
                 className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
               >
-                {updateSaving ? "Saving..." : "Save"}
+                {updateSaving ? t("supervisor.saving") : t("common.actions.save")}
               </button>
             </div>
           </form>

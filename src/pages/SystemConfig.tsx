@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import PageMeta from "../components/common/PageMeta";
+import ThemedSelect from "../components/form/ThemedSelect";
 import { Modal } from "../components/ui/modal";
 import { adminSystemConfigApi, type SystemConfigItem } from "../services/api";
 import { PencilIcon } from "../icons";
@@ -28,6 +30,7 @@ function getEnumOptions(key: string): { value: string; label: string }[] | null 
 }
 
 export default function SystemConfig() {
+  const { t } = useTranslation();
   const [list, setList] = useState<SystemConfigItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -47,13 +50,13 @@ export default function SystemConfig() {
       const msg =
         err && typeof err === "object" && "message" in err
           ? String((err as { message: string }).message)
-          : "Failed to load system configuration.";
+          : t("systemConfig.failedLoad");
       setError(msg);
       setList([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     fetchData();
@@ -79,7 +82,7 @@ export default function SystemConfig() {
       const msg =
         err && typeof err === "object" && "message" in err
           ? String((err as { message: string }).message)
-          : "Failed to update.";
+          : t("systemConfig.failedUpdate");
       setError(msg);
     } finally {
       setSubmitting(false);
@@ -89,17 +92,17 @@ export default function SystemConfig() {
   return (
     <>
       <PageMeta
-        title="System Configuration | Hope - BMQAS"
-        description="View and update system configuration (commission, OTP, defaults, etc.)"
+        title={t("systemConfig.metaTitle")}
+        description={t("systemConfig.metaDescription")}
       />
-      <PageBreadcrumb pageTitle="System Configuration" />
+      <PageBreadcrumb pageTitle={t("systemConfig.pageTitle")} />
       <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] lg:p-6">
         <div className="mb-4">
           <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
-            System configuration
+            {t("systemConfig.heading")}
           </h3>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            Key-value settings used by the platform (e.g. PLATFORM_COMMISSION_PERCENT, DEMO_OTP, DEFAULT_PATIENT_REGISTRATION_STATUS). Edit with care.
+            {t("systemConfig.subheading")}
           </p>
         </div>
 
@@ -111,18 +114,18 @@ export default function SystemConfig() {
 
         {loading ? (
           <div className="py-8 text-center text-gray-500 dark:text-gray-400">
-            Loading…
+            {t("systemConfig.loading")}
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-sm">
               <thead>
                 <tr className="border-b border-gray-200 dark:border-gray-800">
-                  <th className="py-3 text-left font-medium text-gray-500 dark:text-gray-400">Key</th>
-                  <th className="py-3 text-left font-medium text-gray-500 dark:text-gray-400">Value</th>
-                  <th className="py-3 text-left font-medium text-gray-500 dark:text-gray-400">Description</th>
-                  <th className="py-3 text-left font-medium text-gray-500 dark:text-gray-400">Updated</th>
-                  <th className="py-3 text-right font-medium text-gray-500 dark:text-gray-400">Actions</th>
+                  <th className="py-3 text-left font-medium text-gray-500 dark:text-gray-400">{t("systemConfig.key")}</th>
+                  <th className="py-3 text-left font-medium text-gray-500 dark:text-gray-400">{t("systemConfig.value")}</th>
+                  <th className="py-3 text-left font-medium text-gray-500 dark:text-gray-400">{t("systemConfig.description")}</th>
+                  <th className="py-3 text-left font-medium text-gray-500 dark:text-gray-400">{t("systemConfig.updated")}</th>
+                  <th className="py-3 text-right font-medium text-gray-500 dark:text-gray-400">{t("systemConfig.actions")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
@@ -135,10 +138,10 @@ export default function SystemConfig() {
                       {item.value}
                     </td>
                     <td className="max-w-xs py-3 text-gray-600 dark:text-gray-400">
-                      <span className="line-clamp-2">{item.description ?? "—"}</span>
+                      <span className="line-clamp-2">{item.description ?? t("common.noValue")}</span>
                     </td>
                     <td className="py-3 text-gray-500 dark:text-gray-400">
-                      {item.updatedAt ? formatDate(item.updatedAt) : "—"}
+                      {item.updatedAt ? formatDate(item.updatedAt) : t("common.noValue")}
                     </td>
                     <td className="py-3 text-right">
                       <button
@@ -147,7 +150,7 @@ export default function SystemConfig() {
                         className="inline-flex items-center gap-1 rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
                       >
                         <PencilIcon className="h-4 w-4" />
-                        Edit
+                        {t("common.actions.edit")}
                       </button>
                     </td>
                   </tr>
@@ -156,7 +159,7 @@ export default function SystemConfig() {
             </table>
             {list.length === 0 && (
               <p className="py-6 text-center text-gray-500 dark:text-gray-400">
-                No system configuration entries.
+                {t("systemConfig.noEntries")}
               </p>
             )}
           </div>
@@ -167,18 +170,18 @@ export default function SystemConfig() {
         <Modal
           isOpen={true}
           onClose={() => !submitting && setEditing(null)}
-          title={`Edit: ${editing.key}`}
+          title={t("systemConfig.editTitle", { key: editing.key })}
         >
           <div className="space-y-3">
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              Key cannot be changed. Update value and optional description.
+              {t("systemConfig.keyNotEditable")}
             </p>
             <label className="block">
-              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Value</span>
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("systemConfig.value")}</span>
               {(() => {
                 const opts = getEnumOptions(editing.key);
                 return opts ? (
-                  <select
+                  <ThemedSelect
                     value={value}
                     onChange={(e) => setValue(e.target.value)}
                     className="mt-1 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
@@ -188,26 +191,26 @@ export default function SystemConfig() {
                         {opt.label}
                       </option>
                     ))}
-                  </select>
+                  </ThemedSelect>
                 ) : (
                   <input
                     type="text"
                     value={value}
                     onChange={(e) => setValue(e.target.value)}
                     className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
-                    placeholder="Value"
+                    placeholder={t("systemConfig.value")}
                   />
                 );
               })()}
             </label>
             <label className="block">
-              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Description (optional)</span>
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("systemConfig.descriptionOptional")}</span>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={2}
                 className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
-                placeholder="Description"
+                placeholder={t("systemConfig.description")}
               />
             </label>
             <div className="flex justify-end gap-2 pt-2">
@@ -216,7 +219,7 @@ export default function SystemConfig() {
                 onClick={() => !submitting && setEditing(null)}
                 className="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
               >
-                Cancel
+                {t("common.actions.cancel")}
               </button>
               <button
                 type="button"
@@ -224,7 +227,7 @@ export default function SystemConfig() {
                 onClick={handleSave}
                 className="rounded bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
               >
-                {submitting ? "Saving…" : "Save"}
+                {submitting ? t("supervisor.saving") : t("common.actions.save")}
               </button>
             </div>
           </div>

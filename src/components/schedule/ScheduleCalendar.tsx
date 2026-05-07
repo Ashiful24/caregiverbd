@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { bn } from "date-fns/locale/bn";
+import { enUS } from "date-fns/locale/en-US";
 import {
   addDays,
   addHours,
@@ -39,6 +42,7 @@ type Props = {
   subtitle: string;
   requestStartDate: string;
   requestEndDate: string;
+  baseServiceAmount?: string | number | null;
   initialEvents?: ScheduleEventRecord[];
 };
 
@@ -64,20 +68,6 @@ function combineDateHour(dateStr: string, hour: number): Date {
   const [y, m, d] = dateStr.split("-").map(Number);
   return new Date(y, m - 1, d, hour, 0, 0, 0);
 }
-
-function formatDurationLabel(start: Date, end: Date): string {
-  const mins = differenceInMinutes(end, start);
-  if (mins <= 0) return "—";
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  if (m === 0) return `${h}h`;
-  return `${h}h ${m}m`;
-}
-
-const HOUR_OPTIONS = Array.from({ length: 24 }, (_, hour) => ({
-  value: hour,
-  label: format(new Date(2000, 0, 1, hour, 0, 0, 0), "h:mm a"),
-}));
 
 const modalTimeInputClass =
   "rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-white disabled:cursor-not-allowed disabled:border-dashed disabled:border-gray-400 disabled:bg-gray-200/90 disabled:text-gray-500 disabled:opacity-100 dark:disabled:border-gray-500 dark:disabled:bg-gray-800/90 dark:disabled:text-gray-400";
@@ -155,8 +145,32 @@ export function ScheduleCalendar({
   subtitle,
   requestStartDate,
   requestEndDate,
+  baseServiceAmount,
   initialEvents = [],
 }: Props) {
+  const { t, i18n } = useTranslation();
+  const dateLoc = i18n.language?.startsWith("bn") ? bn : enUS;
+
+  const formatDurationLabel = (start: Date, end: Date): string => {
+    const mins = differenceInMinutes(end, start);
+    if (mins <= 0) return "—";
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    const hAbbr = t("scheduleCalendar.hoursAbbr");
+    const mAbbr = t("scheduleCalendar.minutesAbbr");
+    if (m === 0) return `${h}${hAbbr}`;
+    return `${h}${hAbbr} ${m}${mAbbr}`;
+  };
+
+  const hourOptions = useMemo(
+    () =>
+      Array.from({ length: 24 }, (_, hour) => ({
+        value: hour,
+        label: format(new Date(2000, 0, 1, hour, 0, 0, 0), "h:mm a", { locale: dateLoc }),
+      })),
+    [dateLoc]
+  );
+
   const { user } = useAuth();
   const currentRole = String(user?.role ?? "").toUpperCase();
   const supervisorId =
@@ -178,6 +192,7 @@ export function ScheduleCalendar({
   );
   const [formError, setFormError] = useState<string | null>(null);
   const [savingEvent, setSavingEvent] = useState(false);
+  const [locallyAddedAmount, setLocallyAddedAmount] = useState(0);
   const [removeTarget, setRemoveTarget] = useState<ScheduleEventRecord | null>(null);
   const [removingEvent, setRemovingEvent] = useState(false);
   const [removeReason, setRemoveReason] = useState("");
@@ -195,7 +210,34 @@ export function ScheduleCalendar({
 
   useEffect(() => {
     setEvents(initialEvents);
+    setLocallyAddedAmount(0);
   }, [initialEvents, requestId]);
+
+  const parseMoney = (v: unknown): number => {
+    const raw = String(v ?? "").trim();
+    if (!raw) return 0;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  const formatMoney = (v: number): string =>
+    `${v.toLocaleString(undefined, {
+      minimumFractionDigits: Number.isInteger(v) ? 0 : 2,
+      maximumFractionDigits: 2,
+    })} ৳`;
+
+  const extractApiErrorMessage = (err: unknown): string | null => {
+    if (!err || typeof err !== "object") return null;
+    const e = err as Record<string, unknown>;
+    const response = e.response && typeof e.response === "object" ? (e.response as Record<string, unknown>) : null;
+    const data = response?.data && typeof response.data === "object" ? (response.data as Record<string, unknown>) : null;
+    const candidates = [data?.message, e.message];
+    for (const candidate of candidates) {
+      const msg = String(candidate ?? "").trim();
+      if (msg) return msg;
+    }
+    return null;
+  };
 
   const dayInRange = useCallback(
     (day: Date) => {
@@ -211,6 +253,14 @@ export function ScheduleCalendar({
     const end = combineDateHour(modalDraft.endDateStr, modalDraft.endHour);
     return { start, end };
   }, [modalDraft]);
+
+  const selectedNurse = nurses.find((n) => n.id === selectedNurseId) ?? null;
+  const selectedNurseRate = parseMoney(selectedNurse?.rate);
+  const selectedDurationHours = computedRange
+    ? Math.max(0, differenceInMinutes(computedRange.end, computedRange.start) / 60)
+    : 0;
+  const selectedTotalAmount = selectedNurseRate * selectedDurationHours;
+  const totalServiceAmount = parseMoney(baseServiceAmount) + locallyAddedAmount;
 
   const rangeValidForSave = useMemo(() => {
     if (!computedRange) return false;
@@ -279,7 +329,7 @@ export function ScheduleCalendar({
 
   const handleConfirmRemove = async () => {
     if (!removeTarget?.scheduleSlotId) {
-      setRemoveError("Missing schedule slot ID for this event.");
+      setRemoveError(t("scheduleCalendar.errMissingSlot"));
       return;
     }
     setRemovingEvent(true);
@@ -288,12 +338,12 @@ export function ScheduleCalendar({
       await adminLongTermOpportunitiesApi.rejectScheduleSlot(
         requestId,
         removeTarget.scheduleSlotId,
-        { reason: removeReason.trim() || "Removed from calendar by admin" }
+        { reason: removeReason.trim() || t("scheduleCalendar.defaultRemoveReason") }
       );
       setEvents((prev) => prev.filter((e) => e.id !== removeTarget.id));
       handleCloseRemove();
     } catch {
-      setRemoveError("Failed to remove slot. Please try again.");
+      setRemoveError(t("scheduleCalendar.errRemove"));
     } finally {
       setRemovingEvent(false);
     }
@@ -349,7 +399,14 @@ export function ScheduleCalendar({
   const providerLabel = (p: ProviderListItem): string => {
     const full = [p.firstName, p.lastName].filter(Boolean).join(" ").trim();
     if (full) return full;
-    return p.name?.trim() || p.fullName?.trim() || p.providerName?.trim() || p.email || p.username || "Nurse";
+    return (
+      p.name?.trim() ||
+      p.fullName?.trim() ||
+      p.providerName?.trim() ||
+      p.email ||
+      p.username ||
+      t("scheduleCalendar.nurseFallback")
+    );
   };
 
   const handleCheckAvailability = async (providerId: number) => {
@@ -388,14 +445,14 @@ export function ScheduleCalendar({
       if (slots.length === 0) {
         setAvailabilityErrorByNurse((prev) => ({
           ...prev,
-          [providerId]: "No slots available for this date.",
+          [providerId]: t("scheduleCalendar.noSlotsForDate"),
         }));
       }
     } catch {
       setAvailabilityByNurse((prev) => ({ ...prev, [providerId]: [] }));
       setAvailabilityErrorByNurse((prev) => ({
         ...prev,
-        [providerId]: "Failed to load availability.",
+        [providerId]: t("scheduleCalendar.failedAvailability"),
       }));
     } finally {
       setAvailabilityLoadingId(null);
@@ -406,21 +463,22 @@ export function ScheduleCalendar({
     if (!modalDraft || !computedRange || !selectedNurseId) return;
     const { start, end } = computedRange;
     if (differenceInMinutes(end, start) < 60) {
-      setFormError("The visit must be at least 1 hour.");
+      setFormError(t("scheduleCalendar.errMinHour"));
       return;
     }
     if (start.getTime() < requestStart.getTime() || end.getTime() > requestEnd.getTime()) {
-      setFormError("Time must fall within the service request window.");
+      setFormError(t("scheduleCalendar.errWindow"));
       return;
     }
     const nurse = nurses.find((n) => n.id === selectedNurseId);
     if (!nurse) {
-      setFormError("Select a nurse.");
+      setFormError(t("scheduleCalendar.errSelectNurse"));
       return;
     }
     const nurseId = String(nurse.id);
+    const eventAmount = parseMoney(nurse.rate) * (differenceInMinutes(end, start) / 60);
     if (eventOverlapsNurse(events, nurseId, start, end)) {
-      setFormError("This nurse is already assigned in an overlapping time range.");
+      setFormError(t("scheduleCalendar.errOverlap"));
       return;
     }
     setSavingEvent(true);
@@ -443,30 +501,34 @@ export function ScheduleCalendar({
         requestId,
         nurseId,
         nurseName: providerLabel(nurse),
-        title: `${providerLabel(nurse).split(" ")[0]} - Visit`,
+        title: providerLabel(nurse),
+        feeLabel: eventAmount > 0 ? formatMoney(eventAmount) : undefined,
         start: start.toISOString(),
         end: end.toISOString(),
         type: "visit",
         scheduleSlotId: created.scheduleSlotId,
       };
       setEvents((prev) => [...prev, newEvent]);
+      if (eventAmount > 0) {
+        setLocallyAddedAmount((prev) => prev + eventAmount);
+      }
       closeModal();
-    } catch {
-      setFormError("Failed to create schedule. Please try again.");
+    } catch (err: unknown) {
+      setFormError(extractApiErrorMessage(err) ?? t("scheduleCalendar.errCreate"));
     } finally {
       setSavingEvent(false);
     }
   };
 
   const rangeTitle = useMemo(() => {
-    if (view === "month") return format(anchor, "MMMM yyyy");
+    if (view === "month") return format(anchor, "MMMM yyyy", { locale: dateLoc });
     if (view === "week") {
       const ws = startOfWeek(anchor, { weekStartsOn: 1 });
       const we = addDays(ws, 6);
-      return `${format(ws, "MMM d")} – ${format(we, "MMM d, yyyy")}`;
+      return `${format(ws, "MMM d", { locale: dateLoc })} – ${format(we, "MMM d, yyyy", { locale: dateLoc })}`;
     }
-    return format(anchor, "EEEE, MMM d, yyyy");
-  }, [view, anchor]);
+    return format(anchor, "EEEE, MMM d, yyyy", { locale: dateLoc });
+  }, [view, anchor, dateLoc]);
 
   const visibleMonth = view === "month" ? anchor : startOfMonth(anchor);
 
@@ -490,6 +552,9 @@ export function ScheduleCalendar({
         <div>
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{title}</h2>
           <p className="text-sm text-gray-500 dark:text-gray-400">{subtitle}</p>
+          <p className="text-sm font-medium text-brand-700 dark:text-brand-400">
+            {t("scheduleCalendar.serviceAmount", { amount: formatMoney(totalServiceAmount) })}
+          </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -505,7 +570,11 @@ export function ScheduleCalendar({
                     : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
                 }`}
               >
-                {mode[0].toUpperCase() + mode.slice(1)}
+                {mode === "month"
+                  ? t("scheduleCalendar.viewMonth")
+                  : mode === "week"
+                    ? t("scheduleCalendar.viewWeek")
+                    : t("scheduleCalendar.viewDay")}
               </button>
             ))}
           </div>
@@ -515,7 +584,7 @@ export function ScheduleCalendar({
               type="button"
               onClick={goPrev}
               className="inline-flex size-9 items-center justify-center rounded-md text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
-              aria-label="Previous"
+              aria-label={t("scheduleCalendar.ariaPrevious")}
             >
               <AngleLeftIcon className="size-4" />
             </button>
@@ -524,13 +593,13 @@ export function ScheduleCalendar({
               onClick={() => setAnchor(startOfDay(new Date()))}
               className="rounded-md px-2.5 py-1.5 text-xs font-semibold text-brand-600 hover:bg-brand-50 dark:text-brand-400 dark:hover:bg-brand-950/40"
             >
-              Today
+              {t("scheduleCalendar.today")}
             </button>
             <button
               type="button"
               onClick={goNext}
               className="inline-flex size-9 items-center justify-center rounded-md text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
-              aria-label="Next"
+              aria-label={t("scheduleCalendar.ariaNext")}
             >
               <AngleRightIcon className="size-4" />
             </button>
@@ -541,7 +610,7 @@ export function ScheduleCalendar({
       <div className="rounded-xl border-2 border-gray-300 bg-white pt-3 shadow-sm dark:border-gray-600 dark:bg-gray-900/30 sm:pt-4">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-gray-300 pb-3 dark:border-gray-600">
           <p className="text-base font-semibold text-gray-900 dark:text-white">{rangeTitle}</p>
-          <p className="text-xs text-gray-500 dark:text-gray-400">Click any hour to schedule (minimum 1 hour, full-hour times only)</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">{t("scheduleCalendar.clickHourHint")}</p>
         </div>
 
         {view === "month" && (
@@ -576,8 +645,21 @@ export function ScheduleCalendar({
       {modalDraft && computedRange && (
         <div className="fixed inset-0 z-[10060] flex items-center justify-center bg-black/40 p-4">
           <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl border border-gray-200 bg-white p-4 shadow-xl dark:border-gray-800 dark:bg-gray-900">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Schedule visit</h3>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Choose start and end (full hours only), then pick a nurse and check availability by date.</p>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              {t("scheduleCalendar.scheduleVisit")}
+            </h3>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              {t("scheduleCalendar.scheduleVisitHelp")}
+            </p>
+            <p className="mt-2 text-sm font-medium text-brand-700 dark:text-brand-400">
+              {selectedNurse
+                ? t("scheduleCalendar.totalAmountLine", {
+                    hours: String(selectedDurationHours),
+                    rate: formatMoney(selectedNurseRate),
+                    total: formatMoney(selectedTotalAmount),
+                  })
+                : t("scheduleCalendar.selectProviderForTotal")}
+            </p>
 
             <div className="mt-5 space-y-4">
               <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
@@ -593,7 +675,7 @@ export function ScheduleCalendar({
                   onChange={(e) => patchDraft({ startHour: Number(e.target.value) })}
                   className={modalTimeInputClass}
                 >
-                  {HOUR_OPTIONS.map((o) => (
+                  {hourOptions.map((o) => (
                     <option key={o.value} value={o.value}>
                       {o.label}
                     </option>
@@ -611,7 +693,7 @@ export function ScheduleCalendar({
                   onChange={(e) => patchDraft({ endHour: Number(e.target.value) })}
                   className={modalTimeInputClass}
                 >
-                  {HOUR_OPTIONS.map((o) => (
+                  {hourOptions.map((o) => (
                     <option key={o.value} value={o.value}>
                       {o.label}
                     </option>
@@ -634,22 +716,29 @@ export function ScheduleCalendar({
 
             {!rangeValidForSave && (
               <p className="mt-3 text-sm text-amber-700 dark:text-amber-400">
-                Select a range of at least 1 hour that stays within the service request dates ({format(requestStart, "P")} – {format(requestEnd, "P")}).
+                {t("scheduleCalendar.rangeInvalidHint", {
+                  start: format(requestStart, "P", { locale: dateLoc }),
+                  end: format(requestEnd, "P", { locale: dateLoc }),
+                })}
               </p>
             )}
 
             <div className="mt-4 border-t border-gray-100 pt-4 dark:border-gray-800">
-              <p className="text-sm font-semibold text-gray-900 dark:text-white">Nurse list</p>
+              <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                {t("scheduleCalendar.nurseList")}
+              </p>
               <p className="text-xs text-gray-500 dark:text-gray-400">
                 {currentRole === "SUPERVISOR"
-                  ? "Showing nurses filtered by your supervisor account."
-                  : "Showing all nurses."}
+                  ? t("scheduleCalendar.nurseListSupervisor")
+                  : t("scheduleCalendar.nurseListAll")}
               </p>
 
               <div className="mt-3 max-h-60 space-y-2 overflow-y-auto">
-                {nursesLoading && <p className="text-sm text-gray-500">Loading…</p>}
+                {nursesLoading && (
+                  <p className="text-sm text-gray-500">{t("scheduleCalendar.loadingShort")}</p>
+                )}
                 {!nursesLoading && nurses.length === 0 && (
-                  <p className="text-sm text-gray-500 dark:text-gray-400">No nurses found.</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">{t("scheduleCalendar.noNurses")}</p>
                 )}
                 {!nursesLoading &&
                   nurses.map((nurse) => (
@@ -668,11 +757,30 @@ export function ScheduleCalendar({
                             name="schedule-nurse"
                             checked={selectedNurseId === nurse.id}
                             onChange={() => setSelectedNurseId(nurse.id)}
+                            className="sr-only"
                           />
+                          <span
+                            className={`flex h-4 w-4 items-center justify-center rounded-full border ${
+                              selectedNurseId === nurse.id
+                                ? "border-white bg-brand-500"
+                                : "border-gray-300 bg-white dark:border-gray-600 dark:bg-gray-900"
+                            }`}
+                            aria-hidden
+                          >
+                            <span
+                              className={`h-1.5 w-1.5 rounded-full ${
+                                selectedNurseId === nurse.id ? "bg-white" : "bg-transparent"
+                              }`}
+                            />
+                          </span>
                           <span className="text-gray-800 dark:text-gray-200">
                             {providerLabel(nurse)}
                             <span className="ml-1 text-gray-500">
-                              ({nurse.consultationTypeName ?? nurse.username ?? "Nurse"})
+                              (
+                              {nurse.consultationTypeName ??
+                                nurse.username ??
+                                t("scheduleCalendar.nurseFallback")}
+                              )
                             </span>
                           </span>
                         </label>
@@ -682,7 +790,9 @@ export function ScheduleCalendar({
                           disabled={availabilityLoadingId === nurse.id}
                           className="rounded-md border border-gray-200 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
                         >
-                          {availabilityLoadingId === nurse.id ? "Checking..." : "Availability check"}
+                          {availabilityLoadingId === nurse.id
+                            ? t("scheduleCalendar.checking")
+                            : t("scheduleCalendar.availabilityCheck")}
                         </button>
                       </div>
 
@@ -717,7 +827,7 @@ export function ScheduleCalendar({
                 onClick={closeModal}
                 className="rounded-md border border-gray-200 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
               >
-                Cancel
+                {t("scheduleCalendar.cancel")}
               </button>
               <button
                 type="button"
@@ -725,7 +835,7 @@ export function ScheduleCalendar({
                 onClick={() => void saveEvent()}
                 className="rounded-md bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {savingEvent ? "Creating..." : "Create event"}
+                {savingEvent ? t("scheduleCalendar.creating") : t("scheduleCalendar.createEvent")}
               </button>
             </div>
           </div>
@@ -736,22 +846,22 @@ export function ScheduleCalendar({
         <div className="fixed inset-0 z-[10070] flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-4 shadow-xl dark:border-gray-800 dark:bg-gray-900">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Remove schedule slot
+              {t("scheduleCalendar.removeSlotTitle")}
             </h3>
             <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
-              Are you sure you want to remove this slot?
+              {t("scheduleCalendar.removeSlotConfirm")}
             </p>
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              {removeTarget.title} ({format(parseEventRange(removeTarget).start, "PPp")} -{" "}
-              {format(parseEventRange(removeTarget).end, "p")})
+              {removeTarget.title} ({format(parseEventRange(removeTarget).start, "PPp", { locale: dateLoc })}{" "}
+              - {format(parseEventRange(removeTarget).end, "p", { locale: dateLoc })})
             </p>
             <label className="mt-3 block text-xs font-medium text-gray-500 dark:text-gray-400">
-              Reason
+              {t("scheduleCalendar.reason")}
               <input
                 type="text"
                 value={removeReason}
                 onChange={(e) => setRemoveReason(e.target.value)}
-                placeholder="Optional reason"
+                placeholder={t("scheduleCalendar.optionalReasonPlaceholder")}
                 className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
               />
             </label>
@@ -765,7 +875,7 @@ export function ScheduleCalendar({
                 disabled={removingEvent}
                 className="rounded-md border border-gray-200 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
               >
-                Cancel
+                {t("scheduleCalendar.cancel")}
               </button>
               <button
                 type="button"
@@ -773,7 +883,7 @@ export function ScheduleCalendar({
                 disabled={removingEvent}
                 className="rounded-md bg-red-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
               >
-                {removingEvent ? "Removing..." : "Remove"}
+                {removingEvent ? t("scheduleCalendar.removing") : t("scheduleCalendar.remove")}
               </button>
             </div>
           </div>

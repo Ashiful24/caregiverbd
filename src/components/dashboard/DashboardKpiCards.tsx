@@ -1,4 +1,5 @@
 import { Link } from "react-router";
+import { useTranslation } from "react-i18next";
 import { UserIcon, GroupIcon, AlertIcon, TaskIcon, DocsIcon } from "../../icons";
 
 export interface DashboardKpiCardsProps {
@@ -11,7 +12,7 @@ export interface DashboardKpiCardsProps {
 }
 
 const cardBase =
-  "rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800/50 md:p-6 transition-shadow hover:shadow-md";
+  "group rounded-2xl border border-gray-200/80 bg-white/95 p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-lg dark:border-gray-700 dark:bg-gray-800/60 dark:hover:border-brand-700/50 md:p-6";
 
 export function DashboardKpiCards({
   totalPatients,
@@ -21,6 +22,9 @@ export function DashboardKpiCards({
   pendingCertifications,
   loading = false,
 }: DashboardKpiCardsProps) {
+  const { t, i18n } = useTranslation();
+  const locale = i18n.resolvedLanguage === "bn" ? "bn-BD" : "en-US";
+
   if (loading) {
     return (
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
@@ -38,49 +42,49 @@ export function DashboardKpiCards({
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
       <Link to="/patients" className={cardBase}>
-        <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900/30">
-          <UserIcon className="size-6 text-blue-600 dark:text-blue-400" />
+        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-50 text-brand-600 transition-colors group-hover:bg-brand-100 dark:bg-brand-500/15 dark:text-brand-400 dark:group-hover:bg-brand-500/25">
+          <UserIcon className="size-6" />
         </div>
-        <p className="mt-4 text-sm font-medium text-gray-500 dark:text-gray-400">Total patients</p>
-        <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">{totalPatients.toLocaleString()}</p>
+        <p className="mt-4 text-sm font-medium text-gray-500 dark:text-gray-400">{t("dashboard.totalPatients")}</p>
+        <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">{totalPatients.toLocaleString(locale)}</p>
       </Link>
 
       <Link to="/providers" className={cardBase}>
-        <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-900/30">
-          <GroupIcon className="size-6 text-emerald-600 dark:text-emerald-400" />
+        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 transition-colors group-hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400 dark:group-hover:bg-emerald-900/40">
+          <GroupIcon className="size-6" />
         </div>
-        <p className="mt-4 text-sm font-medium text-gray-500 dark:text-gray-400">Total providers</p>
-        <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">{totalProviders.toLocaleString()}</p>
+        <p className="mt-4 text-sm font-medium text-gray-500 dark:text-gray-400">{t("dashboard.totalProviders")}</p>
+        <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">{totalProviders.toLocaleString(locale)}</p>
       </Link>
 
       <Link to="/providers?status=pending" className={cardBase}>
-        <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-900/30">
-          <AlertIcon className="size-6 text-amber-600 dark:text-amber-400" />
+        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-50 text-amber-600 transition-colors group-hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400 dark:group-hover:bg-amber-900/40">
+          <AlertIcon className="size-6" />
         </div>
-        <p className="mt-4 text-sm font-medium text-gray-500 dark:text-gray-400">Pending providers</p>
-        <p className="mt-1 text-2xl font-bold text-amber-700 dark:text-amber-400">{pendingProviders.toLocaleString()}</p>
+        <p className="mt-4 text-sm font-medium text-gray-500 dark:text-gray-400">{t("dashboard.pendingProviders")}</p>
+        <p className="mt-1 text-2xl font-bold text-amber-700 dark:text-amber-400">{pendingProviders.toLocaleString(locale)}</p>
       </Link>
 
       <div className={cardBase}>
-        <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-900/30">
-          <TaskIcon className="size-6 text-violet-600 dark:text-violet-400" />
+        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-violet-50 text-violet-600 transition-colors group-hover:bg-violet-100 dark:bg-violet-900/30 dark:text-violet-400 dark:group-hover:bg-violet-900/40">
+          <TaskIcon className="size-6" />
         </div>
-        <p className="mt-4 text-sm font-medium text-gray-500 dark:text-gray-400">Active requests</p>
+        <p className="mt-4 text-sm font-medium text-gray-500 dark:text-gray-400">{t("dashboard.activeRequests")}</p>
         <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">
-          {activeRequestsCount.toLocaleString()}
+          {activeRequestsCount.toLocaleString(locale)}
         </p>
-        <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">Pending + In progress</p>
+        <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{t("dashboard.activeRequestsHint")}</p>
       </div>
 
       <div className={cardBase}>
-        <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-teal-100 dark:bg-teal-900/30">
-          <DocsIcon className="size-6 text-teal-600 dark:text-teal-400" />
+        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-teal-50 text-teal-600 transition-colors group-hover:bg-teal-100 dark:bg-teal-900/30 dark:text-teal-400 dark:group-hover:bg-teal-900/40">
+          <DocsIcon className="size-6" />
         </div>
-        <p className="mt-4 text-sm font-medium text-gray-500 dark:text-gray-400">Pending certifications</p>
+        <p className="mt-4 text-sm font-medium text-gray-500 dark:text-gray-400">{t("dashboard.pendingCertifications")}</p>
         <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">
-          {pendingCertifications.toLocaleString()}
+          {pendingCertifications.toLocaleString(locale)}
         </p>
-        <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">To review</p>
+        <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{t("dashboard.pendingCertificationsHint")}</p>
       </div>
     </div>
   );

@@ -41,18 +41,18 @@ layer(base);
   --color-white: #ffffff;
   --color-black: #101828;
 
-  --color-brand-25: #f2f7ff;
-  --color-brand-50: #ecf3ff;
-  --color-brand-100: #dde9ff;
-  --color-brand-200: #c2d6ff;
-  --color-brand-300: #9cb9ff;
-  --color-brand-400: #7592ff;
-  --color-brand-500: #465fff;
-  --color-brand-600: #3641f5;
-  --color-brand-700: #2a31d8;
-  --color-brand-800: #252dae;
-  --color-brand-900: #262e89;
-  --color-brand-950: #161950;
+  --color-brand-25: #f7fcf3;
+  --color-brand-50: #edf8e5;
+  --color-brand-100: #daf0cb;
+  --color-brand-200: #b8e29d;
+  --color-brand-300: #9fd981;
+  --color-brand-400: #88ce66;
+  --color-brand-500: #74c055;
+  --color-brand-600: #4c8a36;
+  --color-brand-700: #3c6d2b;
+  --color-brand-800: #2f5522;
+  --color-brand-900: #26451c;
+  --color-brand-950: #13250d;
 
   --color-blue-light-25: #f5fbff;
   --color-blue-light-50: #f0f9ff;
@@ -68,7 +68,7 @@ layer(base);
   --color-blue-light-950: #062c41;
 
   --color-gray-25: #fcfcfd;
-  --color-gray-50: #f9fafb;
+  --color-gray-50: #eaecf0;
   --color-gray-100: #f2f4f7;
   --color-gray-200: #e4e7ec;
   --color-gray-300: #d0d5dd;
@@ -147,7 +147,7 @@ layer(base);
   --shadow-theme-xl: 0px 20px 24px -4px rgba(16, 24, 40, 0.08),
     0px 8px 8px -4px rgba(16, 24, 40, 0.03);
   --shadow-datepicker: -5px 0 0 #262d3c, 5px 0 0 #262d3c;
-  --shadow-focus-ring: 0px 0px 0px 4px rgba(70, 95, 255, 0.12);
+  --shadow-focus-ring: 0px 0px 0px 4px rgba(116, 192, 85, 0.2);
   --shadow-slider-navigation: 0px 1px 2px 0px rgba(16, 24, 40, 0.1),
     0px 1px 3px 0px rgba(16, 24, 40, 0.1);
   --shadow-tooltip: 0px 4px 6px -2px rgba(16, 24, 40, 0.05),
@@ -186,7 +186,33 @@ layer(base);
     cursor: pointer;
   }
   body {
-    @apply relative font-normal font-outfit z-1 bg-gray-50;
+    @apply relative z-1 bg-gray-50 font-normal font-outfit;
+  }
+
+  select:focus-visible,
+  input[type="checkbox"]:focus-visible {
+    outline: 2px solid color-mix(in oklab, var(--color-brand-500) 35%, transparent);
+    outline-offset: 1px;
+  }
+
+  input[type="checkbox"] {
+    accent-color: var(--color-brand-500);
+  }
+
+  input[type="radio"] {
+    accent-color: var(--color-brand-500);
+  }
+
+  /* Native select menu option colors (browser support varies by OS/engine). */
+  select option:checked {
+    background: linear-gradient(var(--color-brand-500), var(--color-brand-500));
+    color: #ffffff;
+  }
+
+  select option:hover,
+  select option:focus {
+    background: linear-gradient(var(--color-brand-100), var(--color-brand-100));
+    color: var(--color-gray-900);
   }
 }
 
@@ -195,7 +221,7 @@ layer(base);
 }
 
 @utility menu-item-active {
-  @apply bg-brand-50 text-brand-500 dark:bg-brand-500/[0.12] dark:text-brand-400;
+  @apply bg-brand-500 text-white dark:bg-brand-500 dark:text-white;
 }
 
 @utility menu-item-inactive {
@@ -207,7 +233,7 @@ layer(base);
 }
 
 @utility menu-item-icon-active {
-  @apply text-brand-500 dark:text-brand-400;
+  @apply text-white dark:text-white;
 }
 
 @utility menu-item-icon-size {
@@ -225,7 +251,7 @@ layer(base);
 }
 
 @utility menu-item-arrow-active {
-  @apply rotate-180 text-brand-500 dark:text-brand-400;
+  @apply rotate-180 text-white dark:text-white;
 }
 
 @utility menu-item-arrow-inactive {
@@ -237,7 +263,7 @@ layer(base);
 }
 
 @utility menu-dropdown-item-active {
-  @apply bg-brand-50 text-brand-500 dark:bg-brand-500/[0.12] dark:text-brand-400;
+  @apply bg-brand-500 text-white dark:bg-brand-500 dark:text-white;
 }
 
 @utility menu-dropdown-item-inactive {
@@ -249,7 +275,7 @@ layer(base);
 }
 
 @utility menu-dropdown-badge-active {
-  @apply bg-brand-100 dark:bg-brand-500/20;
+  @apply bg-white/20 text-white dark:bg-white/20 dark:text-white;
 }
 
 @utility menu-dropdown-badge-inactive {
@@ -523,13 +549,13 @@ span.flatpickr-weekday,
 .flatpickr-day.selected.nextMonthDay,
 .flatpickr-day.startRange.nextMonthDay,
 .flatpickr-day.endRange.nextMonthDay {
-  background: #465fff;
+  background: #74c055;
   @apply !border-brand-500 !bg-brand-500 hover:!border-brand-500 hover:!bg-brand-500;
 }
 .flatpickr-day.selected.startRange + .endRange:not(:nth-child(7n + 1)),
 .flatpickr-day.startRange.startRange + .endRange:not(:nth-child(7n + 1)),
 .flatpickr-day.endRange.startRange + .endRange:not(:nth-child(7n + 1)) {
-  box-shadow: -10px 0 0 #465fff;
+  box-shadow: -10px 0 0 #74c055;
 }
 
 .flatpickr-months .flatpickr-prev-month svg,
@@ -790,3 +816,10 @@ span.flatpickr-weekday,
 .simplebar-scrollbar.simplebar-visible:before {
   @apply opacity-100;
 }
+
+/* Loading bar keyframe — used by the Master Financial Report top-progress bar */
+@keyframes loadingBar {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(400%);  }
+}
+

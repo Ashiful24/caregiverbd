@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useLocation } from "react-router";
 
 import {
@@ -21,84 +22,98 @@ import { useAuth } from "../context/AuthContext";
 import SidebarWidget from "./SidebarWidget";
 
 type NavItem = {
-  name: string;
+  nameKey: string;
   icon: React.ReactNode;
   path?: string;
-  subItems?: { name: string; path: string; pro?: boolean; new?: boolean }[];
+  subItems?: { nameKey: string; path: string; pro?: boolean; new?: boolean }[];
   allowedRoles?: string[];
 };
 
 type NavSection = {
-  title?: string;
+  titleKey?: string;
   items: NavItem[];
 };
 
 const navSections: NavSection[] = [
   {
     items: [
-      { icon: <GridIcon />, name: "Dashboard", path: "/", allowedRoles: ["ADMIN", "SUPERVISOR"] },
+      { icon: <GridIcon />, nameKey: "navigation.dashboard", path: "/", allowedRoles: ["ADMIN", "SUPERVISOR"] },
     ],
   },
   {
-    title: "App Users",
-    items: [{ icon: <UserCircleIcon />, name: "All Users", path: "/users", allowedRoles: ["ADMIN"] }],
+    titleKey: "navigation.appUsers",
+    items: [{ icon: <UserCircleIcon />, nameKey: "navigation.allUsers", path: "/users", allowedRoles: ["ADMIN"] }],
   },
   {
-    title: "Profile",
+    titleKey: "navigation.profile",
     items: [
       {
         icon: <GroupIcon />,
-        name: "Providers",
+        nameKey: "navigation.providers",
         path: "/providers",
         allowedRoles: ["ADMIN", "SUPERVISOR"],
       },
-      { icon: <UserIcon />, name: "Patients", path: "/patients", allowedRoles: ["ADMIN"] },
+      { icon: <UserIcon />, nameKey: "navigation.patients", path: "/patients", allowedRoles: ["ADMIN"] },
       {
         icon: <CalenderIcon />,
-        name: "Service request",
+        nameKey: "navigation.serviceRequest",
         path: "/schedule",
         allowedRoles: ["ADMIN", "SUPERVISOR"],
       },
-      { icon: <TaskIcon />, name: "Supervisor", path: "/supervisors", allowedRoles: ["ADMIN"] },
+      { icon: <TaskIcon />, nameKey: "navigation.supervisor", path: "/supervisors", allowedRoles: ["ADMIN"] },
     ],
   },
   {
-    title: "Configuration",
+    titleKey: "navigation.configuration",
     items: [
       {
         icon: <FolderIcon />,
-        name: "Consultation Types",
+        nameKey: "navigation.consultationTypes",
         path: "/consultation-types",
         allowedRoles: ["ADMIN"],
       },
       {
+        icon: <ListIcon />,
+        nameKey: "navigation.consultationTypeLevels",
+        path: "/consultation-type-levels",
+        allowedRoles: ["ADMIN"],
+      },
+      {
         icon: <PageIcon />,
-        name: "Document Types",
+        nameKey: "navigation.documentTypes",
         path: "/verification-document-types",
         allowedRoles: ["ADMIN"],
       },
-      { icon: <BoltIcon />, name: "System Config", path: "/system-config", allowedRoles: ["ADMIN"] },
+      { icon: <BoltIcon />, nameKey: "navigation.systemConfig", path: "/system-config", allowedRoles: ["ADMIN"] },
     ],
   },
   {
-    title: "Operations",
+    titleKey: "navigation.operations",
     items: [
-      { icon: <ListIcon />, name: "Appointments", path: "/appointments", allowedRoles: ["ADMIN"] },
-      { icon: <PageIcon />, name: "Upgrade Requests", path: "/upgrade-requests", allowedRoles: ["ADMIN"] },
+      { icon: <ListIcon />, nameKey: "navigation.appointments", path: "/appointments", allowedRoles: ["ADMIN"] },
+      { icon: <PageIcon />, nameKey: "navigation.upgradeRequests", path: "/upgrade-requests", allowedRoles: ["ADMIN"] },
+      { icon: <TaskIcon />, nameKey: "navigation.withdrawalRequests", path: "/withdrawal-requests", allowedRoles: ["ADMIN"] },
     ],
   },
   {
-    title: "Reports",
+    titleKey: "navigation.reports",
     items: [
-      { icon: <GridIcon />, name: "Financial Reports", path: "/financial-reports", allowedRoles: ["ADMIN"] },
+      {
+        icon: <ListIcon />, nameKey: "Financial Reports",
+        subItems: [
+          { icon: <GridIcon />, nameKey: "Master Report", path: "/financial-reports",allowedRoles: ["ADMIN"] },
+          { icon: <GridIcon />, nameKey: "GL Reconciliation", path: "/gl-reconciliation",allowedRoles: ["ADMIN"] },
+        ],
+      },
     ],
   },
   {
-    items: [{ icon: <MailIcon />, name: "Notifications", path: "/notifications", allowedRoles: ["ADMIN"] }],
+    items: [{ icon: <MailIcon />, nameKey: "navigation.notifications", path: "/notifications", allowedRoles: ["ADMIN"] }],
   },
 ];
 
 const AppSidebar: React.FC = () => {
+  const { t } = useTranslation();
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
   const { user } = useAuth();
   const location = useLocation();
@@ -170,7 +185,7 @@ const AppSidebar: React.FC = () => {
   const renderMenuItems = (items: NavItem[], menuType: "main" | "reference") => (
     <ul className="flex flex-col gap-4">
       {items.map((nav, index) => (
-        <li key={nav.name}>
+        <li key={nav.nameKey}>
           {nav.subItems ? (
             <button
               onClick={() => handleSubmenuToggle(index, menuType)}
@@ -194,14 +209,14 @@ const AppSidebar: React.FC = () => {
                 {nav.icon}
               </span>
               {(isExpanded || isHovered || isMobileOpen) && (
-                <span className="menu-item-text">{nav.name}</span>
+                <span className="menu-item-text">{t(nav.nameKey)}</span>
               )}
               {(isExpanded || isHovered || isMobileOpen) && (
                 <ChevronDownIcon
                   className={`ml-auto w-5 h-5 transition-transform duration-200 ${
                     openSubmenu?.type === menuType &&
                     openSubmenu?.index === index
-                      ? "rotate-180 text-brand-500"
+                      ? "rotate-180 text-white"
                       : ""
                   }`}
                 />
@@ -225,7 +240,7 @@ const AppSidebar: React.FC = () => {
                   {nav.icon}
                 </span>
                 {(isExpanded || isHovered || isMobileOpen) && (
-                  <span className="menu-item-text">{nav.name}</span>
+                  <span className="menu-item-text">{t(nav.nameKey)}</span>
                 )}
               </Link>
             )
@@ -245,7 +260,7 @@ const AppSidebar: React.FC = () => {
             >
               <ul className="mt-2 space-y-1 ml-9">
                 {nav.subItems.map((subItem) => (
-                  <li key={subItem.name}>
+                  <li key={subItem.nameKey}>
                     <Link
                       to={subItem.path}
                       className={`menu-dropdown-item ${
@@ -254,7 +269,7 @@ const AppSidebar: React.FC = () => {
                           : "menu-dropdown-item-inactive"
                       }`}
                     >
-                      {subItem.name}
+                      {t(subItem.nameKey)}
                       <span className="flex items-center gap-1 ml-auto">
                         {subItem.new && (
                           <span
@@ -360,17 +375,17 @@ const AppSidebar: React.FC = () => {
                 }`}
               >
                 {isExpanded || isHovered || isMobileOpen ? (
-                  "Menu"
+                  t("common.menu")
                 ) : (
                   <HorizontaLDots className="size-6" />
                 )}
               </h2>
               <div className="flex flex-col gap-6">
                 {sectionsForRole.map((section, sectionIndex) => (
-                  <div key={section.title ?? sectionIndex}>
-                    {section.title && (isExpanded || isHovered || isMobileOpen) && (
+                  <div key={section.titleKey ?? sectionIndex}>
+                    {section.titleKey && (isExpanded || isHovered || isMobileOpen) && (
                       <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                        {section.title}
+                        {t(section.titleKey)}
                       </p>
                     )}
                     {renderMenuItems(section.items, "main")}

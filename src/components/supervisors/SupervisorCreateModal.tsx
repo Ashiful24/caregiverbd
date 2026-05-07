@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Modal } from "../ui/modal";
 import Label from "../form/Label";
 import type { SupervisorFullDetails } from "../../data/supervisorSeed";
@@ -129,6 +130,7 @@ export function SupervisorCreateModal({
   onCreated,
   onUpdated,
 }: Props) {
+  const { t } = useTranslation();
   const [form, setForm] = useState<FormState>(emptyForm);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -166,7 +168,7 @@ export function SupervisorCreateModal({
           if (cancelled) return;
           const u = normalizeUserByIdResponse(res.data);
           if (!u) {
-            setPrefillNotice("Could not parse user response; showing list data.");
+            setPrefillNotice(t("supervisor.prefillParseFailed"));
             return;
           }
           setForm({
@@ -180,7 +182,7 @@ export function SupervisorCreateModal({
         })
         .catch(() => {
           if (cancelled) return;
-          setPrefillNotice("Could not load GET /users/:id; showing list data.");
+          setPrefillNotice(t("supervisor.prefillLoadFailed"));
         })
         .finally(() => {
           if (!cancelled) setPrefillLoading(false);
@@ -190,7 +192,7 @@ export function SupervisorCreateModal({
         cancelled = true;
       };
     }
-  }, [isOpen, mode, editSupervisor?.id, editSupervisor?.userId]);
+  }, [isOpen, mode, editSupervisor?.id, editSupervisor?.userId, t]);
 
   const patch = useCallback((partial: Partial<FormState>) => {
     setForm((prev) => ({ ...prev, ...partial }));
@@ -213,7 +215,7 @@ export function SupervisorCreateModal({
     const pwd2 = form.confirmPassword;
     const wantsPassword = Boolean(pwd || pwd2);
     if (wantsPassword && pwd !== pwd2) {
-      setError("Password and confirm password do not match.");
+      setError(t("supervisor.passwordMismatch"));
       return;
     }
     const firstName = form.firstName.trim();
@@ -221,15 +223,15 @@ export function SupervisorCreateModal({
     const email = form.email.trim();
     const username = form.username.trim();
     if (!firstName || !lastName || !email) {
-      setError("First name, last name, and email are required.");
+      setError(t("supervisor.requiredFields"));
       return;
     }
     if (!editing && !username) {
-      setError("Username is required for new supervisors.");
+      setError(t("supervisor.usernameRequiredNew"));
       return;
     }
     if (!editing && !pwd) {
-      setError("Password is required for new supervisors.");
+      setError(t("supervisor.passwordRequiredNew"));
       return;
     }
 
@@ -280,7 +282,7 @@ export function SupervisorCreateModal({
       const message =
         err && typeof err === "object" && "message" in err
           ? String((err as { message: string }).message)
-          : "Request failed.";
+          : t("supervisor.requestFailed");
       setError(message);
     } finally {
       setSubmitting(false);
@@ -299,7 +301,7 @@ export function SupervisorCreateModal({
       <div className="flex max-h-[min(90vh,720px)] flex-col">
         <div className="shrink-0 border-b border-gray-200 px-6 pb-4 pt-6 dark:border-gray-800">
           <h3 className="pr-10 text-xl font-semibold text-gray-900 dark:text-white/90">
-            {isEdit ? "Edit supervisor" : "Create supervisor"}
+            {isEdit ? t("supervisor.editModalTitle") : t("supervisor.createModalTitle")}
           </h3>
           {/* <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
             {isEdit
@@ -312,7 +314,7 @@ export function SupervisorCreateModal({
           <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-6 py-4">
             {prefillLoading ? (
               <p className="mb-4 rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-sm text-brand-900 dark:border-brand-800 dark:bg-brand-950/40 dark:text-brand-200">
-                Loading user from GET /users/:id…
+                {t("supervisor.prefillLoading")}
               </p>
             ) : null}
             {prefillNotice ? (
@@ -322,42 +324,42 @@ export function SupervisorCreateModal({
             ) : null}
             <div className="grid gap-4">
               <div>
-                <Label htmlFor="sup-firstName">First name</Label>
+                <Label htmlFor="sup-firstName">{t("supervisor.firstName")}</Label>
                 <input
                   id="sup-firstName"
                   type="text"
                   value={form.firstName}
                   onChange={(e) => patch({ firstName: e.target.value })}
                   className={inputClass}
-                  placeholder="John"
+                  placeholder={t("supervisor.firstNamePlaceholder")}
                   autoComplete="given-name"
                   required
                   disabled={isEdit && prefillLoading}
                 />
               </div>
               <div>
-                <Label htmlFor="sup-lastName">Last name</Label>
+                <Label htmlFor="sup-lastName">{t("supervisor.lastName")}</Label>
                 <input
                   id="sup-lastName"
                   type="text"
                   value={form.lastName}
                   onChange={(e) => patch({ lastName: e.target.value })}
                   className={inputClass}
-                  placeholder="Doe"
+                  placeholder={t("supervisor.lastNamePlaceholder")}
                   autoComplete="family-name"
                   required
                   disabled={isEdit && prefillLoading}
                 />
               </div>
               <div>
-                <Label htmlFor="sup-email">Email</Label>
+                <Label htmlFor="sup-email">{t("supervisor.email")}</Label>
                 <input
                   id="sup-email"
                   type="email"
                   value={form.email}
                   onChange={(e) => patch({ email: e.target.value })}
                   className={inputClass}
-                  placeholder="user@example.com"
+                  placeholder={t("supervisor.emailPlaceholder")}
                   autoComplete="email"
                   required
                   disabled={isEdit && prefillLoading}
@@ -365,40 +367,40 @@ export function SupervisorCreateModal({
               </div>
               {!isEdit ? (
                 <div>
-                  <Label htmlFor="sup-username">Username</Label>
+                  <Label htmlFor="sup-username">{t("supervisor.username")}</Label>
                   <input
                     id="sup-username"
                     type="text"
                     value={form.username}
                     onChange={(e) => patch({ username: e.target.value })}
                     className={inputClass}
-                    placeholder="john_doe"
+                    placeholder={t("supervisor.usernamePlaceholder")}
                     autoComplete="username"
                     required
                   />
                 </div>
               ) : null}
               <div>
-                <Label htmlFor="sup-password">Password</Label>
+                <Label htmlFor="sup-password">{t("supervisor.password")}</Label>
                 <input
                   id="sup-password"
                   type="password"
                   value={form.password}
                   onChange={(e) => patch({ password: e.target.value })}
                   className={inputClass}
-                  placeholder={isEdit ? "Leave blank to keep current" : "••••••••"}
+                  placeholder={isEdit ? t("supervisor.keepCurrentPassword") : "••••••••"}
                   autoComplete={isEdit ? "new-password" : "new-password"}
                 />
               </div>
               <div>
-                <Label htmlFor="sup-confirm">Confirm password</Label>
+                <Label htmlFor="sup-confirm">{t("supervisor.confirmPassword")}</Label>
                 <input
                   id="sup-confirm"
                   type="password"
                   value={form.confirmPassword}
                   onChange={(e) => patch({ confirmPassword: e.target.value })}
                   className={inputClass}
-                  placeholder={isEdit ? "Leave blank to keep current" : "••••••••"}
+                  placeholder={isEdit ? t("supervisor.keepCurrentPassword") : "••••••••"}
                   autoComplete="new-password"
                 />
               </div>
@@ -419,14 +421,18 @@ export function SupervisorCreateModal({
                 disabled={submitting}
                 className="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
               >
-                Cancel
+                {t("common.actions.cancel")}
               </button>
               <button
                 type="submit"
                 disabled={submitting || (isEdit && prefillLoading)}
                 className="rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
               >
-                {submitting ? "Saving…" : isEdit ? "Save changes" : "Create supervisor"}
+                {submitting
+                  ? t("supervisor.saving")
+                  : isEdit
+                  ? t("common.actions.saveChanges")
+                  : t("supervisor.createSupervisor")}
               </button>
             </div>
           </div>

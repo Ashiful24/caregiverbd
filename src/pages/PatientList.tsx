@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import PageMeta from "../components/common/PageMeta";
+import ThemedSelect from "../components/form/ThemedSelect";
 import { ActionsMenu } from "../components/common/ActionsMenu";
 import { DetailModal } from "../components/common/DetailModal";
 import { PatientFullDetailsView } from "../components/common/ProfileDetailBlocks";
@@ -14,12 +16,13 @@ import {
 import Badge from "../components/ui/badge/Badge";
 import { DropdownItem } from "../components/ui/dropdown/DropdownItem";
 import { patientsApi, type PatientFullDetailsDto, type PatientListItem } from "../services/api";
-import { formatDate } from "../utils/format";
+import { formatAccountActiveLabel, formatDate } from "../utils/format";
 
 const LIMIT_OPTIONS = [10, 20, 50];
 const SEARCH_DEBOUNCE_MS = 300;
 
 export default function PatientList() {
+  const { t } = useTranslation();
   const [patients, setPatients] = useState<PatientListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -75,7 +78,7 @@ export default function PatientList() {
       const message =
         err && typeof err === "object" && "message" in err
           ? String((err as { message: string }).message)
-          : "Failed to load patients.";
+          : t("patients.failedLoad");
       if (!silent) setError(message);
       if (!silent) {
         setPatients([]);
@@ -133,18 +136,18 @@ export default function PatientList() {
   return (
     <>
       <PageMeta
-        title="Patient List | Hope - BMQAS"
-        description="Newly applied patient profile list for Hope Pro by BMQAS"
+        title={t("patients.metaTitle")}
+        description={t("patients.metaDescription")}
       />
-      <PageBreadcrumb pageTitle="Patient List" />
+      <PageBreadcrumb pageTitle={t("patients.pageTitle")} />
       <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
         <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-6">
           <div>
             <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
-              Newly Applied Patients
+              {t("patients.heading")}
             </h3>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              All registered patients with server-side pagination
+              {t("patients.subheading")}
             </p>
           </div>
           <div className="flex shrink-0 sm:ml-auto">
@@ -156,7 +159,7 @@ export default function PatientList() {
               </span>
               <input
                 type="search"
-                placeholder="Search patients..."
+                placeholder={t("patients.searchPlaceholder")}
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
                 className="w-full min-w-[200px] rounded-lg border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:placeholder:text-gray-500 sm:w-56"
@@ -178,7 +181,7 @@ export default function PatientList() {
             </div>
           ) : patients.length === 0 ? (
             <div className="py-16 text-center text-gray-500 dark:text-gray-400">
-              No patients found.
+              {t("patients.noPatientsFound")}
             </div>
           ) : (
             <>
@@ -198,7 +201,7 @@ export default function PatientList() {
                           size="sm"
                           color={patient.isActive !== false ? "success" : "error"}
                         >
-                          {patient.isActive !== false ? "Active" : "Inactive"}
+                          {formatAccountActiveLabel(patient.isActive !== false)}
                         </Badge>
                         <ActionsMenu
                           isOpen={openActionsId === patient.id}
@@ -214,7 +217,7 @@ export default function PatientList() {
                             }}
                             className="dark:hover:bg-gray-700 dark:text-gray-200"
                           >
-                            View full details
+                            {t("patients.viewFullDetails")}
                           </DropdownItem>
                         </ActionsMenu>
                       </div>
@@ -225,19 +228,19 @@ export default function PatientList() {
                         <dd className="text-gray-800 dark:text-gray-200">{(page - 1) * limit + index + 1}</dd>
                       </div>
                       <div className="flex justify-between gap-2">
-                        <dt className="text-gray-500 dark:text-gray-400">Email</dt>
+                        <dt className="text-gray-500 dark:text-gray-400">{t("patients.email")}</dt>
                         <dd className="truncate text-right text-gray-800 dark:text-gray-200">{patient.email ?? "—"}</dd>
                       </div>
                       <div className="flex justify-between gap-2">
-                        <dt className="text-gray-500 dark:text-gray-400">Phone</dt>
+                        <dt className="text-gray-500 dark:text-gray-400">{t("patients.phone")}</dt>
                         <dd className="truncate text-right text-gray-800 dark:text-gray-200">{patient.username ?? "—"}</dd>
                       </div>
                       <div className="flex justify-between gap-2">
-                        <dt className="text-gray-500 dark:text-gray-400">NID</dt>
+                        <dt className="text-gray-500 dark:text-gray-400">{t("patients.nid")}</dt>
                         <dd className="text-gray-800 dark:text-gray-200">{patient.nidNumber ?? "—"}</dd>
                       </div>
                       <div className="flex justify-between gap-2">
-                        <dt className="text-gray-500 dark:text-gray-400">Registered</dt>
+                        <dt className="text-gray-500 dark:text-gray-400">{t("patients.registered")}</dt>
                         <dd className="text-gray-800 dark:text-gray-200">{formatDate(patient.createdAt)}</dd>
                       </div>
                     </dl>
@@ -260,43 +263,43 @@ export default function PatientList() {
                         isHeader
                         className="w-[18%] py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
                       >
-                        Name
+                        {t("patients.name")}
                       </TableCell>
                       <TableCell
                         isHeader
                         className="w-[18%] py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
                       >
-                        Email
+                        {t("patients.email")}
                       </TableCell>
                       <TableCell
                         isHeader
                         className="w-[14%] py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
                       >
-                        Phone
+                        {t("patients.phone")}
                       </TableCell>
                       <TableCell
                         isHeader
                         className="w-[12%] py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
                       >
-                        NID
+                        {t("patients.nid")}
                       </TableCell>
                       <TableCell
                         isHeader
                         className="w-[16%] py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
                       >
-                        Registered
+                        {t("patients.registered")}
                       </TableCell>
                       <TableCell
                         isHeader
                         className="w-[10%] py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
                       >
-                        Status
+                        {t("patients.status")}
                       </TableCell>
                       <TableCell
                         isHeader
                         className="w-[8%] py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
                       >
-                        Actions
+                        {t("patients.actions")}
                       </TableCell>
                     </TableRow>
                   </TableHeader>
@@ -326,7 +329,7 @@ export default function PatientList() {
                             size="sm"
                             color={patient.isActive !== false ? "success" : "error"}
                           >
-                            {patient.isActive !== false ? "Active" : "Inactive"}
+                            {formatAccountActiveLabel(patient.isActive !== false)}
                           </Badge>
                         </TableCell>
                         <TableCell className="py-3 text-right">
@@ -344,7 +347,7 @@ export default function PatientList() {
                               }}
                               className="dark:hover:bg-gray-700 dark:text-gray-200"
                             >
-                              View full details
+                              {t("patients.viewFullDetails")}
                             </DropdownItem>
                           </ActionsMenu>
                         </TableCell>
@@ -361,8 +364,8 @@ export default function PatientList() {
           <div className="flex flex-col gap-4 border-t border-gray-200 px-4 py-4 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <div className="flex flex-wrap items-center gap-4">
               <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                Rows per page
-                <select
+                {t("pagination.rowsPerPage")}
+                <ThemedSelect
                   className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
                   value={limit}
                   onChange={(e) => {
@@ -375,12 +378,15 @@ export default function PatientList() {
                       {n}
                     </option>
                   ))}
-                </select>
+                </ThemedSelect>
               </label>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                Showing <span className="font-medium">{from}</span> to{" "}
-                <span className="font-medium">{to}</span> of{" "}
-                <span className="font-medium">{total}</span> patients
+                {t("pagination.showingRangeOf", {
+                  from,
+                  to,
+                  total,
+                  entity: t("patients.patientsEntity"),
+                })}
               </p>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-end">
@@ -390,10 +396,10 @@ export default function PatientList() {
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page <= 1}
               >
-                Previous
+                {t("common.actions.previous")}
               </button>
               <span className="px-3 py-2 text-sm text-gray-600 dark:text-gray-400">
-                Page {page} of {totalPages}
+                {t("pagination.pageOf", { page, totalPages })}
               </span>
               <button
                 type="button"
@@ -401,7 +407,7 @@ export default function PatientList() {
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page >= totalPages}
               >
-                Next
+                {t("common.actions.next")}
               </button>
             </div>
           </div>
@@ -409,11 +415,11 @@ export default function PatientList() {
       </div>
 
       <DetailModal
-        title="Patient details"
+        title={t("patients.detailsTitle")}
         isOpen={detailModalOpen}
         onClose={closeDetailModal}
         loading={detailLoading}
-        errorMessage={!detailLoading && !detailData ? "Could not load patient details." : null}
+        errorMessage={!detailLoading && !detailData ? t("patients.detailsLoadError") : null}
       >
         {detailData && (
           <PatientFullDetailsView
