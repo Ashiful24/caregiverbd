@@ -20,6 +20,7 @@ import UpgradeRequests from "./pages/UpgradeRequests";
 import UpgradeRequestDetail from "./pages/UpgradeRequestDetail";
 import Notifications from "./pages/Notifications";
 import FinancialReports from "./pages/FinancialReports";
+import WithdrawalRequests from "./pages/WithdrawalRequests";
 import NurseScheduleList from "./pages/NurseScheduleList";
 import NurseScheduleCalendarPage from "./pages/NurseScheduleCalendarPage";
 import SupervisorList from "./pages/SupervisorList";
@@ -141,6 +142,14 @@ export default function App() {
             element={
               <ProtectedRoute allowedRoles={["ADMIN"]}>
                 <FinancialReports />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/withdrawal-requests"
+            element={
+              <ProtectedRoute allowedRoles={["ADMIN"]}>
+                <WithdrawalRequests />
               </ProtectedRoute>
             }
           />
