@@ -97,7 +97,13 @@ const navSections: NavSection[] = [
   {
     titleKey: "navigation.reports",
     items: [
-      { icon: <GridIcon />, nameKey: "navigation.financialReports", path: "/financial-reports", allowedRoles: ["ADMIN"] },
+      {
+        icon: <ListIcon />, nameKey: "Financial Reports",
+        subItems: [
+          { icon: <GridIcon />, nameKey: "Master Report", path: "/financial-reports",allowedRoles: ["ADMIN"] },
+          { icon: <GridIcon />, nameKey: "GL Reconciliation", path: "/gl-reconciliation",allowedRoles: ["ADMIN"] },
+        ],
+      },
     ],
   },
   {
