@@ -3,6 +3,7 @@ import { format, parseISO } from "date-fns";
 import { useTranslation } from "react-i18next";
 import { Modal } from "../ui/modal";
 import type { SupervisorFullDetails } from "../../data/supervisorSeed";
+import { formatStatusLabel } from "../../utils/format";
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -98,7 +99,7 @@ export function SupervisorViewModal({
           </Section>
 
           <Section title={t("supervisor.accountInfo")}>
-            <Item label={t("dashboard.status")} value={supervisor.status} />
+            <Item label={t("dashboard.status")} value={formatStatusLabel(supervisor.status)} />
             <Item label={t("supervisor.password")} value={t("supervisor.hiddenPassword")} />
           </Section>
 

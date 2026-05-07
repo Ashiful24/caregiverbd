@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import PageMeta from "../components/common/PageMeta";
+import ThemedSelect from "../components/form/ThemedSelect";
 import {
   Table,
   TableBody,
@@ -18,7 +19,7 @@ import {
   type LongTermOpportunityListItem,
   type LongTermOpportunityStatusFilter,
 } from "../services/api";
-import { formatDate } from "../utils/format";
+import { formatDate, formatStatusLabel } from "../utils/format";
 import { Modal } from "../components/ui/modal";
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50];
@@ -339,7 +340,7 @@ export default function NurseScheduleList() {
                     : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:border-gray-600 dark:hover:text-gray-300"
                 }`}
               >
-                {tab.value === "all" ? t("common.all") : tab.value}
+                {tab.value === "all" ? t("common.all") : formatStatusLabel(tab.value)}
               </button>
             ))}
           </nav>
@@ -372,7 +373,7 @@ export default function NurseScheduleList() {
                       <div>
                         <p className="font-semibold text-gray-800 dark:text-white/90">{rowTitle(request)}</p>
                         <p className="mt-0.5 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                          {request.status?.trim() || "—"}
+                          {request.status?.trim() ? formatStatusLabel(request.status) : "—"}
                         </p>
                         {request.location ? (
                           <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">{request.location}</p>
@@ -496,7 +497,7 @@ export default function NurseScheduleList() {
                           {request.location?.trim() || "—"}
                         </TableCell>
                         <TableCell className="py-3 text-theme-sm leading-snug text-gray-600 dark:text-gray-400">
-                          {request.status?.trim() || "—"}
+                          {request.status?.trim() ? formatStatusLabel(request.status) : "—"}
                         </TableCell>
                         <TableCell className="py-3 text-right text-theme-sm whitespace-nowrap text-gray-600 dark:text-gray-400">
                           {formatAmount(request)}
@@ -555,7 +556,7 @@ export default function NurseScheduleList() {
             <div className="flex flex-wrap items-center gap-4">
               <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                 {t("pagination.rowsPerPage")}
-                <select
+                <ThemedSelect
                   className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
                   value={limit}
                   onChange={(e) => {
@@ -568,7 +569,7 @@ export default function NurseScheduleList() {
                       {n}
                     </option>
                   ))}
-                </select>
+                </ThemedSelect>
               </label>
               <p className="text-sm text-gray-600 dark:text-gray-400">
                 {t("pagination.showingRangeOf", {
@@ -686,7 +687,7 @@ export default function NurseScheduleList() {
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <label className="text-sm text-gray-700 dark:text-gray-300">
                 {t("dashboard.status")}
-                <select
+                <ThemedSelect
                   value={updateStatus}
                   onChange={(e) => setUpdateStatus(e.target.value)}
                   className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
@@ -704,10 +705,10 @@ export default function NurseScheduleList() {
                     "EXPIRED",
                   ].map((status) => (
                     <option key={status} value={status}>
-                      {status}
+                      {formatStatusLabel(status)}
                     </option>
                   ))}
-                </select>
+                </ThemedSelect>
               </label>
               <label className="text-sm text-gray-700 dark:text-gray-300">
                 {t("schedule.amount")}

@@ -757,7 +757,22 @@ export function ScheduleCalendar({
                             name="schedule-nurse"
                             checked={selectedNurseId === nurse.id}
                             onChange={() => setSelectedNurseId(nurse.id)}
+                            className="sr-only"
                           />
+                          <span
+                            className={`flex h-4 w-4 items-center justify-center rounded-full border ${
+                              selectedNurseId === nurse.id
+                                ? "border-white bg-brand-500"
+                                : "border-gray-300 bg-white dark:border-gray-600 dark:bg-gray-900"
+                            }`}
+                            aria-hidden
+                          >
+                            <span
+                              className={`h-1.5 w-1.5 rounded-full ${
+                                selectedNurseId === nurse.id ? "bg-white" : "bg-transparent"
+                              }`}
+                            />
+                          </span>
                           <span className="text-gray-800 dark:text-gray-200">
                             {providerLabel(nurse)}
                             <span className="ml-1 text-gray-500">

@@ -14,7 +14,9 @@ import {
 } from "../components/ui/table";
 import Badge from "../components/ui/badge/Badge";
 import { ConfirmModal } from "../components/ui/confirm-modal";
+import { Dropdown } from "../components/ui/dropdown/Dropdown";
 import { DropdownItem } from "../components/ui/dropdown/DropdownItem";
+import ThemedSelect from "../components/form/ThemedSelect";
 import { Modal } from "../components/ui/modal";
 import {
   usersListApi,
@@ -79,6 +81,7 @@ export default function UserList() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusTab, setStatusTab] = useState<UserListStatusFilter>("all");
   const [roleFilter, setRoleFilter] = useState<string>("all");
+  const [roleFilterOpen, setRoleFilterOpen] = useState(false);
   const [openActionsId, setOpenActionsId] = useState<number | null>(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [detailUserId, setDetailUserId] = useState<number | null>(null);
@@ -91,6 +94,7 @@ export default function UserList() {
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [passwordChangeLoading, setPasswordChangeLoading] = useState(false);
   const actionsButtonRef = useRef<HTMLButtonElement | null>(null);
+  const roleFilterButtonRef = useRef<HTMLButtonElement | null>(null);
 
   // Debounce search: update searchQuery (and reset to page 1) after user stops typing
   useEffect(() => {
@@ -337,27 +341,61 @@ export default function UserList() {
             <label htmlFor="user-type-filter" className="text-sm font-medium text-gray-700 dark:text-gray-300">
               {t("users.typeLabel")}:
             </label>
-            <select
-              id="user-type-filter"
-              value={roleFilter}
-              onChange={(e) => {
-                setRoleFilter(e.target.value);
-                setPage(1);
-              }}
-              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
-            >
-              {ROLE_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.value === "all"
+            <div className="relative">
+              <button
+                id="user-type-filter"
+                ref={roleFilterButtonRef}
+                type="button"
+                className="dropdown-toggle inline-flex min-w-32 items-center justify-between rounded-lg border border-brand-400 bg-white px-3 py-2 text-sm text-gray-800 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-brand-600 dark:bg-gray-800 dark:text-gray-200"
+                onClick={() => setRoleFilterOpen((prev) => !prev)}
+                aria-haspopup="listbox"
+                aria-expanded={roleFilterOpen}
+              >
+                <span>
+                  {roleFilter === "all"
                     ? t("users.all")
-                    : opt.value === "ADMIN"
+                    : roleFilter === "ADMIN"
                     ? t("users.admin")
-                    : opt.value === "PROVIDER"
+                    : roleFilter === "PROVIDER"
                     ? t("users.provider")
                     : t("users.patient")}
-                </option>
-              ))}
-            </select>
+                </span>
+                <svg className="h-4 w-4 text-gray-500" viewBox="0 0 20 20" fill="none" aria-hidden>
+                  <path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                </svg>
+              </button>
+              <Dropdown
+                isOpen={roleFilterOpen}
+                onClose={() => setRoleFilterOpen(false)}
+                anchorRef={roleFilterButtonRef}
+                className="w-44 p-1"
+              >
+                {ROLE_OPTIONS.map((opt) => {
+                  const isSelected = roleFilter === opt.value;
+                  const label =
+                    opt.value === "all"
+                      ? t("users.all")
+                      : opt.value === "ADMIN"
+                      ? t("users.admin")
+                      : opt.value === "PROVIDER"
+                      ? t("users.provider")
+                      : t("users.patient");
+                  return (
+                    <DropdownItem
+                      key={opt.value}
+                      onClick={() => {
+                        setRoleFilter(opt.value);
+                        setPage(1);
+                        setRoleFilterOpen(false);
+                      }}
+                      className={`rounded-lg ${isSelected ? "bg-brand-500 text-white hover:bg-brand-600 hover:text-white dark:bg-brand-500 dark:text-white" : ""}`}
+                    >
+                      {label}
+                    </DropdownItem>
+                  );
+                })}
+              </Dropdown>
+            </div>
           </div>
         </div>
 
@@ -632,7 +670,7 @@ export default function UserList() {
             <div className="flex flex-wrap items-center gap-4">
               <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                 {t("pagination.rowsPerPage")}
-                <select
+                <ThemedSelect
                   className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
                   value={limit}
                   onChange={(e) => {
@@ -645,7 +683,7 @@ export default function UserList() {
                       {n}
                     </option>
                   ))}
-                </select>
+                </ThemedSelect>
               </label>
               <p className="text-sm text-gray-600 dark:text-gray-400">
                 {t("pagination.showingRangeOf", {

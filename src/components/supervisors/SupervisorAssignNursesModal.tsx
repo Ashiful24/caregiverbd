@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Modal } from "../ui/modal";
 import Button from "../ui/button/Button";
+import Checkbox from "../form/input/Checkbox";
 import type { SupervisorFullDetails } from "../../data/supervisorSeed";
 import {
   adminSupervisorsApi,
@@ -284,12 +285,11 @@ export function SupervisorAssignNursesModal({ isOpen, onClose, supervisor, onAss
                     key={p.id}
                     className="flex items-center gap-3 rounded-lg border border-gray-100 bg-gray-50/80 px-3 py-2.5 dark:border-gray-800 dark:bg-gray-900/40"
                   >
-                    <input
+                    <Checkbox
                       id={`assign-provider-${p.id}`}
-                      type="checkbox"
                       checked={checked}
                       onChange={() => toggle(p.id)}
-                      className="size-4 shrink-0 rounded border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-900"
+                      className="size-4 shrink-0"
                     />
                     <ProviderAvatar p={p} />
                     <label

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import PageMeta from "../components/common/PageMeta";
+import ThemedSelect from "../components/form/ThemedSelect";
 import { Modal } from "../components/ui/modal";
 import { adminSystemConfigApi, type SystemConfigItem } from "../services/api";
 import { PencilIcon } from "../icons";
@@ -180,7 +181,7 @@ export default function SystemConfig() {
               {(() => {
                 const opts = getEnumOptions(editing.key);
                 return opts ? (
-                  <select
+                  <ThemedSelect
                     value={value}
                     onChange={(e) => setValue(e.target.value)}
                     className="mt-1 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
@@ -190,7 +191,7 @@ export default function SystemConfig() {
                         {opt.label}
                       </option>
                     ))}
-                  </select>
+                  </ThemedSelect>
                 ) : (
                   <input
                     type="text"

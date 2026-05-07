@@ -4,10 +4,16 @@ import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import PageMeta from "../components/common/PageMeta";
 import Button from "../components/ui/button/Button";
 import { Modal } from "../components/ui/modal";
+import ThemedSelect from "../components/form/ThemedSelect";
+import Checkbox from "../components/form/input/Checkbox";
 import {
+  consultationTypesApi,
   consultationTypeLevelsApi,
+  levelChecklistMappingsApi,
+  type ConsultationType,
   type ConsultationTypeLevel,
   type ConsultationTypeLevelCategory,
+  type ServiceCategoryChecklistItem,
 } from "../services/api";
 import { PencilIcon, PlusIcon, TrashBinIcon, ViewIcon } from "../icons";
 
@@ -20,6 +26,18 @@ function formatSalaryAmount(value: number): string {
   return new Intl.NumberFormat(undefined, {
     maximumFractionDigits: 0,
   }).format(value);
+}
+
+function flattenConsultationTypes(nodes: ConsultationType[]): ConsultationType[] {
+  const out: ConsultationType[] = [];
+  const walk = (list: ConsultationType[]) => {
+    for (const node of list) {
+      out.push(node);
+      if (Array.isArray(node.children) && node.children.length > 0) walk(node.children);
+    }
+  };
+  walk(nodes);
+  return out;
 }
 
 export default function ConsultationTypeLevels() {
@@ -43,6 +61,16 @@ export default function ConsultationTypeLevels() {
 
   const [pendingDelete, setPendingDelete] = useState<ConsultationTypeLevel | null>(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+  const [mappingModal, setMappingModal] = useState(false);
+  const [mappingSubmitting, setMappingSubmitting] = useState(false);
+  const [mappingConsultationTypeId, setMappingConsultationTypeId] = useState<number | null>(null);
+  const [mappingLevelId, setMappingLevelId] = useState<number | null>(null);
+  const [mappingChecklistIds, setMappingChecklistIds] = useState<number[]>([]);
+  const [mappingConsultationTypes, setMappingConsultationTypes] = useState<ConsultationType[]>([]);
+  const [mappingLevels, setMappingLevels] = useState<ConsultationTypeLevel[]>([]);
+  const [mappingChecklistItems, setMappingChecklistItems] = useState<ServiceCategoryChecklistItem[]>([]);
+  const [mappingLoading, setMappingLoading] = useState(false);
+  const [mappingChecklistLoading, setMappingChecklistLoading] = useState(false);
 
   const resetForm = useCallback(
     (cat: ConsultationTypeLevelCategory) => {
@@ -89,6 +117,42 @@ export default function ConsultationTypeLevels() {
   const openAdd = () => {
     setAddModal(true);
     resetForm(category);
+  };
+
+  const openMapping = async () => {
+    setMappingModal(true);
+    setMappingLoading(true);
+    setError("");
+    setMappingChecklistIds([]);
+    setMappingChecklistItems([]);
+    try {
+      const [typesRes, caregiverRes, doctorRes] = await Promise.all([
+        consultationTypesApi.getAll(),
+        consultationTypeLevelsApi.list({ category: "CAREGIVER" }),
+        consultationTypeLevelsApi.list({ category: "DOCTOR" }),
+      ]);
+      const treeRaw = typesRes?.data ?? typesRes;
+      const tree = Array.isArray(treeRaw) ? treeRaw : [treeRaw];
+      const flatTypes = flattenConsultationTypes(tree).filter((i) => Number.isFinite(i.id));
+      const caregiverLevelsRaw = caregiverRes?.data ?? caregiverRes;
+      const doctorLevelsRaw = doctorRes?.data ?? doctorRes;
+      const allLevels = [
+        ...(Array.isArray(caregiverLevelsRaw) ? caregiverLevelsRaw : []),
+        ...(Array.isArray(doctorLevelsRaw) ? doctorLevelsRaw : []),
+      ];
+      setMappingConsultationTypes(flatTypes);
+      setMappingLevels(allLevels);
+      setMappingConsultationTypeId(flatTypes[0]?.id ?? null);
+      setMappingLevelId(allLevels[0]?.id ?? null);
+    } catch (err: unknown) {
+      const msg =
+        err && typeof err === "object" && "message" in err
+          ? String((err as { message: string }).message)
+          : t("consultationTypeLevels.failedMappingLoad");
+      setError(msg);
+    } finally {
+      setMappingLoading(false);
+    }
   };
 
   const openEdit = async (item: ConsultationTypeLevel) => {
@@ -202,6 +266,101 @@ export default function ConsultationTypeLevels() {
   const formInvalid =
     !name.trim() || minSalary < 0 || maxSalary < 0 || minSalary > maxSalary;
 
+  useEffect(() => {
+    if (!mappingModal || !mappingConsultationTypeId || !mappingLevelId) return;
+    let cancelled = false;
+    const loadChecklistsAndMapped = async () => {
+      setMappingChecklistLoading(true);
+      setMappingChecklistIds([]);
+      try {
+        const [checklistsRes, mappedRes] = await Promise.all([
+          consultationTypesApi.getServices(mappingConsultationTypeId),
+          levelChecklistMappingsApi.getMappedChecklists(mappingConsultationTypeId, mappingLevelId),
+        ]);
+        const data = checklistsRes?.data ?? checklistsRes;
+        const mappedRaw = mappedRes?.data ?? mappedRes;
+        const mappedIds = (() => {
+          if (Array.isArray(mappedRaw)) {
+            return mappedRaw
+              .map((item) =>
+                typeof item === "number"
+                  ? item
+                  : item && typeof item === "object" && "id" in item
+                    ? Number((item as { id?: number }).id)
+                    : NaN
+              )
+              .filter((id) => Number.isFinite(id)) as number[];
+          }
+          if (mappedRaw && typeof mappedRaw === "object") {
+            const obj = mappedRaw as {
+              checklistIds?: number[];
+              mappedChecklistIds?: number[];
+              checklists?: Array<{ id?: number }>;
+            };
+            if (Array.isArray(obj.checklistIds)) return obj.checklistIds;
+            if (Array.isArray(obj.mappedChecklistIds)) return obj.mappedChecklistIds;
+            if (Array.isArray(obj.checklists)) {
+              return obj.checklists
+                .map((x) => Number(x?.id))
+                .filter((id) => Number.isFinite(id)) as number[];
+            }
+          }
+          return [];
+        })();
+        if (cancelled) return;
+        const items = (Array.isArray(data) ? data : []).sort(
+          (a, b) => a.displayOrder - b.displayOrder || a.id - b.id
+        );
+        setMappingChecklistItems(items);
+        const itemIds = new Set(items.map((i) => i.id));
+        setMappingChecklistIds(
+          mappedIds.filter((id, index, arr) => itemIds.has(id) && arr.indexOf(id) === index)
+        );
+      } catch {
+        if (!cancelled) {
+          setMappingChecklistItems([]);
+          setMappingChecklistIds([]);
+        }
+      } finally {
+        if (!cancelled) setMappingChecklistLoading(false);
+      }
+    };
+    void loadChecklistsAndMapped();
+    return () => {
+      cancelled = true;
+    };
+  }, [mappingModal, mappingConsultationTypeId, mappingLevelId]);
+
+  const toggleChecklist = (id: number) => {
+    setMappingChecklistIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  const handleCreateMapping = async () => {
+    if (!mappingConsultationTypeId || !mappingLevelId || mappingChecklistIds.length === 0) return;
+    setMappingSubmitting(true);
+    setError("");
+    try {
+      await levelChecklistMappingsApi.update({
+        consultationTypeId: mappingConsultationTypeId,
+        levelId: mappingLevelId,
+        checklistIds: mappingChecklistIds,
+      });
+      setMappingModal(false);
+      setMappingChecklistIds([]);
+      setMappingChecklistItems([]);
+    } catch (err: unknown) {
+      const msg =
+        err && typeof err === "object" && "message" in err
+          ? String((err as { message: string }).message)
+          : t("consultationTypeLevels.failedCreateMapping");
+      setError(msg);
+    } finally {
+      setMappingSubmitting(false);
+    }
+  };
+
   return (
     <>
       <PageMeta
@@ -245,6 +404,15 @@ export default function ConsultationTypeLevels() {
               className="w-full rounded-xl shadow-sm transition-all duration-200 hover:shadow-md sm:w-auto"
             >
               {t("consultationTypeLevels.addLevel")}
+            </Button>
+            <Button
+              variant="outline"
+              size="md"
+              onClick={() => void openMapping()}
+              disabled={loading}
+              className="w-full rounded-xl sm:w-auto"
+            >
+              {t("consultationTypeLevels.mapChecklist")}
             </Button>
           </div>
         </div>
@@ -387,7 +555,7 @@ export default function ConsultationTypeLevels() {
               <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
                 {t("consultationTypeLevels.category")}
               </span>
-              <select
+              <ThemedSelect
                 value={formCategory}
                 onChange={(e) =>
                   setFormCategory(e.target.value as ConsultationTypeLevelCategory)
@@ -399,7 +567,7 @@ export default function ConsultationTypeLevels() {
                     {t(`consultationTypeLevels.categoryLabels.${c}`)}
                   </option>
                 ))}
-              </select>
+              </ThemedSelect>
             </label>
             <label className="block">
               <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
@@ -453,6 +621,125 @@ export default function ConsultationTypeLevels() {
         </Modal>
       )}
 
+      <Modal
+        isOpen={mappingModal}
+        onClose={() => !mappingSubmitting && setMappingModal(false)}
+        title={t("consultationTypeLevels.mapChecklistTitle")}
+        className="w-full max-w-2xl"
+      >
+        <div className="space-y-4 pt-1">
+          {mappingLoading ? (
+            <div className="py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+              {t("consultationTypeLevels.loading")}
+            </div>
+          ) : (
+            <>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block">
+                  <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                    {t("consultationTypeLevels.consultationType")}
+                  </span>
+                  <ThemedSelect
+                    value={mappingConsultationTypeId ?? ""}
+                    onChange={(e) => setMappingConsultationTypeId(Number(e.target.value) || null)}
+                    className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                  >
+                    {mappingConsultationTypes.map((ct) => (
+                      <option key={ct.id} value={ct.id}>
+                        {ct.name} (#{ct.id})
+                      </option>
+                    ))}
+                  </ThemedSelect>
+                </label>
+                <label className="block">
+                  <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                    {t("consultationTypeLevels.level")}
+                  </span>
+                  <ThemedSelect
+                    value={mappingLevelId ?? ""}
+                    onChange={(e) => setMappingLevelId(Number(e.target.value) || null)}
+                    className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                  >
+                    {mappingLevels
+                      .sort((a, b) => a.levelNumber - b.levelNumber || a.id - b.id)
+                      .map((lv) => (
+                        <option key={lv.id} value={lv.id}>
+                          {lv.name} ({t(`consultationTypeLevels.categoryLabels.${lv.category}`)})
+                        </option>
+                      ))}
+                  </ThemedSelect>
+                </label>
+              </div>
+
+              <div className="rounded-xl border border-gray-200 p-3 dark:border-gray-700">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  {t("consultationTypeLevels.checklistServices")}
+                </p>
+                {mappingChecklistLoading ? (
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    {t("consultationTypeLevels.loading")}
+                  </p>
+                ) : mappingChecklistItems.length === 0 ? (
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    {t("consultationTypeLevels.noChecklistForType")}
+                  </p>
+                ) : (
+                  <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
+                    {mappingChecklistItems.map((item) => (
+                      <label
+                        key={item.id}
+                        className="flex items-start gap-2 rounded-lg border border-gray-200 p-2 text-sm dark:border-gray-700"
+                      >
+                        <Checkbox
+                          checked={mappingChecklistIds.includes(item.id)}
+                          onChange={() => toggleChecklist(item.id)}
+                          className="h-4 w-4"
+                        />
+                        <span className="min-w-0">
+                          <span className="block font-medium text-gray-800 dark:text-gray-100">
+                            {item.name}
+                          </span>
+                          {item.description && (
+                            <span className="block text-xs text-gray-500 dark:text-gray-400">
+                              {item.description}
+                            </span>
+                          )}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => !mappingSubmitting && setMappingModal(false)}
+                  className="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                >
+                  {t("common.actions.cancel")}
+                </button>
+                <button
+                  type="button"
+                  disabled={
+                    mappingSubmitting ||
+                    !mappingConsultationTypeId ||
+                    !mappingLevelId ||
+                    mappingChecklistIds.length === 0
+                  }
+                  onClick={() => void handleCreateMapping()}
+                  className="rounded bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+                >
+                  {mappingSubmitting
+                    ? t("consultationTypeLevels.mappingSaving")
+                    : t("consultationTypeLevels.saveMapping")}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </Modal>
+
       {editModal && (
         <Modal
           isOpen
@@ -491,7 +778,7 @@ export default function ConsultationTypeLevels() {
               <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
                 {t("consultationTypeLevels.category")}
               </span>
-              <select
+              <ThemedSelect
                 value={formCategory}
                 onChange={(e) =>
                   setFormCategory(e.target.value as ConsultationTypeLevelCategory)
@@ -503,7 +790,7 @@ export default function ConsultationTypeLevels() {
                     {t(`consultationTypeLevels.categoryLabels.${c}`)}
                   </option>
                 ))}
-              </select>
+              </ThemedSelect>
             </label>
             <label className="block">
               <span className="text-xs font-medium text-gray-500 dark:text-gray-400">

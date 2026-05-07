@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import PageMeta from "../components/common/PageMeta";
+import ThemedSelect from "../components/form/ThemedSelect";
 import { ActionsMenu } from "../components/common/ActionsMenu";
 import { DetailModal } from "../components/common/DetailModal";
 import { ProviderFullDetailsView } from "../components/common/ProfileDetailBlocks";
@@ -24,7 +25,7 @@ import {
   type ProviderListStatusFilter,
   type VerificationDocumentTypeItem,
 } from "../services/api";
-import { formatDate } from "../utils/format";
+import { formatDate, formatStatusLabel } from "../utils/format";
 import { useAuth } from "../context/AuthContext";
 
 const LIMIT_OPTIONS = [10, 20, 50];
@@ -267,7 +268,7 @@ export default function ProviderList() {
           <div className="flex flex-wrap items-center justify-end gap-3 sm:ml-auto">
             <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
               <span className="shrink-0">{t("providers.consultationType")}</span>
-              <select
+              <ThemedSelect
                 value={consultationTypeFilterId}
                 onChange={(e) => {
                   const v = e.target.value;
@@ -283,11 +284,11 @@ export default function ProviderList() {
                     {opt.name}
                   </option>
                 ))}
-              </select>
+              </ThemedSelect>
             </label>
             <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
               <span className="shrink-0">{t("providers.verificationDocument")}</span>
-              <select
+              <ThemedSelect
                 value={documentTypeFilterCode}
                 onChange={(e) => {
                   setDocumentTypeFilterCode(e.target.value);
@@ -301,7 +302,7 @@ export default function ProviderList() {
                     {opt.label}
                   </option>
                 ))}
-              </select>
+              </ThemedSelect>
             </label>
           </div>
         </div>
@@ -373,7 +374,7 @@ export default function ProviderList() {
                       </span>
                       <div className="flex items-center gap-2">
                         <Badge size="sm" color={providerStatusBadgeColor(provider.status)}>
-                          {provider.status}
+                          {formatStatusLabel(provider.status)}
                         </Badge>
                         <ActionsMenu
                           isOpen={openActionsId === provider.id}
@@ -445,7 +446,7 @@ export default function ProviderList() {
                         </TableCell>
                         <TableCell className="py-3">
                           <Badge size="sm" color={providerStatusBadgeColor(provider.status)}>
-                            {provider.status}
+                            {formatStatusLabel(provider.status)}
                           </Badge>
                         </TableCell>
                         <TableCell className="py-3 text-theme-sm text-gray-600 dark:text-gray-400">{provider.consultationTypeName ?? "—"}</TableCell>
@@ -487,7 +488,7 @@ export default function ProviderList() {
             <div className="flex flex-wrap items-center gap-4">
               <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                 {t("pagination.rowsPerPage")}
-                <select
+                <ThemedSelect
                   className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
                   value={limit}
                   onChange={(e) => {
@@ -500,7 +501,7 @@ export default function ProviderList() {
                       {n}
                     </option>
                   ))}
-                </select>
+                </ThemedSelect>
               </label>
               <p className="text-sm text-gray-600 dark:text-gray-400">
                 {t("pagination.showingRangeOf", {

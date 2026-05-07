@@ -793,6 +793,39 @@ export const consultationTypeLevelsApi = {
   },
 };
 
+// ============== Admin: Level-checklist mappings ==============
+
+export interface CreateLevelChecklistMappingRequest {
+  consultationTypeId: number;
+  levelId: number;
+  checklistIds: number[];
+}
+
+export const levelChecklistMappingsApi = {
+  /** GET /admin/consultation-types/:consultationTypeId/levels/:levelId/mapped-checklists */
+  getMappedChecklists: async (consultationTypeId: number, levelId: number) => {
+    return httpService.get<
+      | { checklistIds?: number[]; mappedChecklistIds?: number[]; checklists?: Array<{ id?: number }> }
+      | number[]
+      | Array<{ id?: number }>
+    >(`/admin/consultation-types/${consultationTypeId}/levels/${levelId}/mapped-checklists`);
+  },
+  /** POST /admin/level-checklist-mappings */
+  create: async (data: CreateLevelChecklistMappingRequest) => {
+    return httpService.post<{ id?: number; message?: string }>(
+      "/admin/level-checklist-mappings",
+      data
+    );
+  },
+  /** PATCH /admin/level-checklist-mappings */
+  update: async (data: CreateLevelChecklistMappingRequest) => {
+    return httpService.patch<{ id?: number; message?: string }>(
+      "/admin/level-checklist-mappings",
+      data
+    );
+  },
+};
+
 // ============== Admin: Upgrade Requests ==============
 
 export interface UpgradeRequestListItem {

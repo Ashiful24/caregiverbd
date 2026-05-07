@@ -2,6 +2,7 @@ import Chart from "react-apexcharts";
 import { useTranslation } from "react-i18next";
 import { ApexOptions } from "apexcharts";
 import type { DashboardServiceRequestsSummary } from "../../services/api";
+import { formatStatusLabel } from "../../utils/format";
 
 const STATUS_ORDER = ["PENDING", "ACCEPTED", "IN_PROGRESS", "COMPLETED", "CANCELLED", "REJECTED"] as const;
 const STATUS_COLORS = [
@@ -22,7 +23,7 @@ export function ServiceRequestsChart({ summary, loading }: ServiceRequestsChartP
   const { t } = useTranslation();
   const series = STATUS_ORDER.map((s) => summary?.[s] ?? 0);
   /** Legend labels match API enum keys (not localized — same in EN/BN). */
-  const labels = [...STATUS_ORDER];
+  const labels = STATUS_ORDER.map((s) => formatStatusLabel(s));
   const total = series.reduce((a, b) => a + b, 0);
 
   const options: ApexOptions = {
@@ -58,22 +59,22 @@ export function ServiceRequestsChart({ summary, loading }: ServiceRequestsChartP
 
   if (loading) {
     return (
-      <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800/50 md:p-6">
+      <div className="rounded-2xl border border-gray-200/80 bg-white/95 p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800/60 md:p-6">
         <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
           {t("dashboard.serviceRequestsByStatus")}
         </h3>
-        <div className="mt-4 flex h-64 items-center justify-center rounded-lg bg-gray-100 dark:bg-gray-700/50 animate-pulse" />
+        <div className="mt-4 flex h-64 animate-pulse items-center justify-center rounded-xl bg-gray-100 dark:bg-gray-700/50" />
       </div>
     );
   }
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800/50 md:p-6">
+    <div className="rounded-2xl border border-gray-200/80 bg-white/95 p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800/60 md:p-6">
       <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
         {t("dashboard.serviceRequestsByStatus")}
       </h3>
       {total === 0 ? (
-        <div className="mt-4 flex h-64 items-center justify-center rounded-lg border border-dashed border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 text-sm">
+        <div className="mt-4 flex h-64 items-center justify-center rounded-xl border border-dashed border-gray-300 text-sm text-gray-500 dark:border-gray-600 dark:text-gray-400">
           {t("dashboard.noServiceRequestData")}
         </div>
       ) : (
