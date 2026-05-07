@@ -19,8 +19,9 @@ import SystemConfig from "./pages/SystemConfig";
 import UpgradeRequests from "./pages/UpgradeRequests";
 import UpgradeRequestDetail from "./pages/UpgradeRequestDetail";
 import Notifications from "./pages/Notifications";
-import FinancialReports from "./pages/FinancialReports";
 import WithdrawalRequests from "./pages/WithdrawalRequests";
+import MasterFinancialReport from "./pages/MasterFinancialReport";
+import GlReconciliation from "./pages/GlReconciliation";
 import NurseScheduleList from "./pages/NurseScheduleList";
 import NurseScheduleCalendarPage from "./pages/NurseScheduleCalendarPage";
 import SupervisorList from "./pages/SupervisorList";
@@ -141,7 +142,15 @@ export default function App() {
             path="/financial-reports"
             element={
               <ProtectedRoute allowedRoles={["ADMIN"]}>
-                <FinancialReports />
+                <MasterFinancialReport />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/gl-reconciliation"
+            element={
+              <ProtectedRoute allowedRoles={["ADMIN"]}>
+                <GlReconciliation />
               </ProtectedRoute>
             }
           />
