@@ -19,6 +19,7 @@ import SystemConfig from "./pages/SystemConfig";
 import UpgradeRequests from "./pages/UpgradeRequests";
 import UpgradeRequestDetail from "./pages/UpgradeRequestDetail";
 import Notifications from "./pages/Notifications";
+import WithdrawalRequests from "./pages/WithdrawalRequests";
 import MasterFinancialReport from "./pages/MasterFinancialReport";
 import GlReconciliation from "./pages/GlReconciliation";
 import NurseScheduleList from "./pages/NurseScheduleList";
@@ -150,6 +151,14 @@ export default function App() {
             element={
               <ProtectedRoute allowedRoles={["ADMIN"]}>
                 <GlReconciliation />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/withdrawal-requests"
+            element={
+              <ProtectedRoute allowedRoles={["ADMIN"]}>
+                <WithdrawalRequests />
               </ProtectedRoute>
             }
           />

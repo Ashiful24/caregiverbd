@@ -346,6 +346,63 @@ export interface ClaimBalanceRequest {
   amount?: number; // optional; if omitted, claim all
 }
 
+export type WithdrawalRequestStatus =
+  | "PENDING"
+  | "APPROVED"
+  | "COMPLETED"
+  | "REJECTED"
+  | "CANCELLED";
+
+export interface WithdrawalRequestListItem {
+  id: number;
+  providerId?: number | null;
+  providerName?: string | null;
+  amount?: string | number | null;
+  status: WithdrawalRequestStatus | string;
+  createdAt?: string | null;
+  requestedAt?: string | null;
+  updatedAt?: string | null;
+  approvedAt?: string | null;
+  completedAt?: string | null;
+  method?: string | null;
+  reference?: string | null;
+}
+
+export interface WithdrawalRequestListResponse {
+  data: WithdrawalRequestListItem[];
+  meta?: {
+    total?: number;
+    page?: number;
+    limit?: number;
+    totalPages?: number;
+  };
+  total?: number;
+  page?: number;
+  limit?: number;
+  totalPages?: number;
+}
+
+export interface WithdrawalRequestDetail extends WithdrawalRequestListItem {
+  walletId?: number | null;
+  userId?: number | null;
+  method?: string | null;
+  accountName?: string | null;
+  accountNumber?: string | null;
+  bankName?: string | null;
+  mobileNumber?: string | null;
+  proofUrl?: string | null;
+  adminNote?: string | null;
+  [key: string]: unknown;
+}
+
+export interface WithdrawalReviewPayload {
+  adminNote?: string;
+}
+
+export interface WithdrawalCompletePayload extends WithdrawalReviewPayload {
+  proofUrl?: string;
+}
+
 // ============== Verification Documents ==============
 
 /** Single verification document (upload response or in list). */
@@ -1805,6 +1862,79 @@ export const financialApi = {
     return httpService.post<{ transactionId: number; paymentGateway: string; gatewayUrl: string }>(
       "/financial/recharge/initiate",
       data
+    );
+  },
+
+  /**
+   * GET /financial/withdrawal/admin/list
+   * Query: page, limit, status, startDate, endDate
+   */
+  getWithdrawalAdminList: async (
+    params?: {
+      page?: number;
+      limit?: number;
+      status?: WithdrawalRequestStatus;
+      startDate?: string;
+      endDate?: string;
+    },
+    config?: { signal?: AbortSignal }
+  ) => {
+    const query: Record<string, string | number> = {
+      page: params?.page ?? 1,
+      limit: params?.limit ?? 10,
+    };
+    if (params?.status) query.status = params.status;
+    if (params?.startDate) query.startDate = params.startDate;
+    if (params?.endDate) query.endDate = params.endDate;
+    return httpService.get<WithdrawalRequestListResponse>("/financial/withdrawal/admin/list", {
+      params: query,
+      signal: config?.signal,
+    });
+  },
+
+  /** GET /financial/withdrawal/admin/:id */
+  getWithdrawalAdminById: async (id: number, config?: { signal?: AbortSignal }) => {
+    return httpService.get<WithdrawalRequestDetail>(`/financial/withdrawal/admin/${id}`, {
+      signal: config?.signal,
+    });
+  },
+
+  /** PATCH /financial/withdrawal/admin/:id/approve */
+  approveWithdrawalAdmin: async (
+    id: number,
+    data?: WithdrawalReviewPayload,
+    config?: { signal?: AbortSignal }
+  ) => {
+    return httpService.patch<WithdrawalRequestDetail>(
+      `/financial/withdrawal/admin/${id}/approve`,
+      data ?? {},
+      config
+    );
+  },
+
+  /** PATCH /financial/withdrawal/admin/:id/reject */
+  rejectWithdrawalAdmin: async (
+    id: number,
+    data?: WithdrawalReviewPayload,
+    config?: { signal?: AbortSignal }
+  ) => {
+    return httpService.patch<WithdrawalRequestDetail>(
+      `/financial/withdrawal/admin/${id}/reject`,
+      data ?? {},
+      config
+    );
+  },
+
+  /** PATCH /financial/withdrawal/admin/:id/complete */
+  completeWithdrawalAdmin: async (
+    id: number,
+    data?: WithdrawalCompletePayload,
+    config?: { signal?: AbortSignal }
+  ) => {
+    return httpService.patch<WithdrawalRequestDetail>(
+      `/financial/withdrawal/admin/${id}/complete`,
+      data ?? {},
+      config
     );
   },
 };

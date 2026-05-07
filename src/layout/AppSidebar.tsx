@@ -92,6 +92,7 @@ const navSections: NavSection[] = [
     items: [
       { icon: <ListIcon />, nameKey: "navigation.appointments", path: "/appointments", allowedRoles: ["ADMIN"] },
       { icon: <PageIcon />, nameKey: "navigation.upgradeRequests", path: "/upgrade-requests", allowedRoles: ["ADMIN"] },
+      { icon: <TaskIcon />, nameKey: "navigation.withdrawalRequests", path: "/withdrawal-requests", allowedRoles: ["ADMIN"] },
     ],
   },
   {
