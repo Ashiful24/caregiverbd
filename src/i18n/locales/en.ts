@@ -353,6 +353,27 @@ const en = {
     scheduled: "Scheduled",
     created: "Created",
     failedToLoad: "Failed to load appointments.",
+    provider: "Provider",
+    detailTitle: "Request #{{id}}",
+    lifecycleHeading: "Service lifecycle",
+    lifecycleStaticNote:
+      "This timeline is a static preview for administrators. A detailed history API will replace it soon.",
+    lifecycle: {
+      submittedTitle: "Request submitted",
+      submittedDesc:
+        "The patient submitted this service request. It is visible to providers and awaiting the next action.",
+      acceptedTitle: "Provider accepted",
+      acceptedDesc:
+        "A provider accepted the request. Scheduling and preparation can proceed from this point.",
+      inProgressTitle: "Service in progress",
+      inProgressDesc:
+        "The consultation or visit is underway. Payment or documentation steps may still be open.",
+      completedTitle: "Completed",
+      completedDesc: "The service request is finished and archived for reporting.",
+      closedTitle: "Request closed",
+      closedDesc:
+        "This request was rejected or cancelled before completion. No further steps apply.",
+    },
   },
   consultationConfig: {
     pageTitle: "Consultation type config",

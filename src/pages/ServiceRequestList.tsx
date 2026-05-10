@@ -18,6 +18,7 @@ import {
   type ConsultationType,
 } from "../services/api";
 import { formatDate, formatDateTime, formatStatusLabel } from "../utils/format";
+import { ServiceRequestDetailModal } from "../components/service-requests/ServiceRequestDetailModal";
 
 const LIMIT_OPTIONS = [10, 20, 50];
 const SEARCH_DEBOUNCE_MS = 300;
@@ -81,6 +82,7 @@ export default function ServiceRequestList() {
   const [searchDoctorQuery, setSearchDoctorQuery] = useState("");
   const [searchPatientInput, setSearchPatientInput] = useState("");
   const [searchPatientQuery, setSearchPatientQuery] = useState("");
+  const [detailItem, setDetailItem] = useState<AdminServiceRequestListDto | null>(null);
 
   const fetchConsultationTypes = useCallback(async () => {
     try {
@@ -190,6 +192,11 @@ export default function ServiceRequestList() {
 
   return (
     <>
+      <ServiceRequestDetailModal
+        item={detailItem}
+        isOpen={detailItem != null}
+        onClose={() => setDetailItem(null)}
+      />
       <PageMeta title={t("appointments.metaTitle")} description={t("appointments.metaDescription")} />
       <PageBreadcrumb pageTitle={t("appointments.pageTitle")} />
       <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
@@ -288,7 +295,7 @@ export default function ServiceRequestList() {
                       </div>
                       <div className="flex justify-between gap-2">
                         <dt className="text-gray-500 dark:text-gray-400">
-                          Provider
+                          {t("appointments.provider")}
                         </dt>
                         <dd className="text-gray-800 dark:text-gray-200">
                           {item.providerName ?? "—"}
@@ -331,6 +338,15 @@ export default function ServiceRequestList() {
                         </div>
                       )}
                     </dl>
+                    <div className="mt-4 border-t border-gray-200 pt-4 dark:border-gray-700">
+                      <button
+                        type="button"
+                        onClick={() => setDetailItem(item)}
+                        className="w-full rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100"
+                      >
+                        {t("common.actions.details")}
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -358,7 +374,7 @@ export default function ServiceRequestList() {
                         isHeader
                         className="w-[14%] py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
                       >
-                        Provider
+                        {t("appointments.provider")}
                       </TableCell>
                       <TableCell
                         isHeader
@@ -389,6 +405,12 @@ export default function ServiceRequestList() {
                         className="w-[12%] py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
                       >
                         {t("appointments.created")}
+                      </TableCell>
+                      <TableCell
+                        isHeader
+                        className="w-[11%] py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
+                      >
+                        {t("users.actions")}
                       </TableCell>
                     </TableRow>
                   </TableHeader>
@@ -427,6 +449,15 @@ export default function ServiceRequestList() {
                           {item.createdAt
                             ? formatDate(item.createdAt)
                             : "—"}
+                        </TableCell>
+                        <TableCell className="py-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => setDetailItem(item)}
+                            className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-theme-sm font-medium text-gray-800 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                          >
+                            {t("common.actions.details")}
+                          </button>
                         </TableCell>
                       </TableRow>
                     ))}
