@@ -1203,6 +1203,8 @@ export interface ProviderFullProfileDto {
   bmdcNumber: string;
   experience?: string | null;
   status: string;
+  /** Assigned consultation-type level (admin verify API). */
+  levelId?: number | null;
   consultationTypeId?: number | null;
   consultationTypeName?: string | null;
   latitude?: string | null;
@@ -1440,6 +1442,35 @@ export interface PatientFullDetailsDto {
   beneficiaries?: BeneficiaryDetailDto[] | null;
 }
 
+/** Parse GET /admin/providers/:id/level JSON (raw or wrapped) into a level id, or null. */
+export function parseAdminProviderLevelResponse(body: unknown): number | null {
+  if (body == null) return null;
+  if (typeof body === "number" && Number.isFinite(body)) return body;
+  if (typeof body !== "object") return null;
+  const o = body as Record<string, unknown>;
+  const asNum = (v: unknown): number | null => {
+    if (typeof v === "number" && Number.isFinite(v)) return v;
+    if (typeof v === "string" && v.trim() !== "") {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : null;
+    }
+    return null;
+  };
+  const fromObject = (obj: Record<string, unknown>): number | null => {
+    const id = asNum(obj.levelId);
+    if (id != null) return id;
+    return asNum(obj.id);
+  };
+  const direct = fromObject(o);
+  if (direct != null) return direct;
+  const data = o.data;
+  if (data && typeof data === "object") {
+    const inner = fromObject(data as Record<string, unknown>);
+    if (inner != null) return inner;
+  }
+  return null;
+}
+
 export const providersApi = {
   /**
    * GET /v1/admin/providers — List all provider profiles (providers table).
@@ -1579,7 +1610,12 @@ export const providersApi = {
   /** PATCH /v1/admin/providers/:providerId/verify - Set provider status. Allowed transitions: PENDING → Rejected/Active/Deactivated/Archived; ACTIVE → Pending/Rejected. */
   verifyProvider: async (
     providerId: number,
-    data: { status: "PENDING" | "ACTIVE" | "REJECTED" | "DEACTIVATED" | "ARCHIVED"; comment?: string },
+    data: {
+      status: "PENDING" | "ACTIVE" | "REJECTED" | "DEACTIVATED" | "ARCHIVED";
+      /** Consultation type level to assign (required by backend for verify). */
+      levelId: number;
+      comment?: string;
+    },
     config?: { signal?: AbortSignal }
   ) => {
     return httpService.patch<ProviderFullProfileDto>(
@@ -1587,6 +1623,30 @@ export const providersApi = {
       data,
       config
     );
+  },
+
+  /** PATCH /v1/admin/providers/:providerId/level — Set provider level only (no status change). */
+  updateProviderLevel: async (
+    providerId: number,
+    data: { levelId: number },
+    config?: { signal?: AbortSignal }
+  ) => {
+    return httpService.patch<ProviderFullProfileDto>(
+      `/admin/providers/${providerId}/level`,
+      data,
+      config
+    );
+  },
+
+  /**
+   * GET /v1/admin/providers/:providerId/level — Current provider consultation type level.
+   * Returns normalized `levelId` (null if unassigned or not present in payload).
+   */
+  getProviderLevel: async (providerId: number, config?: { signal?: AbortSignal }) => {
+    const res = await httpService.get<unknown>(`/admin/providers/${providerId}/level`, {
+      signal: config?.signal,
+    });
+    return { levelId: parseAdminProviderLevelResponse(res.data) };
   },
 
   /** POST /providers/search - Search with location, type, date, time, pagination */
