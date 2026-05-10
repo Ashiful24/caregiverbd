@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { formatAccountActiveLabel, formatDate, formatStatusLabel } from "../../utils/format";
 import { getAssetUrl } from "../../utils/assetUrl";
@@ -10,7 +10,15 @@ import { UserCircleIcon, EyeIcon, DownloadIcon } from "../../icons";
 import { Calendar } from "../ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import Checkbox from "../form/input/Checkbox";
-import { providersApi, adminCertificationsApi, patientsApi, adminUsersApi, adminDocumentsApi, adminProvidersApi } from "../../services/api";
+import {
+  providersApi,
+  adminCertificationsApi,
+  patientsApi,
+  adminUsersApi,
+  adminDocumentsApi,
+  adminProvidersApi,
+  consultationTypeLevelsApi,
+} from "../../services/api";
 import type {
   AdminCertificationDto,
   AdminDocumentDto,
@@ -24,6 +32,7 @@ import type {
   SalaryHistoryResponseDto,
   VitalsEntryDto,
   WalletHistoryEntryDto,
+  ConsultationTypeLevel,
 } from "../../services/api";
 
 /** Reusable block for detail views (Personal, Contact, etc.). Full width, responsive. */
@@ -703,6 +712,7 @@ export function ProviderFullDetailsView({
   const [fundingHistoryError, setFundingHistoryError] = useState<string | null>(null);
   const [fundingHistoryPage, setFundingHistoryPage] = useState(1);
   const [statusUpdating, setStatusUpdating] = useState(false);
+  const [levelUpdating, setLevelUpdating] = useState(false);
   type ProviderStatusValue = "PENDING" | "ACTIVE" | "REJECTED" | "DEACTIVATED" | "ARCHIVED";
   const currentStatus = String(provider.status).toUpperCase() as ProviderStatusValue;
   /** Pending → Active/Rejected/Archived. Active → Deactivated/Archived. Rejected → Active/Archived. Deactivated → Active/Archived. Archived → none. */
@@ -733,6 +743,12 @@ export function ProviderFullDetailsView({
     allowedNextStatuses[0]?.value ?? "DEACTIVATED"
   );
   const [profileStatusComment, setProfileStatusComment] = useState("");
+  const [providerLevelOptions, setProviderLevelOptions] = useState<ConsultationTypeLevel[]>([]);
+  const [levelsLoading, setLevelsLoading] = useState(false);
+  const [levelsLoadError, setLevelsLoadError] = useState<string | null>(null);
+  const [profileLevelId, setProfileLevelId] = useState<number | "">("");
+  /** From GET /admin/providers/:id/level; undefined = not loaded yet or failed (fall back to details). */
+  const [providerLevelFromApi, setProviderLevelFromApi] = useState<number | null | undefined>(undefined);
   const [userStatusChoice, setUserStatusChoice] = useState<"Active" | "Inactive">(
     user.isActive ? "Active" : "Inactive"
   );
@@ -780,6 +796,85 @@ export function ProviderFullDetailsView({
     else if (currentStatus === "REJECTED") setProfileStatusChoice("ACTIVE");
     else if (currentStatus === "DEACTIVATED") setProfileStatusChoice("ACTIVE");
   }, [currentStatus]);
+
+  const formatLevelOptionLabel = useCallback(
+    (level: ConsultationTypeLevel) => {
+      const cat =
+        level.category === "DOCTOR"
+          ? t("providers.providerLevelCategoryDoctor")
+          : t("providers.providerLevelCategoryCaregiver");
+      return `${cat} · ${level.name} (#${level.levelNumber})`;
+    },
+    [t]
+  );
+
+  useEffect(() => {
+    let aborted = false;
+    setLevelsLoading(true);
+    setLevelsLoadError(null);
+    Promise.all([
+      consultationTypeLevelsApi.list({ category: "CAREGIVER" }),
+      consultationTypeLevelsApi.list({ category: "DOCTOR" }),
+    ])
+      .then(([caregiverRes, doctorRes]) => {
+        if (aborted) return;
+        const cRaw = caregiverRes?.data ?? caregiverRes;
+        const dRaw = doctorRes?.data ?? doctorRes;
+        const c = Array.isArray(cRaw) ? cRaw : [];
+        const d = Array.isArray(dRaw) ? dRaw : [];
+        const merged = [...c, ...d].sort((a, b) => {
+          if (a.category !== b.category) return a.category.localeCompare(b.category);
+          if (a.levelNumber !== b.levelNumber) return a.levelNumber - b.levelNumber;
+          return a.name.localeCompare(b.name);
+        });
+        setProviderLevelOptions(merged);
+      })
+      .catch(() => {
+        if (!aborted) setLevelsLoadError(t("providers.levelsLoadError"));
+      })
+      .finally(() => {
+        if (!aborted) setLevelsLoading(false);
+      });
+    return () => {
+      aborted = true;
+    };
+  }, [t]);
+
+  useEffect(() => {
+    if (!provider.id) return;
+    const ac = new AbortController();
+    let aborted = false;
+    setProviderLevelFromApi(undefined);
+    providersApi
+      .getProviderLevel(provider.id, { signal: ac.signal })
+      .then(({ levelId }) => {
+        if (!aborted) setProviderLevelFromApi(levelId);
+      })
+      .catch(() => {
+        if (!aborted) setProviderLevelFromApi(undefined);
+      });
+    return () => {
+      aborted = true;
+      ac.abort();
+    };
+  }, [provider.id]);
+
+  useEffect(() => {
+    if (providerLevelOptions.length === 0) {
+      setProfileLevelId("");
+      return;
+    }
+    const fromDetails =
+      provider.levelId != null && Number.isFinite(Number(provider.levelId))
+        ? Number(provider.levelId)
+        : null;
+    const preferred = providerLevelFromApi !== undefined ? providerLevelFromApi : fromDetails;
+    const lid =
+      preferred != null && providerLevelOptions.some((o) => o.id === preferred)
+        ? preferred
+        : providerLevelOptions[0].id;
+    setProfileLevelId(lid);
+  }, [provider.id, provider.levelId, providerLevelOptions, providerLevelFromApi]);
 
   useEffect(() => {
     const next: Record<number, boolean> = {};
@@ -1080,15 +1175,36 @@ export function ProviderFullDetailsView({
     }
   };
 
+  const handleUpdateProviderLevel = async () => {
+    if (typeof profileLevelId !== "number") return;
+    setLevelUpdating(true);
+    try {
+      await providersApi.updateProviderLevel(provider.id, { levelId: profileLevelId });
+      await onRefresh?.();
+      const r = await providersApi.getProviderLevel(provider.id);
+      setProviderLevelFromApi(r.levelId);
+    } catch {
+      setCertsError(t("providers.failedUpdateLevel"));
+    } finally {
+      setLevelUpdating(false);
+    }
+  };
+
   const handleSetProviderStatus = async () => {
+    if (typeof profileLevelId !== "number") {
+      throw new Error("LEVEL_REQUIRED");
+    }
     setStatusUpdating(true);
     try {
       await providersApi.verifyProvider(provider.id, {
         status: profileStatusChoice as "PENDING" | "ACTIVE" | "REJECTED" | "DEACTIVATED" | "ARCHIVED",
+        levelId: profileLevelId,
         comment: profileStatusComment.trim() || undefined,
       });
       setProfileStatusComment("");
       await onRefresh?.();
+      const r = await providersApi.getProviderLevel(provider.id);
+      setProviderLevelFromApi(r.levelId);
     } catch {
       setCertsError("Failed to update provider status.");
     } finally {
@@ -1103,6 +1219,43 @@ export function ProviderFullDetailsView({
     (serviceRequestsByStatus.IN_PROGRESS?.length ?? 0) +
     (serviceRequestsByStatus.COMPLETED?.length ?? 0) +
     (serviceRequestsByStatus.CANCELLED?.length ?? 0);
+
+  const assignedLevelDisplay = useMemo(() => {
+    const displayId =
+      providerLevelFromApi !== undefined
+        ? providerLevelFromApi
+        : provider.levelId != null && Number.isFinite(Number(provider.levelId))
+          ? Number(provider.levelId)
+          : null;
+    if (displayId == null) return null;
+    const match = providerLevelOptions.find((o) => o.id === displayId);
+    if (match) return formatLevelOptionLabel(match);
+    return `#${displayId}`;
+  }, [provider.levelId, providerLevelOptions, formatLevelOptionLabel, providerLevelFromApi]);
+
+  const canSubmitProviderStatusUpdate =
+    canChangeStatus &&
+    typeof profileLevelId === "number" &&
+    !levelsLoading &&
+    providerLevelOptions.length > 0;
+
+  const canPatchLevelOnly =
+    typeof profileLevelId === "number" &&
+    !levelsLoading &&
+    providerLevelOptions.length > 0 &&
+    !levelsLoadError;
+
+  const savedLevelIdForCompare: number | null =
+    providerLevelFromApi !== undefined
+      ? providerLevelFromApi
+      : provider.levelId != null && Number.isFinite(Number(provider.levelId))
+        ? Number(provider.levelId)
+        : null;
+
+  const levelMatchesSaved =
+    typeof profileLevelId === "number" &&
+    savedLevelIdForCompare !== null &&
+    savedLevelIdForCompare === profileLevelId;
 
   const providerDisplayName =
     [user.firstName, user.lastName].filter(Boolean).join(" ") || t("providers.providerName");
@@ -1293,11 +1446,49 @@ export function ProviderFullDetailsView({
           }
         />
         <DetailBlockRow label={t("providers.consultationType")} value={provider.consultationTypeName} />
+        <DetailBlockRow label={t("providers.level")} value={assignedLevelDisplay ?? "—"} />
         <DetailBlockRow label={t("providers.location")} value={provider.latitude && provider.longitude ? `${provider.latitude}, ${provider.longitude}` : undefined} />
         <DetailBlockRow label={t("providers.serviceRadiusKm")} value={provider.serviceRadiusKm} />
         <DetailBlockRow label={t("providers.created")} value={formatDate(provider.createdAt)} />
         <div className="mt-3 w-full min-w-0 border-t border-gray-100 pt-3 dark:border-gray-700">
+          <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">{t("providers.level")}</label>
+          <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">{t("providers.updateLevelHint")}</p>
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+            <select
+              value={profileLevelId === "" ? "" : String(profileLevelId)}
+              onChange={(e) => {
+                const v = e.target.value;
+                setProfileLevelId(v === "" ? "" : Number(v));
+              }}
+              disabled={levelsLoading || providerLevelOptions.length === 0}
+              className="w-full min-w-0 rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 sm:min-w-[14rem] sm:max-w-md sm:flex-1"
+            >
+              <option value="">{levelsLoading ? t("consultationTypeLevels.loading") : t("providers.selectLevel")}</option>
+              {providerLevelOptions.map((lvl) => (
+                <option key={lvl.id} value={lvl.id}>
+                  {formatLevelOptionLabel(lvl)}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              disabled={levelUpdating || !canPatchLevelOnly || levelMatchesSaved}
+              onClick={() => void handleUpdateProviderLevel()}
+              className="w-full shrink-0 rounded border border-brand-600 bg-white px-3 py-2 text-sm font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-50 dark:border-brand-500 dark:bg-gray-900 dark:text-brand-300 dark:hover:bg-gray-800 sm:w-auto"
+            >
+              {levelUpdating ? t("providers.updating") : t("providers.updateLevel")}
+            </button>
+          </div>
+          {levelsLoadError && (
+            <p className="mt-2 text-xs text-red-600 dark:text-red-400">{levelsLoadError}</p>
+          )}
+          {!levelsLoading && !levelsLoadError && providerLevelOptions.length === 0 && (
+            <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">{t("providers.noLevelsConfigured")}</p>
+          )}
+        </div>
+        <div className="mt-3 w-full min-w-0 border-t border-gray-100 pt-3 dark:border-gray-700">
           <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">{t("providers.providerProfileStatus")}</label>
+          <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">{t("providers.changeProviderStatusLevelHint")}</p>
           {canChangeStatus ? (
             <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
               <select
@@ -1320,7 +1511,7 @@ export function ProviderFullDetailsView({
               />
               <button
                 type="button"
-                disabled={statusUpdating}
+                disabled={statusUpdating || !canSubmitProviderStatusUpdate}
                 onClick={() => setShowProviderStatusConfirm(true)}
                 className="w-full shrink-0 rounded bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 dark:bg-brand-700 dark:hover:bg-brand-800 sm:w-auto"
               >
@@ -1349,13 +1540,30 @@ export function ProviderFullDetailsView({
                 {t("providers.providerLabel")}: {user.firstName} {user.lastName} ({provider.consultationTypeName})
               </span>
             )}
+            {typeof profileLevelId === "number" && (
+              <span className="block mt-2 text-gray-500 dark:text-gray-400">
+                {t("providers.level")}:{" "}
+                <span className="font-medium text-gray-800 dark:text-white/90">
+                  {(() => {
+                    const lvl = providerLevelOptions.find((o) => o.id === profileLevelId);
+                    return lvl ? formatLevelOptionLabel(lvl) : `#${profileLevelId}`;
+                  })()}
+                </span>
+              </span>
+            )}
           </>
         }
         confirmLabel={t("providers.updateStatus")}
         cancelLabel={t("common.actions.cancel")}
         confirmVariant="primary"
         onConfirm={handleSetProviderStatus}
-        onError={() => setCertsError("Failed to update provider status.")}
+        onError={(err) => {
+          if (err instanceof Error && err.message === "LEVEL_REQUIRED") {
+            setCertsError(t("providers.levelRequired"));
+            return;
+          }
+          setCertsError("Failed to update provider status.");
+        }}
       />
 
       <div className="w-full min-w-0 sm:col-span-2">
