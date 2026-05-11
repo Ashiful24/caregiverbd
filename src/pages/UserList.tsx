@@ -17,7 +17,7 @@ import { Dropdown } from "../components/ui/dropdown/Dropdown";
 import { DropdownItem } from "../components/ui/dropdown/DropdownItem";
 import ThemedSelect from "../components/form/ThemedSelect";
 import { Modal } from "../components/ui/modal";
-import { CheckLineIcon, CloseLineIcon, LockIcon, ViewIcon } from "../icons";
+import { CheckLineIcon, CloseLineIcon, LockIcon } from "../icons";
 import {
   usersListApi,
   userApi,
@@ -226,6 +226,9 @@ export default function UserList() {
     setError("");
     await adminUsersApi.updateStatus(String(confirmDeactivateUser.id), { isActive: false });
     await fetchUsers();
+    if (detailModalOpen && detailUserId === confirmDeactivateUser.id) {
+      void loadUserDetail(confirmDeactivateUser.id);
+    }
   };
 
   const handleConfirmActivate = async () => {
@@ -233,6 +236,9 @@ export default function UserList() {
     setError("");
     await adminUsersApi.updateStatus(String(confirmActivateUser.id), { isActive: true });
     await fetchUsers();
+    if (detailModalOpen && detailUserId === confirmActivateUser.id) {
+      void loadUserDetail(confirmActivateUser.id);
+    }
   };
 
   const handleSubmitPasswordChange = async (e: FormEvent) => {
@@ -308,7 +314,10 @@ export default function UserList() {
 
         {/* Status tabs (users only) + Type dropdown */}
         <div className="flex flex-col gap-4 border-b border-gray-200 px-4 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <nav className="-mb-px flex gap-6 sm:gap-8" aria-label={t("users.statusFilter")}>
+          <nav
+            className="-mb-px flex gap-4 overflow-x-auto pb-px sm:gap-8"
+            aria-label={t("users.statusFilter")}
+          >
             {STATUS_TABS.map((tab) => (
               <button
                 key={tab.value}
@@ -417,7 +426,16 @@ export default function UserList() {
                 {users.map((user, index) => (
                   <div
                     key={user.id}
-                    className="rounded-xl border border-gray-200 bg-gray-50/50 p-4 dark:border-gray-800 dark:bg-gray-800/30"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => openDetails(user.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        openDetails(user.id);
+                      }
+                    }}
+                    className="cursor-pointer rounded-xl border border-gray-200 bg-gray-50/50 p-4 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-800/30 dark:hover:bg-white/[0.02]"
                   >
                     <div className="flex flex-wrap items-start justify-between gap-2 border-b border-gray-200 pb-3 dark:border-gray-700">
                       <span className="text-sm font-semibold text-gray-800 dark:text-white/90">
@@ -435,18 +453,12 @@ export default function UserList() {
                         </Badge>
                         <button
                           type="button"
-                          title={t("users.viewFullDetails")}
-                          aria-label={t("users.viewFullDetails")}
-                          onClick={() => openDetails(user.id)}
-                          className="rounded-md border border-gray-200 bg-white p-2 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
-                        >
-                          <ViewIcon className="size-4" />
-                        </button>
-                        <button
-                          type="button"
                           title={t("users.changePassword")}
                           aria-label={t("users.changePassword")}
-                          onClick={() => openPasswordChange(user)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openPasswordChange(user);
+                          }}
                           className="rounded-md border border-gray-200 bg-white p-2 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
                         >
                           <LockIcon className="size-4" />
@@ -455,7 +467,10 @@ export default function UserList() {
                           type="button"
                           title={isUserActive(user) ? t("users.deactivateUser") : t("users.activateUser")}
                           aria-label={isUserActive(user) ? t("users.deactivateUser") : t("users.activateUser")}
-                          onClick={() => toggleUserActive(user)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleUserActive(user);
+                          }}
                           className="rounded-md border border-gray-200 bg-white p-2 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
                         >
                           {isUserActive(user) ? (
@@ -549,7 +564,7 @@ export default function UserList() {
                       </TableCell>
                       <TableCell
                         isHeader
-                        className="w-[8%] py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
+                        className="w-[10%] py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
                       >
                         {t("users.actions")}
                       </TableCell>
@@ -557,7 +572,11 @@ export default function UserList() {
                   </TableHeader>
                   <TableBody className="divide-y divide-gray-100 dark:divide-gray-800">
                     {users.map((user, index) => (
-                      <TableRow key={user.id}>
+                      <TableRow
+                        key={user.id}
+                        onClick={() => openDetails(user.id)}
+                        className="cursor-pointer hover:bg-gray-50 dark:hover:bg-white/[0.02]"
+                      >
                         <TableCell className="py-3 text-theme-sm text-gray-700 dark:text-gray-300">
                           {(page - 1) * limit + index + 1}
                         </TableCell>
@@ -592,21 +611,15 @@ export default function UserList() {
                           {formatDate(user.createdAt)}
                         </TableCell>
                         <TableCell className="py-3 text-right">
-                          <div className="inline-flex items-center gap-1">
-                            <button
-                              type="button"
-                              title={t("users.viewFullDetails")}
-                              aria-label={t("users.viewFullDetails")}
-                              onClick={() => openDetails(user.id)}
-                              className="rounded-md border border-gray-200 bg-white p-2 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
-                            >
-                              <ViewIcon className="size-4" />
-                            </button>
+                          <div className="inline-flex items-center justify-end gap-1">
                             <button
                               type="button"
                               title={t("users.changePassword")}
                               aria-label={t("users.changePassword")}
-                              onClick={() => openPasswordChange(user)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openPasswordChange(user);
+                              }}
                               className="rounded-md border border-gray-200 bg-white p-2 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
                             >
                               <LockIcon className="size-4" />
@@ -615,7 +628,10 @@ export default function UserList() {
                               type="button"
                               title={isUserActive(user) ? t("users.deactivateUser") : t("users.activateUser")}
                               aria-label={isUserActive(user) ? t("users.deactivateUser") : t("users.activateUser")}
-                              onClick={() => toggleUserActive(user)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleUserActive(user);
+                              }}
                               className="rounded-md border border-gray-200 bg-white p-2 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
                             >
                               {isUserActive(user) ? (
@@ -727,6 +743,26 @@ export default function UserList() {
                 </>
               )}
             </dl>
+            <div className="mt-4 flex flex-wrap gap-2 border-t border-gray-200 pt-4 dark:border-gray-800">
+              <button
+                type="button"
+                onClick={() => openPasswordChange(detailData)}
+                className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+              >
+                {t("users.changePassword")}
+              </button>
+              <button
+                type="button"
+                onClick={() => toggleUserActive(detailData)}
+                className={`rounded-lg px-3 py-2 text-sm font-medium text-white ${
+                  isUserActive(detailData)
+                    ? "bg-red-600 hover:bg-red-700"
+                    : "bg-brand-600 hover:bg-brand-700"
+                }`}
+              >
+                {isUserActive(detailData) ? t("users.deactivateUser") : t("users.activateUser")}
+              </button>
+            </div>
           </div>
         )}
       </DetailModal>

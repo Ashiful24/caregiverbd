@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Check, Download, Eye, Upload, X } from "lucide-react";
+import { Check, Download, Upload, X } from "lucide-react";
 import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import PageMeta from "../components/common/PageMeta";
 import ThemedSelect from "../components/form/ThemedSelect";
@@ -411,7 +411,16 @@ export default function WithdrawalRequests() {
                 {list.map((row, index) => (
                   <div
                     key={row.id}
-                    className="rounded-xl border border-gray-200 bg-gray-50/50 p-4 dark:border-gray-800 dark:bg-gray-800/30"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => void openDetails(row.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        void openDetails(row.id);
+                      }
+                    }}
+                    className="cursor-pointer rounded-xl border border-gray-200 bg-gray-50/50 p-4 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-800/30 dark:hover:bg-white/[0.02]"
                   >
                     <div className="flex items-start justify-between gap-2 border-b border-gray-200 pb-3 dark:border-gray-700">
                       <span className="text-sm font-semibold text-gray-800 dark:text-white/90">
@@ -443,7 +452,8 @@ export default function WithdrawalRequests() {
                           type="button"
                           title={t("withdrawalRequests.approve")}
                           aria-label={t("withdrawalRequests.approve")}
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             if (String(row.status).toUpperCase() !== "PENDING") return;
                             setConfirmApproveId(row.id);
                             setApproveNote("");
@@ -456,18 +466,10 @@ export default function WithdrawalRequests() {
                         </button>
                         <button
                           type="button"
-                          title={t("common.actions.details")}
-                          aria-label={t("common.actions.details")}
-                          onClick={() => void openDetails(row.id)}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-brand-200 text-brand-600 hover:bg-brand-50 dark:border-brand-700/60 dark:text-brand-400 dark:hover:bg-brand-900/20"
-                        >
-                          <Eye className="size-4" />
-                        </button>
-                        <button
-                          type="button"
                           title={t("withdrawalRequests.reject")}
                           aria-label={t("withdrawalRequests.reject")}
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             if (String(row.status).toUpperCase() === "COMPLETED") return;
                             setConfirmRejectId(row.id);
                           }}
@@ -496,7 +498,11 @@ export default function WithdrawalRequests() {
                   </TableHeader>
                   <TableBody className="divide-y divide-gray-100 dark:divide-gray-800">
                     {list.map((row, index) => (
-                      <TableRow key={row.id}>
+                      <TableRow
+                        key={row.id}
+                        onClick={() => void openDetails(row.id)}
+                        className="cursor-pointer hover:bg-gray-50 dark:hover:bg-white/[0.02]"
+                      >
                         <TableCell className="px-2 py-3 text-theme-sm text-gray-700 dark:text-gray-300">
                           {(page - 1) * limit + index + 1}
                         </TableCell>
@@ -522,7 +528,8 @@ export default function WithdrawalRequests() {
                               type="button"
                               title={t("withdrawalRequests.approve")}
                               aria-label={t("withdrawalRequests.approve")}
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 if (String(row.status).toUpperCase() !== "PENDING") return;
                                 setConfirmApproveId(row.id);
                                 setApproveNote("");
@@ -535,18 +542,10 @@ export default function WithdrawalRequests() {
                             </button>
                             <button
                               type="button"
-                              title={t("common.actions.details")}
-                              aria-label={t("common.actions.details")}
-                              onClick={() => void openDetails(row.id)}
-                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-brand-200 text-brand-600 hover:bg-brand-50 dark:border-brand-700/60 dark:text-brand-400 dark:hover:bg-brand-900/20"
-                            >
-                              <Eye className="size-4" />
-                            </button>
-                            <button
-                              type="button"
                               title={t("withdrawalRequests.reject")}
                               aria-label={t("withdrawalRequests.reject")}
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 if (String(row.status).toUpperCase() === "COMPLETED") return;
                                 setConfirmRejectId(row.id);
                               }}

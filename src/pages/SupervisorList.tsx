@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "../components/ui/table";
-import { PencilIcon, PlusIcon, TaskIcon, UserIcon, ViewIcon } from "../icons";
+import { PencilIcon, PlusIcon, TaskIcon, UserIcon } from "../icons";
 import type { SupervisorFullDetails } from "../data/supervisorSeed";
 import {
   adminSupervisorsApi,
@@ -265,7 +265,16 @@ export default function SupervisorList() {
             {supervisors.map((s) => (
               <div
                 key={s.id}
-                className="rounded-xl border border-gray-200 bg-gray-50/50 p-4 dark:border-gray-800 dark:bg-gray-800/30"
+                role="button"
+                tabIndex={0}
+                onClick={() => void openView(s)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    void openView(s);
+                  }
+                }}
+                className="cursor-pointer rounded-xl border border-gray-200 bg-gray-50/50 p-4 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-800/30 dark:hover:bg-white/[0.02]"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
@@ -277,18 +286,12 @@ export default function SupervisorList() {
                     <div className="inline-flex items-center gap-1">
                       <button
                         type="button"
-                        title={t("common.actions.view")}
-                        aria-label={t("common.actions.view")}
-                        onClick={() => void openView(s)}
-                        className="rounded-md border border-gray-200 bg-white p-2 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
-                      >
-                        <ViewIcon className="size-4" />
-                      </button>
-                      <button
-                        type="button"
                         title={t("common.actions.edit")}
                         aria-label={t("common.actions.edit")}
-                        onClick={() => openEdit(s)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openEdit(s);
+                        }}
                         className="rounded-md border border-gray-200 bg-white p-2 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
                       >
                         <PencilIcon className="size-4" />
@@ -297,7 +300,10 @@ export default function SupervisorList() {
                         type="button"
                         title={t("supervisor.assignNurse")}
                         aria-label={t("supervisor.assignNurse")}
-                        onClick={() => openAssign(s)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openAssign(s);
+                        }}
                         className="rounded-md border border-gray-200 bg-white p-2 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
                       >
                         <UserIcon className="size-4" />
@@ -393,7 +399,11 @@ export default function SupervisorList() {
               </TableHeader>
               <TableBody className="divide-y divide-gray-100 dark:divide-gray-800">
                 {supervisors.map((s) => (
-                  <TableRow key={s.id}>
+                  <TableRow
+                    key={s.id}
+                    onClick={() => void openView(s)}
+                    className="cursor-pointer hover:bg-gray-50 dark:hover:bg-white/[0.02]"
+                  >
                     <TableCell className="min-w-0 py-3 align-top font-medium text-gray-800 dark:text-white/90">
                       {s.name}
                     </TableCell>
@@ -423,18 +433,12 @@ export default function SupervisorList() {
                       <div className="inline-flex items-center gap-1">
                         <button
                           type="button"
-                          title={t("common.actions.view")}
-                          aria-label={t("common.actions.view")}
-                          onClick={() => void openView(s)}
-                          className="rounded-md border border-gray-200 bg-white p-2 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
-                        >
-                          <ViewIcon className="size-4" />
-                        </button>
-                        <button
-                          type="button"
                           title={t("common.actions.edit")}
                           aria-label={t("common.actions.edit")}
-                          onClick={() => openEdit(s)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openEdit(s);
+                          }}
                           className="rounded-md border border-gray-200 bg-white p-2 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
                         >
                           <PencilIcon className="size-4" />
@@ -443,7 +447,10 @@ export default function SupervisorList() {
                           type="button"
                           title={t("supervisor.assignNurse")}
                           aria-label={t("supervisor.assignNurse")}
-                          onClick={() => openAssign(s)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openAssign(s);
+                          }}
                           className="rounded-md border border-gray-200 bg-white p-2 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
                         >
                           <UserIcon className="size-4" />

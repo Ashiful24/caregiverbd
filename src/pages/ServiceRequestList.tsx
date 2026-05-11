@@ -271,7 +271,16 @@ export default function ServiceRequestList() {
                 {list.map((item) => (
                   <div
                     key={item.id}
-                    className="rounded-xl border border-gray-200 bg-gray-50/50 p-4 dark:border-gray-800 dark:bg-gray-800/30"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setDetailItem(item)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setDetailItem(item);
+                      }
+                    }}
+                    className="cursor-pointer rounded-xl border border-gray-200 bg-gray-50/50 p-4 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-800/30 dark:hover:bg-white/[0.02]"
                   >
                     <div className="flex flex-wrap items-start justify-between gap-2 border-b border-gray-200 pb-3 dark:border-gray-700">
                       <span className="text-sm font-semibold text-gray-800 dark:text-white/90">
@@ -338,15 +347,6 @@ export default function ServiceRequestList() {
                         </div>
                       )}
                     </dl>
-                    <div className="mt-4 border-t border-gray-200 pt-4 dark:border-gray-700">
-                      <button
-                        type="button"
-                        onClick={() => setDetailItem(item)}
-                        className="w-full rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100"
-                      >
-                        {t("common.actions.details")}
-                      </button>
-                    </div>
                   </div>
                 ))}
               </div>
@@ -406,17 +406,15 @@ export default function ServiceRequestList() {
                       >
                         {t("appointments.created")}
                       </TableCell>
-                      <TableCell
-                        isHeader
-                        className="w-[11%] py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
-                      >
-                        {t("users.actions")}
-                      </TableCell>
                     </TableRow>
                   </TableHeader>
                   <TableBody className="divide-y divide-gray-100 dark:divide-gray-800">
                     {list.map((item) => (
-                      <TableRow key={item.id}>
+                      <TableRow
+                        key={item.id}
+                        onClick={() => setDetailItem(item)}
+                        className="cursor-pointer hover:bg-gray-50 dark:hover:bg-white/[0.02]"
+                      >
                         <TableCell className="py-3 text-theme-sm text-gray-700 dark:text-gray-300">
                           {item.id}
                         </TableCell>
@@ -449,15 +447,6 @@ export default function ServiceRequestList() {
                           {item.createdAt
                             ? formatDate(item.createdAt)
                             : "—"}
-                        </TableCell>
-                        <TableCell className="py-3 text-right">
-                          <button
-                            type="button"
-                            onClick={() => setDetailItem(item)}
-                            className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-theme-sm font-medium text-gray-800 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
-                          >
-                            {t("common.actions.details")}
-                          </button>
                         </TableCell>
                       </TableRow>
                     ))}
