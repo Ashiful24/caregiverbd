@@ -100,8 +100,8 @@ export function ServiceRequestDetailModal({
       className="max-w-xl p-6 sm:p-8 md:max-w-2xl"
     >
       {item ? (
-        <div className="flex max-h-[85vh] flex-col pe-10 pt-1 sm:pe-14">
-          <div className="shrink-0 border-b border-gray-200 pb-4 dark:border-gray-800">
+        <div className="flex max-h-[85vh] flex-col">
+          <div className="shrink-0 border-b border-gray-200 pb-4 pt-1 dark:border-gray-800">
             <h3 className="text-xl font-semibold text-gray-900 dark:text-white/95">
               {t("appointments.detailTitle", { id: item.id })}
             </h3>
