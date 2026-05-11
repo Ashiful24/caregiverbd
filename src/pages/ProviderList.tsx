@@ -13,7 +13,6 @@ import {
   TableRow,
 } from "../components/ui/table";
 import Badge from "../components/ui/badge/Badge";
-import { ViewIcon } from "../icons";
 import {
   providersApi,
   consultationTypesApi,
@@ -365,26 +364,24 @@ export default function ProviderList() {
                 {providers.map((provider, index) => (
                   <div
                     key={provider.id}
-                    className="rounded-xl border border-gray-200 bg-gray-50/50 p-4 dark:border-gray-800 dark:bg-gray-800/30"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => openDetails(provider.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        openDetails(provider.id);
+                      }
+                    }}
+                    className="cursor-pointer rounded-xl border border-gray-200 bg-gray-50/50 p-4 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-800/30 dark:hover:bg-white/[0.02]"
                   >
                     <div className="flex flex-wrap items-start justify-between gap-2 border-b border-gray-200 pb-3 dark:border-gray-700">
                       <span className="text-sm font-semibold text-gray-800 dark:text-white/90">
                         {[provider.firstName, provider.lastName].filter(Boolean).join(" ") || "—"}
                       </span>
-                      <div className="flex items-center gap-2">
-                        <Badge size="sm" color={providerStatusBadgeColor(provider.status)}>
-                          {formatStatusLabel(provider.status)}
-                        </Badge>
-                        <button
-                          type="button"
-                          title={t("providers.viewFullDetails")}
-                          aria-label={t("providers.viewFullDetails")}
-                          onClick={() => openDetails(provider.id)}
-                          className="rounded-md border border-gray-200 bg-white p-2 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
-                        >
-                          <ViewIcon className="size-4" />
-                        </button>
-                      </div>
+                      <Badge size="sm" color={providerStatusBadgeColor(provider.status)}>
+                        {formatStatusLabel(provider.status)}
+                      </Badge>
                     </div>
                     <dl className="mt-3 grid grid-cols-1 gap-2 text-sm">
                       <div className="flex justify-between gap-2">
@@ -425,12 +422,15 @@ export default function ProviderList() {
                       <TableCell isHeader className="w-[16%] py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">{t("providers.email")}</TableCell>
                       <TableCell isHeader className="w-[12%] py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">{t("providers.phone")}</TableCell>
                       <TableCell isHeader className="w-[12%] py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">{t("providers.created")}</TableCell>
-                      <TableCell isHeader className="w-[8%] py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">{t("providers.actions")}</TableCell>
                     </TableRow>
                   </TableHeader>
                   <TableBody className="divide-y divide-gray-100 dark:divide-gray-800">
                     {providers.map((provider, index) => (
-                      <TableRow key={provider.id}>
+                      <TableRow
+                        key={provider.id}
+                        onClick={() => openDetails(provider.id)}
+                        className="cursor-pointer hover:bg-gray-50 dark:hover:bg-white/[0.02]"
+                      >
                         <TableCell className="py-3 text-theme-sm text-gray-700 dark:text-gray-300">{(page - 1) * limit + index + 1}</TableCell>
                         <TableCell className="py-3 font-medium text-gray-800 dark:text-white/90">
                           {[provider.firstName, provider.lastName].filter(Boolean).join(" ") || "—"}
@@ -445,17 +445,6 @@ export default function ProviderList() {
                         <TableCell className="py-3 text-theme-sm text-gray-600 dark:text-gray-400">{provider.username ?? "—"}</TableCell>
                         <TableCell className="py-3 text-theme-sm text-gray-600 dark:text-gray-400">
                           {provider.createdAt ? formatDate(String(provider.createdAt)) : "—"}
-                        </TableCell>
-                        <TableCell className="py-3 text-right">
-                          <button
-                            type="button"
-                            title={t("providers.viewFullDetails")}
-                            aria-label={t("providers.viewFullDetails")}
-                            onClick={() => openDetails(provider.id)}
-                            className="rounded-md border border-gray-200 bg-white p-2 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
-                          >
-                            <ViewIcon className="size-4" />
-                          </button>
                         </TableCell>
                       </TableRow>
                     ))}
