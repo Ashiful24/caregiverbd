@@ -366,7 +366,10 @@ export default function WithdrawalRequests() {
         </div>
 
         <div className="border-b border-gray-200 px-4 dark:border-gray-800 sm:px-6">
-          <nav className="-mb-px flex gap-6 sm:gap-8" aria-label={t("withdrawalRequests.status")}>
+          <nav
+            className="-mb-px flex gap-4 overflow-x-auto pb-px sm:gap-8"
+            aria-label={t("withdrawalRequests.status")}
+          >
             {STATUS_TABS.map((tab) => (
               <button
                 key={tab}

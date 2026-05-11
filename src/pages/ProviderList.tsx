@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import PageMeta from "../components/common/PageMeta";
 import ThemedSelect from "../components/form/ThemedSelect";
-import { ActionsMenu } from "../components/common/ActionsMenu";
 import { DetailModal } from "../components/common/DetailModal";
 import { ProviderFullDetailsView } from "../components/common/ProfileDetailBlocks";
 import {
@@ -14,7 +13,7 @@ import {
   TableRow,
 } from "../components/ui/table";
 import Badge from "../components/ui/badge/Badge";
-import { DropdownItem } from "../components/ui/dropdown/DropdownItem";
+import { ViewIcon } from "../icons";
 import {
   providersApi,
   consultationTypesApi,
@@ -100,8 +99,6 @@ export default function ProviderList() {
   const [documentTypes, setDocumentTypes] = useState<VerificationDocumentTypeItem[]>([]);
   const [documentTypeFilterCode, setDocumentTypeFilterCode] = useState<string>("");
   const [statusTab, setStatusTab] = useState<ProviderListStatusFilter>("all");
-  const [openActionsId, setOpenActionsId] = useState<number | null>(null);
-  const actionsButtonRef = useRef<HTMLButtonElement>(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [detailProviderId, setDetailProviderId] = useState<number | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -234,7 +231,6 @@ export default function ProviderList() {
   }, [detailModalOpen, detailProviderId, loadProviderDetail]);
 
   const openDetails = (providerId: number) => {
-    setOpenActionsId(null);
     setDetailProviderId(providerId);
     setDetailModalOpen(true);
   };
@@ -309,7 +305,10 @@ export default function ProviderList() {
 
         {/* Status tabs */}
         <div className="border-b border-gray-200 px-4 dark:border-gray-800 sm:px-6">
-          <nav className="-mb-px flex gap-6 sm:gap-8" aria-label={t("providers.statusFilter")}>
+          <nav
+            className="-mb-px flex gap-4 overflow-x-auto pb-px sm:gap-8"
+            aria-label={t("providers.statusFilter")}
+          >
             {STATUS_TABS.map((tab) => (
               <button
                 key={tab.value}
@@ -376,23 +375,15 @@ export default function ProviderList() {
                         <Badge size="sm" color={providerStatusBadgeColor(provider.status)}>
                           {formatStatusLabel(provider.status)}
                         </Badge>
-                        <ActionsMenu
-                          isOpen={openActionsId === provider.id}
-                          onClose={() => setOpenActionsId(null)}
-                          onButtonClick={() => setOpenActionsId(openActionsId === provider.id ? null : provider.id)}
-                          buttonRef={openActionsId === provider.id ? actionsButtonRef : undefined}
+                        <button
+                          type="button"
+                          title={t("providers.viewFullDetails")}
+                          aria-label={t("providers.viewFullDetails")}
+                          onClick={() => openDetails(provider.id)}
+                          className="rounded-md border border-gray-200 bg-white p-2 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
                         >
-                          <DropdownItem
-                            onMouseDown={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              openDetails(provider.id);
-                            }}
-                            className="dark:hover:bg-gray-700 dark:text-gray-200"
-                          >
-                            {t("providers.viewFullDetails")}
-                          </DropdownItem>
-                        </ActionsMenu>
+                          <ViewIcon className="size-4" />
+                        </button>
                       </div>
                     </div>
                     <dl className="mt-3 grid grid-cols-1 gap-2 text-sm">
@@ -456,23 +447,15 @@ export default function ProviderList() {
                           {provider.createdAt ? formatDate(String(provider.createdAt)) : "—"}
                         </TableCell>
                         <TableCell className="py-3 text-right">
-                          <ActionsMenu
-                            isOpen={openActionsId === provider.id}
-                            onClose={() => setOpenActionsId(null)}
-                            onButtonClick={() => setOpenActionsId(openActionsId === provider.id ? null : provider.id)}
-                            buttonRef={openActionsId === provider.id ? actionsButtonRef : undefined}
+                          <button
+                            type="button"
+                            title={t("providers.viewFullDetails")}
+                            aria-label={t("providers.viewFullDetails")}
+                            onClick={() => openDetails(provider.id)}
+                            className="rounded-md border border-gray-200 bg-white p-2 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
                           >
-                            <DropdownItem
-                              onMouseDown={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                openDetails(provider.id);
-                              }}
-                              className="dark:hover:bg-gray-700 dark:text-gray-200"
-                            >
-                              {t("providers.viewFullDetails")}
-                            </DropdownItem>
-                          </ActionsMenu>
+                            <ViewIcon className="size-4" />
+                          </button>
                         </TableCell>
                       </TableRow>
                     ))}

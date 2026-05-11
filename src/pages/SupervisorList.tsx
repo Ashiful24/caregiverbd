@@ -1,10 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { format, isValid, parseISO } from "date-fns";
 import { useTranslation } from "react-i18next";
 import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import PageMeta from "../components/common/PageMeta";
-import { ActionsMenu } from "../components/common/ActionsMenu";
-import { DropdownItem } from "../components/ui/dropdown/DropdownItem";
 import { SupervisorAssignNursesModal } from "../components/supervisors/SupervisorAssignNursesModal";
 import { SupervisorCreateModal } from "../components/supervisors/SupervisorCreateModal";
 import { SupervisorViewModal } from "../components/supervisors/SupervisorViewModal";
@@ -15,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "../components/ui/table";
-import { PlusIcon, TaskIcon } from "../icons";
+import { PencilIcon, PlusIcon, TaskIcon, UserIcon, ViewIcon } from "../icons";
 import type { SupervisorFullDetails } from "../data/supervisorSeed";
 import {
   adminSupervisorsApi,
@@ -142,8 +140,6 @@ export default function SupervisorList() {
   const [viewDetailLoading, setViewDetailLoading] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
   const [assignTarget, setAssignTarget] = useState<SupervisorFullDetails | null>(null);
-  const [openActionsId, setOpenActionsId] = useState<string | null>(null);
-  const actionsButtonRef = useRef<HTMLButtonElement>(null);
 
   const fetchSupervisors = useCallback(async () => {
     setLoading(true);
@@ -169,21 +165,18 @@ export default function SupervisorList() {
   }, [fetchSupervisors]);
 
   const openCreate = () => {
-    setOpenActionsId(null);
     setFormMode("create");
     setEditTarget(null);
     setCreateOpen(true);
   };
 
   const openEdit = (s: SupervisorFullDetails) => {
-    setOpenActionsId(null);
     setFormMode("edit");
     setEditTarget(s);
     setCreateOpen(true);
   };
 
   const openView = async (s: SupervisorFullDetails) => {
-    setOpenActionsId(null);
     setViewing(s);
     setViewOpen(true);
     if (s.userId == null) {
@@ -216,7 +209,6 @@ export default function SupervisorList() {
   };
 
   const openAssign = (s: SupervisorFullDetails) => {
-    setOpenActionsId(null);
     setAssignTarget(s);
     setAssignOpen(true);
   };
@@ -282,45 +274,35 @@ export default function SupervisorList() {
                   </div>
                   <div className="flex shrink-0 items-start gap-2">
                     {statusBadge(s.status, s.status)}
-                    <ActionsMenu
-                      isOpen={openActionsId === s.id}
-                      onClose={() => setOpenActionsId(null)}
-                      onButtonClick={() =>
-                        setOpenActionsId(openActionsId === s.id ? null : s.id)
-                      }
-                      buttonRef={openActionsId === s.id ? actionsButtonRef : undefined}
-                    >
-                      <DropdownItem
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          openView(s);
-                        }}
-                        className="dark:hover:bg-gray-700 dark:text-gray-200"
+                    <div className="inline-flex items-center gap-1">
+                      <button
+                        type="button"
+                        title={t("common.actions.view")}
+                        aria-label={t("common.actions.view")}
+                        onClick={() => void openView(s)}
+                        className="rounded-md border border-gray-200 bg-white p-2 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
                       >
-                        {t("common.actions.view")}
-                      </DropdownItem>
-                      <DropdownItem
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          openEdit(s);
-                        }}
-                        className="dark:hover:bg-gray-700 dark:text-gray-200"
+                        <ViewIcon className="size-4" />
+                      </button>
+                      <button
+                        type="button"
+                        title={t("common.actions.edit")}
+                        aria-label={t("common.actions.edit")}
+                        onClick={() => openEdit(s)}
+                        className="rounded-md border border-gray-200 bg-white p-2 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
                       >
-                        {t("common.actions.edit")}
-                      </DropdownItem>
-                      <DropdownItem
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          openAssign(s);
-                        }}
-                        className="dark:hover:bg-gray-700 dark:text-gray-200"
+                        <PencilIcon className="size-4" />
+                      </button>
+                      <button
+                        type="button"
+                        title={t("supervisor.assignNurse")}
+                        aria-label={t("supervisor.assignNurse")}
+                        onClick={() => openAssign(s)}
+                        className="rounded-md border border-gray-200 bg-white p-2 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
                       >
-                        {t("supervisor.assignNurse")}
-                      </DropdownItem>
-                    </ActionsMenu>
+                        <UserIcon className="size-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
                 <dl className="mt-3 grid grid-cols-1 gap-2 text-sm">
@@ -438,45 +420,35 @@ export default function SupervisorList() {
                       {formatJoinedDate(s.joinedAt)}
                     </TableCell>
                     <TableCell className="py-3 text-right">
-                      <ActionsMenu
-                        isOpen={openActionsId === s.id}
-                        onClose={() => setOpenActionsId(null)}
-                        onButtonClick={() =>
-                          setOpenActionsId(openActionsId === s.id ? null : s.id)
-                        }
-                        buttonRef={openActionsId === s.id ? actionsButtonRef : undefined}
-                      >
-                        <DropdownItem
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            openView(s);
-                          }}
-                          className="dark:hover:bg-gray-700 dark:text-gray-200"
+                      <div className="inline-flex items-center gap-1">
+                        <button
+                          type="button"
+                          title={t("common.actions.view")}
+                          aria-label={t("common.actions.view")}
+                          onClick={() => void openView(s)}
+                          className="rounded-md border border-gray-200 bg-white p-2 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
                         >
-                          {t("common.actions.view")}
-                        </DropdownItem>
-                        <DropdownItem
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            openEdit(s);
-                          }}
-                          className="dark:hover:bg-gray-700 dark:text-gray-200"
+                          <ViewIcon className="size-4" />
+                        </button>
+                        <button
+                          type="button"
+                          title={t("common.actions.edit")}
+                          aria-label={t("common.actions.edit")}
+                          onClick={() => openEdit(s)}
+                          className="rounded-md border border-gray-200 bg-white p-2 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
                         >
-                          {t("common.actions.edit")}
-                        </DropdownItem>
-                        <DropdownItem
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            openAssign(s);
-                          }}
-                          className="dark:hover:bg-gray-700 dark:text-gray-200"
+                          <PencilIcon className="size-4" />
+                        </button>
+                        <button
+                          type="button"
+                          title={t("supervisor.assignNurse")}
+                          aria-label={t("supervisor.assignNurse")}
+                          onClick={() => openAssign(s)}
+                          className="rounded-md border border-gray-200 bg-white p-2 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
                         >
-                          {t("supervisor.assignNurse")}
-                        </DropdownItem>
-                      </ActionsMenu>
+                          <UserIcon className="size-4" />
+                        </button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

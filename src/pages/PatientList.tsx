@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import PageMeta from "../components/common/PageMeta";
 import ThemedSelect from "../components/form/ThemedSelect";
-import { ActionsMenu } from "../components/common/ActionsMenu";
 import { DetailModal } from "../components/common/DetailModal";
 import { PatientFullDetailsView } from "../components/common/ProfileDetailBlocks";
 import {
@@ -14,7 +13,7 @@ import {
   TableRow,
 } from "../components/ui/table";
 import Badge from "../components/ui/badge/Badge";
-import { DropdownItem } from "../components/ui/dropdown/DropdownItem";
+import { ViewIcon } from "../icons";
 import { patientsApi, type PatientFullDetailsDto, type PatientListItem } from "../services/api";
 import { formatAccountActiveLabel, formatDate } from "../utils/format";
 
@@ -32,8 +31,6 @@ export default function PatientList() {
   const [totalPages, setTotalPages] = useState(0);
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [openActionsId, setOpenActionsId] = useState<number | null>(null);
-  const actionsButtonRef = useRef<HTMLButtonElement>(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [detailPatientId, setDetailPatientId] = useState<number | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -119,7 +116,6 @@ export default function PatientList() {
   }, [detailModalOpen, detailPatientId, loadPatientDetail]);
 
   const openDetails = (patientId: number) => {
-    setOpenActionsId(null);
     setDetailPatientId(patientId);
     setDetailModalOpen(true);
   };
@@ -203,23 +199,15 @@ export default function PatientList() {
                         >
                           {formatAccountActiveLabel(patient.isActive !== false)}
                         </Badge>
-                        <ActionsMenu
-                          isOpen={openActionsId === patient.id}
-                          onClose={() => setOpenActionsId(null)}
-                          onButtonClick={() => setOpenActionsId(openActionsId === patient.id ? null : patient.id)}
-                          buttonRef={openActionsId === patient.id ? actionsButtonRef : undefined}
+                        <button
+                          type="button"
+                          title={t("patients.viewFullDetails")}
+                          aria-label={t("patients.viewFullDetails")}
+                          onClick={() => openDetails(patient.id)}
+                          className="rounded-md border border-gray-200 bg-white p-2 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
                         >
-                          <DropdownItem
-                            onMouseDown={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              openDetails(patient.id);
-                            }}
-                            className="dark:hover:bg-gray-700 dark:text-gray-200"
-                          >
-                            {t("patients.viewFullDetails")}
-                          </DropdownItem>
-                        </ActionsMenu>
+                          <ViewIcon className="size-4" />
+                        </button>
                       </div>
                     </div>
                     <dl className="mt-3 grid grid-cols-1 gap-2 text-sm">
@@ -333,23 +321,15 @@ export default function PatientList() {
                           </Badge>
                         </TableCell>
                         <TableCell className="py-3 text-right">
-                          <ActionsMenu
-                            isOpen={openActionsId === patient.id}
-                            onClose={() => setOpenActionsId(null)}
-                            onButtonClick={() => setOpenActionsId(openActionsId === patient.id ? null : patient.id)}
-                            buttonRef={openActionsId === patient.id ? actionsButtonRef : undefined}
+                          <button
+                            type="button"
+                            title={t("patients.viewFullDetails")}
+                            aria-label={t("patients.viewFullDetails")}
+                            onClick={() => openDetails(patient.id)}
+                            className="rounded-md border border-gray-200 bg-white p-2 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
                           >
-                            <DropdownItem
-                              onMouseDown={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                openDetails(patient.id);
-                              }}
-                              className="dark:hover:bg-gray-700 dark:text-gray-200"
-                            >
-                              {t("patients.viewFullDetails")}
-                            </DropdownItem>
-                          </ActionsMenu>
+                            <ViewIcon className="size-4" />
+                          </button>
                         </TableCell>
                       </TableRow>
                     ))}

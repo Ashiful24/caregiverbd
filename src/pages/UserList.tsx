@@ -3,7 +3,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import PageMeta from "../components/common/PageMeta";
-import { ActionsMenu } from "../components/common/ActionsMenu";
 import { DetailModal } from "../components/common/DetailModal";
 import {
   Table,
@@ -18,6 +17,7 @@ import { Dropdown } from "../components/ui/dropdown/Dropdown";
 import { DropdownItem } from "../components/ui/dropdown/DropdownItem";
 import ThemedSelect from "../components/form/ThemedSelect";
 import { Modal } from "../components/ui/modal";
+import { CheckLineIcon, CloseLineIcon, LockIcon, ViewIcon } from "../icons";
 import {
   usersListApi,
   userApi,
@@ -82,7 +82,6 @@ export default function UserList() {
   const [statusTab, setStatusTab] = useState<UserListStatusFilter>("all");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [roleFilterOpen, setRoleFilterOpen] = useState(false);
-  const [openActionsId, setOpenActionsId] = useState<number | null>(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [detailUserId, setDetailUserId] = useState<number | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -93,7 +92,6 @@ export default function UserList() {
   const [passwordNew, setPasswordNew] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [passwordChangeLoading, setPasswordChangeLoading] = useState(false);
-  const actionsButtonRef = useRef<HTMLButtonElement | null>(null);
   const roleFilterButtonRef = useRef<HTMLButtonElement | null>(null);
 
   // Debounce search: update searchQuery (and reset to page 1) after user stops typing
@@ -183,7 +181,6 @@ export default function UserList() {
   }, [detailModalOpen, detailUserId, loadUserDetail]);
 
   const openDetails = (userId: number) => {
-    setOpenActionsId(null);
     setDetailUserId(userId);
     setDetailModalOpen(true);
   };
@@ -197,7 +194,6 @@ export default function UserList() {
   const openDeactivateConfirm = (user: UserListItem) => {
     if (!isUserActive(user)) return;
     setConfirmDeactivateUser(user);
-    setOpenActionsId(null);
   };
 
   const closeDeactivateConfirm = () => {
@@ -207,7 +203,6 @@ export default function UserList() {
   const openActivateConfirm = (user: UserListItem) => {
     if (isUserActive(user)) return;
     setConfirmActivateUser(user);
-    setOpenActionsId(null);
   };
 
   const closeActivateConfirm = () => {
@@ -218,7 +213,6 @@ export default function UserList() {
     setPasswordChangeUser(user);
     setPasswordNew("");
     setPasswordConfirm("");
-    setOpenActionsId(null);
   };
 
   const closePasswordChange = () => {
@@ -439,51 +433,37 @@ export default function UserList() {
                         >
                           {formatAccountActiveLabel(isUserActive(user))}
                         </Badge>
-                        <ActionsMenu
-                          isOpen={openActionsId === user.id}
-                          onClose={() => setOpenActionsId(null)}
-                          onButtonClick={() => setOpenActionsId(openActionsId === user.id ? null : user.id)}
-                          buttonRef={openActionsId === user.id ? actionsButtonRef : undefined}
-                          buttonClassName="dropdown-toggle inline-flex min-h-[36px] min-w-[36px] items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
-                          dropdownClassName="min-w-[160px] py-1 right-0 left-auto"
+                        <button
+                          type="button"
+                          title={t("users.viewFullDetails")}
+                          aria-label={t("users.viewFullDetails")}
+                          onClick={() => openDetails(user.id)}
+                          className="rounded-md border border-gray-200 bg-white p-2 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
                         >
-                          <DropdownItem
-                            onMouseDown={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              openDetails(user.id);
-                            }}
-                            className="dark:hover:bg-gray-700 dark:text-gray-200"
-                          >
-                            {t("users.viewFullDetails")}
-                          </DropdownItem>
-                          <DropdownItem
-                            onMouseDown={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              openPasswordChange(user);
-                            }}
-                            className="dark:hover:bg-gray-700 dark:text-gray-200"
-                          >
-                            {t("users.changePassword")}
-                          </DropdownItem>
-                          <DropdownItem
-                            onMouseDown={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              if (isUserActive(user)) {
-                                openDeactivateConfirm(user);
-                              } else {
-                                toggleUserActive(user);
-                              }
-                            }}
-                            className="dark:hover:bg-gray-700 dark:text-gray-200"
-                          >
-                            {isUserActive(user)
-                              ? t("users.deactivateUser")
-                              : t("users.activateUser")}
-                          </DropdownItem>
-                        </ActionsMenu>
+                          <ViewIcon className="size-4" />
+                        </button>
+                        <button
+                          type="button"
+                          title={t("users.changePassword")}
+                          aria-label={t("users.changePassword")}
+                          onClick={() => openPasswordChange(user)}
+                          className="rounded-md border border-gray-200 bg-white p-2 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
+                        >
+                          <LockIcon className="size-4" />
+                        </button>
+                        <button
+                          type="button"
+                          title={isUserActive(user) ? t("users.deactivateUser") : t("users.activateUser")}
+                          aria-label={isUserActive(user) ? t("users.deactivateUser") : t("users.activateUser")}
+                          onClick={() => toggleUserActive(user)}
+                          className="rounded-md border border-gray-200 bg-white p-2 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
+                        >
+                          {isUserActive(user) ? (
+                            <CloseLineIcon className="size-4" />
+                          ) : (
+                            <CheckLineIcon className="size-4" />
+                          )}
+                        </button>
                       </div>
                     </div>
                     <dl className="mt-3 grid grid-cols-1 gap-2 text-sm">
@@ -612,49 +592,39 @@ export default function UserList() {
                           {formatDate(user.createdAt)}
                         </TableCell>
                         <TableCell className="py-3 text-right">
-                          <ActionsMenu
-                            isOpen={openActionsId === user.id}
-                            onClose={() => setOpenActionsId(null)}
-                            onButtonClick={() => setOpenActionsId(openActionsId === user.id ? null : user.id)}
-                            buttonRef={openActionsId === user.id ? actionsButtonRef : undefined}
-                          >
-                            <DropdownItem
-                              onMouseDown={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                openDetails(user.id);
-                              }}
-                              className="dark:hover:bg-gray-700 dark:text-gray-200"
+                          <div className="inline-flex items-center gap-1">
+                            <button
+                              type="button"
+                              title={t("users.viewFullDetails")}
+                              aria-label={t("users.viewFullDetails")}
+                              onClick={() => openDetails(user.id)}
+                              className="rounded-md border border-gray-200 bg-white p-2 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
                             >
-                              {t("users.viewFullDetails")}
-                            </DropdownItem>
-                            <DropdownItem
-                              onMouseDown={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                openPasswordChange(user);
-                              }}
-                              className="dark:hover:bg-gray-700 dark:text-gray-200"
+                              <ViewIcon className="size-4" />
+                            </button>
+                            <button
+                              type="button"
+                              title={t("users.changePassword")}
+                              aria-label={t("users.changePassword")}
+                              onClick={() => openPasswordChange(user)}
+                              className="rounded-md border border-gray-200 bg-white p-2 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
                             >
-                              {t("users.changePassword")}
-                            </DropdownItem>
-                            <DropdownItem
-                              onMouseDown={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                if (isUserActive(user)) {
-                                  openDeactivateConfirm(user);
-                                } else {
-                                  toggleUserActive(user);
-                                }
-                              }}
-                              className="dark:hover:bg-gray-700 dark:text-gray-200"
+                              <LockIcon className="size-4" />
+                            </button>
+                            <button
+                              type="button"
+                              title={isUserActive(user) ? t("users.deactivateUser") : t("users.activateUser")}
+                              aria-label={isUserActive(user) ? t("users.deactivateUser") : t("users.activateUser")}
+                              onClick={() => toggleUserActive(user)}
+                              className="rounded-md border border-gray-200 bg-white p-2 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
                             >
-                              {isUserActive(user)
-                                ? t("users.deactivateUser")
-                                : t("users.activateUser")}
-                            </DropdownItem>
-                          </ActionsMenu>
+                              {isUserActive(user) ? (
+                                <CloseLineIcon className="size-4" />
+                              ) : (
+                                <CheckLineIcon className="size-4" />
+                              )}
+                            </button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
