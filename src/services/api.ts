@@ -1647,10 +1647,10 @@ export const providersApi = {
     );
   },
 
-  /** GET /v1/admin/providers/:providerId/certifications - List certifications (and linked documents) for this provider (Admin, per api_business_flow §4b). */
+  /** GET /v1/certifications/provider/:providerId - List certifications (and linked documents) for this provider. */
   getCertifications: async (providerId: number, config?: { signal?: AbortSignal }) => {
     return httpService.get<AdminCertificationDto[]>(
-      `/admin/providers/${providerId}/certifications`,
+      `/certifications/provider/${encodeURIComponent(String(providerId))}`,
       { signal: config?.signal }
     );
   },

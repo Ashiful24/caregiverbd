@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import PageMeta from "../components/common/PageMeta";
 import Button from "../components/ui/button/Button";
+import Label from "../components/form/Label";
 import { Modal } from "../components/ui/modal";
 import Badge from "../components/ui/badge/Badge";
 import {
@@ -11,6 +12,9 @@ import {
 } from "../services/api";
 import { formatAccountActiveLabel } from "../utils/format";
 import { PencilIcon, PlusIcon } from "../icons";
+
+const inputClass =
+  "h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30";
 
 export default function VerificationDocumentTypes() {
   const { t } = useTranslation();
@@ -23,6 +27,7 @@ export default function VerificationDocumentTypes() {
   const [label, setLabel] = useState("");
   const [displayOrder, setDisplayOrder] = useState(0);
   const [submitting, setSubmitting] = useState(false);
+  const [editModalError, setEditModalError] = useState<string | null>(null);
   const [togglingId, setTogglingId] = useState<number | null>(null);
 
   const fetchData = useCallback(async () => {
@@ -74,24 +79,32 @@ export default function VerificationDocumentTypes() {
     }
   };
 
-  const handleUpdate = async () => {
+  const handleCloseEditModal = () => {
+    if (submitting) return;
+    setEditModal(null);
+    setEditModalError(null);
+    setLabel("");
+    setDisplayOrder(0);
+  };
+
+  const handleUpdate = async (e: FormEvent) => {
+    e.preventDefault();
     if (!editModal) return;
     setSubmitting(true);
+    setEditModalError(null);
     try {
       await verificationDocumentTypesApi.update(editModal.id, {
         label: label.trim(),
         displayOrder,
       });
-      setEditModal(null);
-      setLabel("");
-      setDisplayOrder(0);
+      handleCloseEditModal();
       await fetchData();
     } catch (err: unknown) {
       const msg =
         err && typeof err === "object" && "message" in err
           ? String((err as { message: string }).message)
           : t("verificationDocumentTypes.failedUpdate");
-      setError(msg);
+      setEditModalError(msg);
     } finally {
       setSubmitting(false);
     }
@@ -110,6 +123,7 @@ export default function VerificationDocumentTypes() {
   };
 
   const openEdit = (item: VerificationDocumentTypeItem) => {
+    setEditModalError(null);
     setEditModal(item);
     setLabel(item.label);
     setDisplayOrder(item.displayOrder);
@@ -296,49 +310,97 @@ export default function VerificationDocumentTypes() {
       {editModal && (
         <Modal
           isOpen={true}
-          onClose={() => !submitting && setEditModal(null)}
-          title={t("verificationDocumentTypes.editModalTitle")}
+          onClose={handleCloseEditModal}
+          showCloseButton
+          className="max-h-[min(90vh,720px)] w-full max-w-lg overflow-hidden p-0 sm:p-0"
         >
-          <div className="space-y-3">
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              {t("verificationDocumentTypes.codeReadonly", { code: editModal.code })}
-            </p>
-            <label className="block">
-              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("verificationDocumentTypes.label")}</span>
-              <input
-                type="text"
-                value={label}
-                onChange={(e) => setLabel(e.target.value)}
-                className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
-              />
-            </label>
-            <label className="block">
-              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("verificationDocumentTypes.displayOrder")}</span>
-              <input
-                type="number"
-                min={0}
-                value={displayOrder}
-                onChange={(e) => setDisplayOrder(parseInt(e.target.value, 10) || 0)}
-                className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
-              />
-            </label>
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => !submitting && setEditModal(null)}
-                className="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
-              >
-                {t("common.actions.cancel")}
-              </button>
-              <button
-                type="button"
-                disabled={submitting || !label.trim()}
-                onClick={handleUpdate}
-                className="rounded bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
-              >
-                {submitting ? t("supervisor.saving") : t("common.actions.save")}
-              </button>
+          <div className="flex max-h-[min(90vh,720px)] flex-col">
+            <div className="shrink-0 border-b border-gray-200 px-6 pb-4 pt-6 dark:border-gray-800">
+              <h3 className="pr-10 text-xl font-semibold text-gray-900 dark:text-white/90">
+                {t("verificationDocumentTypes.editModalTitle")}
+              </h3>
             </div>
+
+            <form onSubmit={handleUpdate} className="flex min-h-0 flex-1 flex-col">
+              <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-6 py-4">
+                <div className="grid gap-4">
+                  <div>
+                    <Label htmlFor="vdt-edit-code">{t("verificationDocumentTypes.code")}</Label>
+                    <input
+                      id="vdt-edit-code"
+                      type="text"
+                      value={editModal.code}
+                      readOnly
+                      tabIndex={-1}
+                      className={`${inputClass} cursor-not-allowed opacity-80`}
+                      aria-describedby="vdt-edit-code-hint"
+                    />
+                    <p
+                      id="vdt-edit-code-hint"
+                      className="mt-1.5 text-xs text-gray-500 dark:text-gray-400"
+                    >
+                      {t("verificationDocumentTypes.codeReadonly", { code: editModal.code })}
+                    </p>
+                  </div>
+                  <div>
+                    <Label htmlFor="vdt-edit-label">{t("verificationDocumentTypes.label")}</Label>
+                    <input
+                      id="vdt-edit-label"
+                      type="text"
+                      value={label}
+                      onChange={(e) => {
+                        setLabel(e.target.value);
+                        setEditModalError(null);
+                      }}
+                      className={inputClass}
+                      placeholder={t("verificationDocumentTypes.labelPlaceholder")}
+                      autoComplete="off"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="vdt-edit-order">{t("verificationDocumentTypes.displayOrder")}</Label>
+                    <input
+                      id="vdt-edit-order"
+                      type="number"
+                      min={0}
+                      value={displayOrder}
+                      onChange={(e) => {
+                        setDisplayOrder(parseInt(e.target.value, 10) || 0);
+                        setEditModalError(null);
+                      }}
+                      className={inputClass}
+                    />
+                  </div>
+                </div>
+
+                {editModalError ? (
+                  <p className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
+                    {editModalError}
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="shrink-0 border-t border-gray-200 bg-gray-50/80 px-6 py-4 dark:border-gray-800 dark:bg-gray-900/50">
+                <div className="flex flex-wrap items-center justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={handleCloseEditModal}
+                    disabled={submitting}
+                    className="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                  >
+                    {t("common.actions.cancel")}
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submitting || !label.trim()}
+                    className="rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
+                  >
+                    {submitting ? t("supervisor.saving") : t("common.actions.saveChanges")}
+                  </button>
+                </div>
+              </div>
+            </form>
           </div>
         </Modal>
       )}
