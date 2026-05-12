@@ -1346,6 +1346,54 @@ export interface AdminServiceRequestListResponse {
   limit: number;
 }
 
+/** GET /v1/service-requests/:id/event-logs — audit / lifecycle entries (shape may vary by backend). */
+export interface ServiceRequestEventLogDto {
+  id?: number;
+  eventType?: string | null;
+  title?: string | null;
+  message?: string | null;
+  description?: string | null;
+  details?: string | null;
+  comment?: string | null;
+  note?: string | null;
+  status?: string | null;
+  label?: string | null;
+  createdAt?: string | null;
+  occurredAt?: string | null;
+  timestamp?: string | null;
+  actorName?: string | null;
+  performedBy?: string | null;
+  [key: string]: unknown;
+}
+
+/** Normalize GET event-logs body whether the API returns an array or a wrapped object. */
+export function normalizeServiceRequestEventLogs(raw: unknown): ServiceRequestEventLogDto[] {
+  if (Array.isArray(raw)) {
+    return raw.filter((x) => x && typeof x === "object") as ServiceRequestEventLogDto[];
+  }
+  if (raw && typeof raw === "object") {
+    const o = raw as Record<string, unknown>;
+    const nested =
+      o.data ??
+      o.eventLogs ??
+      o.logs ??
+      o.events ??
+      o.items ??
+      o.content ??
+      o.results;
+    if (Array.isArray(nested)) {
+      return nested.filter((x) => x && typeof x === "object") as ServiceRequestEventLogDto[];
+    }
+  }
+  return [];
+}
+
+function eventLogSortTime(log: ServiceRequestEventLogDto): number {
+  const s = log.createdAt ?? log.occurredAt ?? log.timestamp ?? "";
+  const t = Date.parse(String(s));
+  return Number.isFinite(t) ? t : 0;
+}
+
 /** Certification item for a provider (per api_business_flow §4a/4b: GET .../certifications). */
 export interface AdminCertificationDto {
   id: number;
@@ -2124,7 +2172,21 @@ export const adminServiceRequestsApi = {
       signal: config?.signal,
     });
   },
+
+  /**
+   * GET /v1/service-requests/:requestId/event-logs — timeline / lifecycle events for a service request.
+   */
+  getEventLogs: async (requestId: number, config?: { signal?: AbortSignal }) => {
+    return httpService.get<unknown>(
+      `/service-requests/${encodeURIComponent(String(requestId))}/event-logs`,
+      { signal: config?.signal }
+    );
+  },
 };
+
+export function sortServiceRequestEventLogsAsc(logs: ServiceRequestEventLogDto[]): ServiceRequestEventLogDto[] {
+  return [...logs].sort((a, b) => eventLogSortTime(a) - eventLogSortTime(b));
+}
 
 // ============== Admin long-term opportunities (service requests — nursing schedule pipeline) ==============
 

@@ -357,7 +357,13 @@ const en = {
     detailTitle: "Request #{{id}}",
     lifecycleHeading: "Service lifecycle",
     lifecycleStaticNote:
-      "This timeline is a static preview for administrators. A detailed history API will replace it soon.",
+      "This timeline is a static preview for administrators when the server returns no event log entries.",
+    lifecycleFromEventLogs: "Timeline entries from the service request event log API.",
+    eventLogsLoading: "Loading timeline…",
+    eventLogsLoadError: "Could not load the timeline for this request.",
+    eventLogsEmpty: "No timeline events have been recorded for this request yet.",
+    eventLogUntitled: "Event",
+    eventLogNoDetail: "No additional details.",
     lifecycle: {
       submittedTitle: "Request submitted",
       submittedDesc:
@@ -373,6 +379,9 @@ const en = {
       closedTitle: "Request closed",
       closedDesc:
         "This request was rejected or cancelled before completion. No further steps apply.",
+      expiredTitle: "Request expired",
+      expiredDesc:
+        "This request is no longer active. The patient or provider may need to submit a new request if care is still needed.",
     },
   },
   consultationConfig: {

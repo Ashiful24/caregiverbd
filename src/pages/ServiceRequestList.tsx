@@ -59,6 +59,7 @@ function serviceRequestStatusBadgeColor(
       return "error";
     case "IN_PROGRESS":
     case "PAYMENT_PENDING":
+    case "EXPIRED":
       return "light";
     default:
       return "light";
