@@ -15,7 +15,7 @@ import {
   type ConsultationTypeLevelCategory,
   type ServiceCategoryChecklistItem,
 } from "../services/api";
-import { PencilIcon, PlusIcon, TrashBinIcon, ViewIcon } from "../icons";
+import { PencilIcon, PlusIcon, TrashBinIcon } from "../icons";
 
 const CATEGORIES: ConsultationTypeLevelCategory[] = ["CAREGIVER", "DOCTOR"];
 
@@ -458,7 +458,18 @@ export default function ConsultationTypeLevels() {
                           a.levelNumber - b.levelNumber || a.id - b.id
                       )
                       .map((item) => (
-                        <tr key={item.id}>
+                        <tr
+                          key={item.id}
+                          onClick={() => {
+                            if (loadingDetail) return;
+                            void openDetail(item);
+                          }}
+                          className={
+                            loadingDetail
+                              ? ""
+                              : "cursor-pointer hover:bg-gray-50 dark:hover:bg-white/[0.02]"
+                          }
+                        >
                           <td className="py-3 font-medium text-gray-800 dark:text-white/90">
                             {item.name}
                           </td>
@@ -475,17 +486,10 @@ export default function ConsultationTypeLevels() {
                             <div className="flex flex-wrap justify-end gap-1">
                               <button
                                 type="button"
-                                onClick={() => void openDetail(item)}
-                                disabled={loadingDetail}
-                                className={actionIconButtonClass}
-                                title={t("common.actions.view")}
-                                aria-label={t("common.actions.view")}
-                              >
-                                <ViewIcon className="h-4 w-4" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => void openEdit(item)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  void openEdit(item);
+                                }}
                                 disabled={loadingDetail}
                                 className={actionIconButtonClass}
                                 title={t("common.actions.edit")}
@@ -495,7 +499,10 @@ export default function ConsultationTypeLevels() {
                               </button>
                               <button
                                 type="button"
-                                onClick={() => setPendingDelete(item)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setPendingDelete(item);
+                                }}
                                 className={actionIconButtonClass}
                                 title={t("consultationTypeLevels.remove")}
                                 aria-label={t("consultationTypeLevels.remove")}

@@ -18,6 +18,7 @@ import {
   type ConsultationType,
 } from "../services/api";
 import { formatDate, formatDateTime, formatStatusLabel } from "../utils/format";
+import { ServiceRequestDetailModal } from "../components/service-requests/ServiceRequestDetailModal";
 
 const LIMIT_OPTIONS = [10, 20, 50];
 const SEARCH_DEBOUNCE_MS = 300;
@@ -58,6 +59,7 @@ function serviceRequestStatusBadgeColor(
       return "error";
     case "IN_PROGRESS":
     case "PAYMENT_PENDING":
+    case "EXPIRED":
       return "light";
     default:
       return "light";
@@ -81,6 +83,7 @@ export default function ServiceRequestList() {
   const [searchDoctorQuery, setSearchDoctorQuery] = useState("");
   const [searchPatientInput, setSearchPatientInput] = useState("");
   const [searchPatientQuery, setSearchPatientQuery] = useState("");
+  const [detailItem, setDetailItem] = useState<AdminServiceRequestListDto | null>(null);
 
   const fetchConsultationTypes = useCallback(async () => {
     try {
@@ -190,6 +193,11 @@ export default function ServiceRequestList() {
 
   return (
     <>
+      <ServiceRequestDetailModal
+        item={detailItem}
+        isOpen={detailItem != null}
+        onClose={() => setDetailItem(null)}
+      />
       <PageMeta title={t("appointments.metaTitle")} description={t("appointments.metaDescription")} />
       <PageBreadcrumb pageTitle={t("appointments.pageTitle")} />
       <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
@@ -264,7 +272,16 @@ export default function ServiceRequestList() {
                 {list.map((item) => (
                   <div
                     key={item.id}
-                    className="rounded-xl border border-gray-200 bg-gray-50/50 p-4 dark:border-gray-800 dark:bg-gray-800/30"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setDetailItem(item)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setDetailItem(item);
+                      }
+                    }}
+                    className="cursor-pointer rounded-xl border border-gray-200 bg-gray-50/50 p-4 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-800/30 dark:hover:bg-white/[0.02]"
                   >
                     <div className="flex flex-wrap items-start justify-between gap-2 border-b border-gray-200 pb-3 dark:border-gray-700">
                       <span className="text-sm font-semibold text-gray-800 dark:text-white/90">
@@ -288,7 +305,7 @@ export default function ServiceRequestList() {
                       </div>
                       <div className="flex justify-between gap-2">
                         <dt className="text-gray-500 dark:text-gray-400">
-                          Provider
+                          {t("appointments.provider")}
                         </dt>
                         <dd className="text-gray-800 dark:text-gray-200">
                           {item.providerName ?? "—"}
@@ -358,7 +375,7 @@ export default function ServiceRequestList() {
                         isHeader
                         className="w-[14%] py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
                       >
-                        Provider
+                        {t("appointments.provider")}
                       </TableCell>
                       <TableCell
                         isHeader
@@ -394,7 +411,11 @@ export default function ServiceRequestList() {
                   </TableHeader>
                   <TableBody className="divide-y divide-gray-100 dark:divide-gray-800">
                     {list.map((item) => (
-                      <TableRow key={item.id}>
+                      <TableRow
+                        key={item.id}
+                        onClick={() => setDetailItem(item)}
+                        className="cursor-pointer hover:bg-gray-50 dark:hover:bg-white/[0.02]"
+                      >
                         <TableCell className="py-3 text-theme-sm text-gray-700 dark:text-gray-300">
                           {item.id}
                         </TableCell>
