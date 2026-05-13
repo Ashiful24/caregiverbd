@@ -29,6 +29,7 @@ import {
   providersApi,
   type ProviderListItem,
 } from "../../services/api";
+import { buildEventsFromScheduleDetails } from "../../utils/longTermScheduleEvents";
 import { useAuth } from "../../context/AuthContext";
 import { ScheduleMonthView } from "./ScheduleMonthView";
 import { ScheduleWeekView } from "./ScheduleWeekView";
@@ -44,6 +45,8 @@ type Props = {
   requestEndDate: string;
   baseServiceAmount?: string | number | null;
   initialEvents?: ScheduleEventRecord[];
+  /** After create, parent can persist schedule-details payload (request row + initialEvents). */
+  onScheduleDetailsSynced?: (scheduleDetailsPayload: unknown) => void;
 };
 
 type ModalDraft = {
@@ -147,6 +150,7 @@ export function ScheduleCalendar({
   requestEndDate,
   baseServiceAmount,
   initialEvents = [],
+  onScheduleDetailsSynced,
 }: Props) {
   const { t, i18n } = useTranslation();
   const dateLoc = i18n.language?.startsWith("bn") ? bn : enUS;
@@ -494,21 +498,33 @@ export function ScheduleCalendar({
           },
         ],
       });
-      const created = extractCreatedScheduleMeta(createRes.data);
-
-      const newEvent: ScheduleEventRecord = {
-        id: created.longTermCalendarSlotId ?? `evt-${requestId}-${Date.now()}`,
-        requestId,
-        nurseId,
-        nurseName: providerLabel(nurse),
-        title: providerLabel(nurse),
-        feeLabel: eventAmount > 0 ? formatMoney(eventAmount) : undefined,
-        start: start.toISOString(),
-        end: end.toISOString(),
-        type: "visit",
-        scheduleSlotId: created.scheduleSlotId,
-      };
-      setEvents((prev) => [...prev, newEvent]);
+      const nurseFallback = t("scheduleCalendar.nurseFallback");
+      try {
+        const detailsRes = await adminLongTermOpportunitiesApi.getScheduleDetails(requestId);
+        const raw = detailsRes.data;
+        if (raw != null && typeof raw === "object") {
+          const fresh = buildEventsFromScheduleDetails(raw, requestId, nurseFallback);
+          setEvents(fresh);
+          onScheduleDetailsSynced?.(raw);
+        } else {
+          throw new Error("empty schedule details");
+        }
+      } catch {
+        const created = extractCreatedScheduleMeta(createRes.data);
+        const newEvent: ScheduleEventRecord = {
+          id: created.longTermCalendarSlotId ?? `evt-${requestId}-${Date.now()}`,
+          requestId,
+          nurseId,
+          nurseName: providerLabel(nurse),
+          title: providerLabel(nurse),
+          feeLabel: eventAmount > 0 ? formatMoney(eventAmount) : undefined,
+          start: start.toISOString(),
+          end: end.toISOString(),
+          type: "visit",
+          scheduleSlotId: created.scheduleSlotId,
+        };
+        setEvents((prev) => [...prev, newEvent]);
+      }
       if (eventAmount > 0) {
         setLocallyAddedAmount((prev) => prev + eventAmount);
       }
