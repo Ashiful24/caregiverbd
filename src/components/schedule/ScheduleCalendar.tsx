@@ -346,8 +346,8 @@ export function ScheduleCalendar({
       );
       setEvents((prev) => prev.filter((e) => e.id !== removeTarget.id));
       handleCloseRemove();
-    } catch {
-      setRemoveError(t("scheduleCalendar.errRemove"));
+    } catch (err: unknown) {
+      setRemoveError(extractApiErrorMessage(err) ?? t("scheduleCalendar.errRemove"));
     } finally {
       setRemovingEvent(false);
     }
