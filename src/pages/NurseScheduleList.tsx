@@ -104,6 +104,39 @@ function extractOpportunityPayload(data: unknown): Record<string, unknown> | nul
   return null;
 }
 
+/** Prefer `fee` from schedule-details (root / data / opportunity shapes). */
+function extractFeeFromScheduleDetails(data: unknown): string | null {
+  if (!data || typeof data !== "object") return null;
+  const o = data as Record<string, unknown>;
+  const nestedData = o.data && typeof o.data === "object" ? (o.data as Record<string, unknown>) : null;
+  const candidates: unknown[] = [
+    o,
+    nestedData,
+    o.opportunity,
+    nestedData?.opportunity,
+    o.longTermOpportunity,
+    o.serviceRequest,
+    o.request,
+    o.scheduleDetails,
+  ];
+  for (const node of candidates) {
+    if (!node || typeof node !== "object" || Array.isArray(node)) continue;
+    const r = node as Record<string, unknown>;
+    const fee = String(r.fee ?? r.totalFee ?? r.total_fee ?? "").trim();
+    if (fee) return fee;
+  }
+  return null;
+}
+
+function applyFeeFromScheduleDetails(
+  raw: unknown,
+  row: LongTermOpportunityListItem
+): LongTermOpportunityListItem {
+  const fee = extractFeeFromScheduleDetails(raw);
+  if (!fee) return row;
+  return { ...row, amount: fee };
+}
+
 function extractAssignedProviderNames(data: unknown): string | null {
   if (!data || typeof data !== "object") return null;
   const o = data as Record<string, unknown>;
@@ -205,7 +238,8 @@ export default function NurseScheduleList() {
     setActionLoadingId(request.id);
     try {
       const { normalized, raw } = await fetchScheduleDetailsOpportunity(request.id);
-      const routeRequest = normalized.id > 0 ? normalized : request;
+      const routeRequest =
+        normalized.id > 0 ? applyFeeFromScheduleDetails(raw, normalized) : request;
       navigate(`/schedule/${request.id}`, { state: { request: routeRequest, scheduleDetails: raw } });
     } catch {
       navigate(`/schedule/${request.id}`, { state: { request } });
@@ -218,7 +252,7 @@ export default function NurseScheduleList() {
     setActionLoadingId(request.id);
     try {
       const { normalized, raw } = await fetchScheduleDetailsOpportunity(request.id);
-      const base = normalized.id > 0 ? normalized : request;
+      const base = normalized.id > 0 ? applyFeeFromScheduleDetails(raw, normalized) : request;
       const assignedFromSchedule = extractAssignedProviderNames(raw);
       setDetailsItem({
         ...base,
@@ -236,7 +270,7 @@ export default function NurseScheduleList() {
     let source = request;
     try {
       const { normalized, raw } = await fetchScheduleDetailsOpportunity(request.id);
-      if (normalized.id > 0) source = normalized;
+      if (normalized.id > 0) source = applyFeeFromScheduleDetails(raw, normalized);
       void extractOpportunityPayload(raw);
     } catch {
       // fall back to list row values
