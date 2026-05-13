@@ -133,12 +133,13 @@ export function buildEventsFromScheduleDetails(
             nurseFallback
         ).trim() || nurseFallback;
       const feeLabel = formatFee(
-        serviceRequest?.providerFee ??
+        serviceRequest?.fee ??
+          raw.fee ??
+          s.fee ??
+          serviceRequest?.providerFee ??
           serviceRequest?.provider_fee ??
-          serviceRequest?.fee ??
           raw.providerFee ??
-          raw.provider_fee ??
-          raw.fee
+          raw.provider_fee
       );
       const slotIdCandidate =
         serviceRequest?.scheduleSlotId ??
