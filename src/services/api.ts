@@ -2414,6 +2414,8 @@ export const adminLongTermOpportunitiesApi = {
   getScheduleDetails: async (id: string | number, config?: { signal?: AbortSignal }) => {
     return httpService.get<unknown>(`/long-term-opportunities/schedule-details/${id}`, {
       signal: config?.signal,
+      // Bust browser/CDN caches so refresh always matches server after creates/updates.
+      params: { _t: Date.now() },
     });
   },
 
