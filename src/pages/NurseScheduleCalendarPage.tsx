@@ -76,40 +76,53 @@ export default function NurseScheduleCalendarPage() {
       setLoading(false);
       return;
     }
-    if (routeRequest && String(routeRequest.id) === requestId) {
+
+    const ac = new AbortController();
+    const fromList = routeRequest && String(routeRequest.id) === requestId;
+
+    // Paint immediately from router state when present; always refetch so refresh / post-create match server.
+    if (fromList) {
       setRequest(routeRequest);
       if (routeScheduleDetails) {
         setInitialEvents(buildEventsFromScheduleDetails(routeScheduleDetails, requestId, nurseFallback));
       }
-      setLoading(false);
-      return;
+    } else {
+      setLoading(true);
     }
-    const ac = new AbortController();
-    setLoading(true);
+
     void (async () => {
       try {
         const res = await adminLongTermOpportunitiesApi.getScheduleDetails(requestId, {
           signal: ac.signal,
         });
+        if (ac.signal.aborted) return;
         const row = resolveOpportunityFromScheduleDetails(res.data);
-        setRequest(row.id > 0 ? row : null);
+        setRequest(row.id > 0 ? row : fromList ? routeRequest : null);
         setInitialEvents(buildEventsFromScheduleDetails(res.data, requestId, nurseFallback));
       } catch {
+        if (ac.signal.aborted) return;
         try {
           const res = await adminLongTermOpportunitiesApi.getById(requestId, {
             signal: ac.signal,
           });
+          if (ac.signal.aborted) return;
           const row = normalizeLongTermOpportunityRow(res.data);
-          setRequest(row.id > 0 ? row : null);
+          setRequest(row.id > 0 ? row : fromList ? routeRequest : null);
           setInitialEvents([]);
         } catch {
-          setRequest(null);
-          setInitialEvents([]);
+          if (ac.signal.aborted) return;
+          setRequest(fromList ? routeRequest : null);
+          setInitialEvents(
+            fromList && routeScheduleDetails
+              ? buildEventsFromScheduleDetails(routeScheduleDetails, requestId, nurseFallback)
+              : []
+          );
         }
       } finally {
-        setLoading(false);
+        if (!ac.signal.aborted) setLoading(false);
       }
     })();
+
     return () => ac.abort();
   }, [requestId, routeRequest, routeScheduleDetails, nurseFallback]);
 

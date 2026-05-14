@@ -91,7 +91,7 @@ const tryRefresh = async (): Promise<{ accessToken: string; refreshToken: string
 };
 
 /**
- * Handle logout when token is invalid
+ * Handle logout when the access token is invalid or missing (401).
  * Note: This only clears auth data. The redirect is handled by ProtectedRoute
  * to avoid full page refresh.
  */
@@ -195,17 +195,18 @@ const logResponse = <T>(_method: string, _url: string, _response: ApiResponse<T>
  * Handle API response
  */
 const handleResponse = async <T>(response: Response, method?: string, url?: string): Promise<ApiResponse<T>> => {
-  // Handle unauthorized (401) or forbidden (403)
-  if (response.status === 401 || response.status === 403) {
+  // Only 401 means the session/token is invalid — clear auth and redirect to login.
+  // 403 is "authenticated but not allowed for this action" (e.g. supervisor cannot reject another supervisor's nurse slot); do not logout.
+  if (response.status === 401) {
     const error = {
       message: "Unauthorized. Please login again.",
       status: response.status,
     } as ApiError;
-    
+
     if (method && url) {
       logResponse(method, url, {} as ApiResponse<T>, error);
     }
-    
+
     handleUnauthorized();
     throw error;
   }
@@ -373,7 +374,7 @@ class HttpService {
     const url = buildUrl(endpoint, config?.params);
     logRequest("GET (blob)", url, undefined, buildHeaders(config));
     const response = await fetchWithAuthRetry("GET", url, undefined, config?.signal, config);
-    if (response.status === 401 || response.status === 403) {
+    if (response.status === 401) {
       handleUnauthorized();
       throw { message: "Unauthorized", status: response.status } as ApiError;
     }
