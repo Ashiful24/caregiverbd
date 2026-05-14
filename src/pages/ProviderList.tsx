@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import PageMeta from "../components/common/PageMeta";
 import ThemedSelect from "../components/form/ThemedSelect";
-import { ActionsMenu } from "../components/common/ActionsMenu";
 import { DetailModal } from "../components/common/DetailModal";
 import { ProviderFullDetailsView } from "../components/common/ProfileDetailBlocks";
 import {
@@ -14,7 +13,6 @@ import {
   TableRow,
 } from "../components/ui/table";
 import Badge from "../components/ui/badge/Badge";
-import { DropdownItem } from "../components/ui/dropdown/DropdownItem";
 import {
   providersApi,
   consultationTypesApi,
@@ -100,8 +98,6 @@ export default function ProviderList() {
   const [documentTypes, setDocumentTypes] = useState<VerificationDocumentTypeItem[]>([]);
   const [documentTypeFilterCode, setDocumentTypeFilterCode] = useState<string>("");
   const [statusTab, setStatusTab] = useState<ProviderListStatusFilter>("all");
-  const [openActionsId, setOpenActionsId] = useState<number | null>(null);
-  const actionsButtonRef = useRef<HTMLButtonElement>(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [detailProviderId, setDetailProviderId] = useState<number | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -234,7 +230,6 @@ export default function ProviderList() {
   }, [detailModalOpen, detailProviderId, loadProviderDetail]);
 
   const openDetails = (providerId: number) => {
-    setOpenActionsId(null);
     setDetailProviderId(providerId);
     setDetailModalOpen(true);
   };
@@ -309,7 +304,10 @@ export default function ProviderList() {
 
         {/* Status tabs */}
         <div className="border-b border-gray-200 px-4 dark:border-gray-800 sm:px-6">
-          <nav className="-mb-px flex gap-6 sm:gap-8" aria-label={t("providers.statusFilter")}>
+          <nav
+            className="-mb-px flex gap-4 overflow-x-auto pb-px sm:gap-8"
+            aria-label={t("providers.statusFilter")}
+          >
             {STATUS_TABS.map((tab) => (
               <button
                 key={tab.value}
@@ -366,34 +364,24 @@ export default function ProviderList() {
                 {providers.map((provider, index) => (
                   <div
                     key={provider.id}
-                    className="rounded-xl border border-gray-200 bg-gray-50/50 p-4 dark:border-gray-800 dark:bg-gray-800/30"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => openDetails(provider.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        openDetails(provider.id);
+                      }
+                    }}
+                    className="cursor-pointer rounded-xl border border-gray-200 bg-gray-50/50 p-4 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-800/30 dark:hover:bg-white/[0.02]"
                   >
                     <div className="flex flex-wrap items-start justify-between gap-2 border-b border-gray-200 pb-3 dark:border-gray-700">
                       <span className="text-sm font-semibold text-gray-800 dark:text-white/90">
                         {[provider.firstName, provider.lastName].filter(Boolean).join(" ") || "—"}
                       </span>
-                      <div className="flex items-center gap-2">
-                        <Badge size="sm" color={providerStatusBadgeColor(provider.status)}>
-                          {formatStatusLabel(provider.status)}
-                        </Badge>
-                        <ActionsMenu
-                          isOpen={openActionsId === provider.id}
-                          onClose={() => setOpenActionsId(null)}
-                          onButtonClick={() => setOpenActionsId(openActionsId === provider.id ? null : provider.id)}
-                          buttonRef={openActionsId === provider.id ? actionsButtonRef : undefined}
-                        >
-                          <DropdownItem
-                            onMouseDown={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              openDetails(provider.id);
-                            }}
-                            className="dark:hover:bg-gray-700 dark:text-gray-200"
-                          >
-                            {t("providers.viewFullDetails")}
-                          </DropdownItem>
-                        </ActionsMenu>
-                      </div>
+                      <Badge size="sm" color={providerStatusBadgeColor(provider.status)}>
+                        {formatStatusLabel(provider.status)}
+                      </Badge>
                     </div>
                     <dl className="mt-3 grid grid-cols-1 gap-2 text-sm">
                       <div className="flex justify-between gap-2">
@@ -434,12 +422,15 @@ export default function ProviderList() {
                       <TableCell isHeader className="w-[16%] py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">{t("providers.email")}</TableCell>
                       <TableCell isHeader className="w-[12%] py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">{t("providers.phone")}</TableCell>
                       <TableCell isHeader className="w-[12%] py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">{t("providers.created")}</TableCell>
-                      <TableCell isHeader className="w-[8%] py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">{t("providers.actions")}</TableCell>
                     </TableRow>
                   </TableHeader>
                   <TableBody className="divide-y divide-gray-100 dark:divide-gray-800">
                     {providers.map((provider, index) => (
-                      <TableRow key={provider.id}>
+                      <TableRow
+                        key={provider.id}
+                        onClick={() => openDetails(provider.id)}
+                        className="cursor-pointer hover:bg-gray-50 dark:hover:bg-white/[0.02]"
+                      >
                         <TableCell className="py-3 text-theme-sm text-gray-700 dark:text-gray-300">{(page - 1) * limit + index + 1}</TableCell>
                         <TableCell className="py-3 font-medium text-gray-800 dark:text-white/90">
                           {[provider.firstName, provider.lastName].filter(Boolean).join(" ") || "—"}
@@ -454,25 +445,6 @@ export default function ProviderList() {
                         <TableCell className="py-3 text-theme-sm text-gray-600 dark:text-gray-400">{provider.username ?? "—"}</TableCell>
                         <TableCell className="py-3 text-theme-sm text-gray-600 dark:text-gray-400">
                           {provider.createdAt ? formatDate(String(provider.createdAt)) : "—"}
-                        </TableCell>
-                        <TableCell className="py-3 text-right">
-                          <ActionsMenu
-                            isOpen={openActionsId === provider.id}
-                            onClose={() => setOpenActionsId(null)}
-                            onButtonClick={() => setOpenActionsId(openActionsId === provider.id ? null : provider.id)}
-                            buttonRef={openActionsId === provider.id ? actionsButtonRef : undefined}
-                          >
-                            <DropdownItem
-                              onMouseDown={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                openDetails(provider.id);
-                              }}
-                              className="dark:hover:bg-gray-700 dark:text-gray-200"
-                            >
-                              {t("providers.viewFullDetails")}
-                            </DropdownItem>
-                          </ActionsMenu>
                         </TableCell>
                       </TableRow>
                     ))}

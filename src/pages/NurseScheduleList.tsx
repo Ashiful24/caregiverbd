@@ -11,7 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from "../components/ui/table";
-import { CalenderIcon, PencilIcon, ViewIcon } from "../icons";
+import { CalenderIcon, PencilIcon } from "../icons";
 import {
   adminLongTermOpportunitiesApi,
   normalizeLongTermOpportunitiesListResponse,
@@ -102,6 +102,39 @@ function extractOpportunityPayload(data: unknown): Record<string, unknown> | nul
     if (Number.isFinite(idVal) && idVal > 0) return { ...co };
   }
   return null;
+}
+
+/** Prefer `fee` from schedule-details (root / data / opportunity shapes). */
+function extractFeeFromScheduleDetails(data: unknown): string | null {
+  if (!data || typeof data !== "object") return null;
+  const o = data as Record<string, unknown>;
+  const nestedData = o.data && typeof o.data === "object" ? (o.data as Record<string, unknown>) : null;
+  const candidates: unknown[] = [
+    o,
+    nestedData,
+    o.opportunity,
+    nestedData?.opportunity,
+    o.longTermOpportunity,
+    o.serviceRequest,
+    o.request,
+    o.scheduleDetails,
+  ];
+  for (const node of candidates) {
+    if (!node || typeof node !== "object" || Array.isArray(node)) continue;
+    const r = node as Record<string, unknown>;
+    const fee = String(r.fee ?? r.totalFee ?? r.total_fee ?? "").trim();
+    if (fee) return fee;
+  }
+  return null;
+}
+
+function applyFeeFromScheduleDetails(
+  raw: unknown,
+  row: LongTermOpportunityListItem
+): LongTermOpportunityListItem {
+  const fee = extractFeeFromScheduleDetails(raw);
+  if (!fee) return row;
+  return { ...row, amount: fee };
 }
 
 function extractAssignedProviderNames(data: unknown): string | null {
@@ -205,7 +238,8 @@ export default function NurseScheduleList() {
     setActionLoadingId(request.id);
     try {
       const { normalized, raw } = await fetchScheduleDetailsOpportunity(request.id);
-      const routeRequest = normalized.id > 0 ? normalized : request;
+      const routeRequest =
+        normalized.id > 0 ? applyFeeFromScheduleDetails(raw, normalized) : request;
       navigate(`/schedule/${request.id}`, { state: { request: routeRequest, scheduleDetails: raw } });
     } catch {
       navigate(`/schedule/${request.id}`, { state: { request } });
@@ -218,7 +252,7 @@ export default function NurseScheduleList() {
     setActionLoadingId(request.id);
     try {
       const { normalized, raw } = await fetchScheduleDetailsOpportunity(request.id);
-      const base = normalized.id > 0 ? normalized : request;
+      const base = normalized.id > 0 ? applyFeeFromScheduleDetails(raw, normalized) : request;
       const assignedFromSchedule = extractAssignedProviderNames(raw);
       setDetailsItem({
         ...base,
@@ -236,7 +270,7 @@ export default function NurseScheduleList() {
     let source = request;
     try {
       const { normalized, raw } = await fetchScheduleDetailsOpportunity(request.id);
-      if (normalized.id > 0) source = normalized;
+      if (normalized.id > 0) source = applyFeeFromScheduleDetails(raw, normalized);
       void extractOpportunityPayload(raw);
     } catch {
       // fall back to list row values
@@ -367,7 +401,24 @@ export default function NurseScheduleList() {
                 {items.map((request) => (
                   <div
                     key={request.id}
-                    className="rounded-xl border border-gray-200 bg-gray-50/50 p-4 dark:border-gray-800 dark:bg-gray-800/30"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => {
+                      if (actionLoadingId === request.id) return;
+                      void openDetails(request);
+                    }}
+                    onKeyDown={(e) => {
+                      if (actionLoadingId === request.id) return;
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        void openDetails(request);
+                      }
+                    }}
+                    className={`rounded-xl border border-gray-200 bg-gray-50/50 p-4 transition-colors dark:border-gray-800 dark:bg-gray-800/30 ${
+                      actionLoadingId === request.id
+                        ? "opacity-70"
+                        : "cursor-pointer hover:bg-gray-50 dark:hover:bg-white/[0.02]"
+                    }`}
                   >
                     <div className="flex items-start justify-between gap-2 border-b border-gray-200 pb-3 dark:border-gray-700">
                       <div>
@@ -385,27 +436,23 @@ export default function NurseScheduleList() {
                           title={t("schedule.viewCalendar")}
                           aria-label={t("schedule.viewCalendar")}
                           disabled={actionLoadingId === request.id}
-                          onClick={() => void goToCalendar(request)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void goToCalendar(request);
+                          }}
                           className="rounded-md border border-gray-200 bg-white p-2 text-gray-600 hover:bg-gray-100 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
                         >
                           <CalenderIcon className="size-4" />
                         </button>
                         <button
                           type="button"
-                          title={t("common.actions.details")}
-                          aria-label={t("common.actions.details")}
-                          disabled={actionLoadingId === request.id}
-                          onClick={() => void openDetails(request)}
-                          className="rounded-md border border-gray-200 bg-white p-2 text-gray-600 hover:bg-gray-100 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
-                        >
-                          <ViewIcon className="size-4" />
-                        </button>
-                        <button
-                          type="button"
                           title={t("common.actions.update")}
                           aria-label={t("common.actions.update")}
                           disabled={actionLoadingId === request.id}
-                          onClick={() => void openUpdate(request)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void openUpdate(request);
+                          }}
                           className="rounded-md border border-gray-200 bg-white p-2 text-gray-600 hover:bg-gray-100 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
                         >
                           <PencilIcon className="size-4" />
@@ -486,7 +533,18 @@ export default function NurseScheduleList() {
                   </TableHeader>
                   <TableBody className="divide-y divide-gray-100 dark:divide-gray-800">
                     {items.map((request) => (
-                      <TableRow key={request.id}>
+                      <TableRow
+                        key={request.id}
+                        onClick={() => {
+                          if (actionLoadingId === request.id) return;
+                          void openDetails(request);
+                        }}
+                        className={
+                          actionLoadingId === request.id
+                            ? ""
+                            : "cursor-pointer hover:bg-gray-50 dark:hover:bg-white/[0.02]"
+                        }
+                      >
                         <TableCell className="py-3 font-medium text-gray-800 dark:text-white/90">
                           {request.requestNo?.trim() || `SR-${request.id}`}
                         </TableCell>
@@ -515,27 +573,23 @@ export default function NurseScheduleList() {
                               title={t("schedule.viewCalendar")}
                               aria-label={t("schedule.viewCalendar")}
                               disabled={actionLoadingId === request.id}
-                              onClick={() => void goToCalendar(request)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void goToCalendar(request);
+                              }}
                               className="rounded-md border border-gray-200 bg-white p-2 text-gray-600 hover:bg-gray-100 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
                             >
                               <CalenderIcon className="size-4" />
                             </button>
                             <button
                               type="button"
-                              title={t("common.actions.details")}
-                              aria-label={t("common.actions.details")}
-                              disabled={actionLoadingId === request.id}
-                              onClick={() => void openDetails(request)}
-                              className="rounded-md border border-gray-200 bg-white p-2 text-gray-600 hover:bg-gray-100 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
-                            >
-                              <ViewIcon className="size-4" />
-                            </button>
-                            <button
-                              type="button"
                               title={t("common.actions.update")}
                               aria-label={t("common.actions.update")}
                               disabled={actionLoadingId === request.id}
-                              onClick={() => void openUpdate(request)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void openUpdate(request);
+                              }}
                               className="rounded-md border border-gray-200 bg-white p-2 text-gray-600 hover:bg-gray-100 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
                             >
                               <PencilIcon className="size-4" />

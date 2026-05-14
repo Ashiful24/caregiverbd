@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import PageMeta from "../components/common/PageMeta";
 import ThemedSelect from "../components/form/ThemedSelect";
-import { ActionsMenu } from "../components/common/ActionsMenu";
 import { DetailModal } from "../components/common/DetailModal";
 import { PatientFullDetailsView } from "../components/common/ProfileDetailBlocks";
 import {
@@ -14,7 +13,6 @@ import {
   TableRow,
 } from "../components/ui/table";
 import Badge from "../components/ui/badge/Badge";
-import { DropdownItem } from "../components/ui/dropdown/DropdownItem";
 import { patientsApi, type PatientFullDetailsDto, type PatientListItem } from "../services/api";
 import { formatAccountActiveLabel, formatDate } from "../utils/format";
 
@@ -32,8 +30,6 @@ export default function PatientList() {
   const [totalPages, setTotalPages] = useState(0);
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [openActionsId, setOpenActionsId] = useState<number | null>(null);
-  const actionsButtonRef = useRef<HTMLButtonElement>(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [detailPatientId, setDetailPatientId] = useState<number | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -119,7 +115,6 @@ export default function PatientList() {
   }, [detailModalOpen, detailPatientId, loadPatientDetail]);
 
   const openDetails = (patientId: number) => {
-    setOpenActionsId(null);
     setDetailPatientId(patientId);
     setDetailModalOpen(true);
   };
@@ -190,37 +185,27 @@ export default function PatientList() {
                 {patients.map((patient, index) => (
                   <div
                     key={patient.id}
-                    className="rounded-xl border border-gray-200 bg-gray-50/50 p-4 dark:border-gray-800 dark:bg-gray-800/30"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => openDetails(patient.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        openDetails(patient.id);
+                      }
+                    }}
+                    className="cursor-pointer rounded-xl border border-gray-200 bg-gray-50/50 p-4 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-800/30 dark:hover:bg-white/[0.02]"
                   >
                     <div className="flex flex-wrap items-start justify-between gap-2 border-b border-gray-200 pb-3 dark:border-gray-700">
                       <span className="text-sm font-semibold text-gray-800 dark:text-white/90">
                         {patient.firstName} {patient.lastName}
                       </span>
-                      <div className="flex items-center gap-2">
-                        <Badge
-                          size="sm"
-                          color={patient.isActive !== false ? "success" : "error"}
-                        >
-                          {formatAccountActiveLabel(patient.isActive !== false)}
-                        </Badge>
-                        <ActionsMenu
-                          isOpen={openActionsId === patient.id}
-                          onClose={() => setOpenActionsId(null)}
-                          onButtonClick={() => setOpenActionsId(openActionsId === patient.id ? null : patient.id)}
-                          buttonRef={openActionsId === patient.id ? actionsButtonRef : undefined}
-                        >
-                          <DropdownItem
-                            onMouseDown={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              openDetails(patient.id);
-                            }}
-                            className="dark:hover:bg-gray-700 dark:text-gray-200"
-                          >
-                            {t("patients.viewFullDetails")}
-                          </DropdownItem>
-                        </ActionsMenu>
-                      </div>
+                      <Badge
+                        size="sm"
+                        color={patient.isActive !== false ? "success" : "error"}
+                      >
+                        {formatAccountActiveLabel(patient.isActive !== false)}
+                      </Badge>
                     </div>
                     <dl className="mt-3 grid grid-cols-1 gap-2 text-sm">
                       <div className="flex justify-between gap-2">
@@ -295,17 +280,15 @@ export default function PatientList() {
                       >
                         {t("patients.status")}
                       </TableCell>
-                      <TableCell
-                        isHeader
-                        className="w-[8%] py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
-                      >
-                        {t("patients.actions")}
-                      </TableCell>
                     </TableRow>
                   </TableHeader>
                   <TableBody className="divide-y divide-gray-100 dark:divide-gray-800">
                     {patients.map((patient, index) => (
-                      <TableRow key={patient.id}>
+                      <TableRow
+                        key={patient.id}
+                        onClick={() => openDetails(patient.id)}
+                        className="cursor-pointer hover:bg-gray-50 dark:hover:bg-white/[0.02]"
+                      >
                         <TableCell className="py-3 text-theme-sm text-gray-700 dark:text-gray-300">
                           {(page - 1) * limit + index + 1}
                         </TableCell>
@@ -331,25 +314,6 @@ export default function PatientList() {
                           >
                             {formatAccountActiveLabel(patient.isActive !== false)}
                           </Badge>
-                        </TableCell>
-                        <TableCell className="py-3 text-right">
-                          <ActionsMenu
-                            isOpen={openActionsId === patient.id}
-                            onClose={() => setOpenActionsId(null)}
-                            onButtonClick={() => setOpenActionsId(openActionsId === patient.id ? null : patient.id)}
-                            buttonRef={openActionsId === patient.id ? actionsButtonRef : undefined}
-                          >
-                            <DropdownItem
-                              onMouseDown={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                openDetails(patient.id);
-                              }}
-                              className="dark:hover:bg-gray-700 dark:text-gray-200"
-                            >
-                              {t("patients.viewFullDetails")}
-                            </DropdownItem>
-                          </ActionsMenu>
                         </TableCell>
                       </TableRow>
                     ))}

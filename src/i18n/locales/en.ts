@@ -353,6 +353,36 @@ const en = {
     scheduled: "Scheduled",
     created: "Created",
     failedToLoad: "Failed to load appointments.",
+    provider: "Provider",
+    detailTitle: "Request #{{id}}",
+    lifecycleHeading: "Service lifecycle",
+    lifecycleStaticNote:
+      "This timeline is a static preview for administrators when the server returns no event log entries.",
+    lifecycleFromEventLogs: "Timeline entries from the service request event log API.",
+    eventLogsLoading: "Loading timeline…",
+    eventLogsLoadError: "Could not load the timeline for this request.",
+    eventLogsEmpty: "No timeline events have been recorded for this request yet.",
+    eventLogUntitled: "Event",
+    eventLogNoDetail: "No additional details.",
+    lifecycle: {
+      submittedTitle: "Request submitted",
+      submittedDesc:
+        "The patient submitted this service request. It is visible to providers and awaiting the next action.",
+      acceptedTitle: "Provider accepted",
+      acceptedDesc:
+        "A provider accepted the request. Scheduling and preparation can proceed from this point.",
+      inProgressTitle: "Service in progress",
+      inProgressDesc:
+        "The consultation or visit is underway. Payment or documentation steps may still be open.",
+      completedTitle: "Completed",
+      completedDesc: "The service request is finished and archived for reporting.",
+      closedTitle: "Request closed",
+      closedDesc:
+        "This request was rejected or cancelled before completion. No further steps apply.",
+      expiredTitle: "Request expired",
+      expiredDesc:
+        "This request is no longer active. The patient or provider may need to submit a new request if care is still needed.",
+    },
   },
   consultationConfig: {
     pageTitle: "Consultation type config",
