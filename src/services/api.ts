@@ -745,6 +745,54 @@ export const adminSystemConfigApi = {
   },
 };
 
+// ============== Admin: Scheduler jobs ==============
+
+export interface SchedulerJobItem {
+  id: number;
+  jobKey: string;
+  description: string | null;
+  runEveryMinutes: number;
+  isEnabled: boolean;
+  metadata: Record<string, unknown> | null;
+  lastRunAt: string | null;
+  nextRunAt: string | null;
+  createdAt: string;
+  updatedAt: string | null;
+}
+
+export interface UpdateSchedulerJobPayload {
+  runEveryMinutes?: number;
+  isEnabled?: boolean;
+  description?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface RefundReconcileResult {
+  scanned: number;
+  settled: number;
+  failed: number;
+  pending: number;
+  escalated: number;
+}
+
+export const adminSchedulerApi = {
+  /** GET /admin/scheduler/jobs */
+  listJobs: async () => {
+    return httpService.get<SchedulerJobItem[]>("/admin/scheduler/jobs");
+  },
+  /** PATCH /admin/scheduler/jobs/:id */
+  updateJob: async (id: number, data: UpdateSchedulerJobPayload) => {
+    return httpService.patch<SchedulerJobItem>(`/admin/scheduler/jobs/${id}`, data);
+  },
+};
+
+export const adminCancellationApi = {
+  /** POST /admin/refunds/reconcile — poll SSL Commerz for pending gateway refunds */
+  reconcileRefunds: async () => {
+    return httpService.post<RefundReconcileResult>("/admin/refunds/reconcile", {});
+  },
+};
+
 // ============== Admin: Verification Document Types ==============
 
 /** Admin-managed verification document type (add, update, deactivate). */
