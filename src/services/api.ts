@@ -2891,6 +2891,7 @@ export interface GlProfitSummaryDto {
   commissionBalance: string;
   taxBalance: string;
   totalPlatformEarnings: string;
+  aitBalance: string;
   totalPayoutsProcessed: string;
 }
 
@@ -2903,6 +2904,10 @@ export interface GlCrossSystemValidationDto {
   glTaxBalance: string;
   taxDrift: string;
   taxInSync: boolean;
+  srAitTotal: string;
+  glAitBalance: string;
+  aitDrift: string;
+  aitInSync: boolean;
 }
 
 export interface GlOverallHealthDto {
@@ -2982,6 +2987,7 @@ export interface FinancialReportTotalsDto {
   totalProviderFee: string;
   totalCommission: string;
   totalTax: string;
+  totalAit: string;
   totalWithdrawals: string;
   netPlatformEarnings: string;
   consultationCount: number;
@@ -2991,7 +2997,7 @@ export interface FinancialReportTotalsDto {
 export interface FinancialReportDayDto {
   date: string;
   inflow: { onlinePayments: string; cashPayments: string; total: string };
-  distribution: { providerFee: string; commission: string; tax: string };
+  distribution: { providerFee: string; commission: string; tax: string; ait: string };
   outflow: { withdrawals: string };
   transactionCount: number;
 }
@@ -3019,6 +3025,7 @@ export interface FinancialReportTxItemDto {
   providerFee: string | null;
   commission: string | null;
   tax: string | null;
+  ait: string | null;
 }
 
 export interface FinancialReportPaginationDto {
@@ -3051,6 +3058,7 @@ export interface FinancialTxDetailBreakdownDto {
   totalFee: string;
   commission: FinancialTxDetailBreakdownPart;
   tax: FinancialTxDetailBreakdownPart;
+  ait: FinancialTxDetailBreakdownPart;
   providerFee: string;
 }
 

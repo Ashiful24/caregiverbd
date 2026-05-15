@@ -453,7 +453,7 @@ export default function MasterFinancialReport() {
 
         {/* ─────────────────────────── SUMMARY KPIs ─────────────────────────────── */}
         {totals ? (
-          <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
             <KpiCard
               label="Total inflow"
               value={fmtBDT(totals.totalInflow)}
@@ -466,14 +466,20 @@ export default function MasterFinancialReport() {
               value={fmtBDT(totals.totalProviderFee)}
               hint={`${totals.consultationCount} payments`}
               tone="neutral"
-              tooltip="Sum of providerFee — the net amount credited to provider wallets after platform deductions. This is what providers actually earned from completed services in the selected range."
+              tooltip="Sum of providerFee — net credited to provider wallets after commission, tax, and AIT. This is what providers actually received from completed services in the selected range."
+            />
+            <KpiCard
+              label="AIT withheld"
+              value={fmtBDT(totals.totalAit ?? "0")}
+              tone="neutral"
+              tooltip="Advance Income Tax withheld from provider earnings and credited to AIT_GL. Deducted from the provider share after commission (not platform revenue)."
             />
             <KpiCard
               label="Platform earnings"
               value={fmtBDT(totals.netPlatformEarnings)}
               hint={`${fmtBDT(totals.totalCommission)} commission · ${fmtBDT(totals.totalTax)} tax`}
               tone="positive"
-              tooltip="Commission + tax that the platform collected during the selected range. Hint shows the split."
+              tooltip="Commission + tax that the platform collected during the selected range. Hint shows the split. AIT is excluded — it is withheld from providers, not platform income."
             />
             <KpiCard
               label="Withdrawals"
@@ -537,6 +543,12 @@ export default function MasterFinancialReport() {
                         <InfoTooltip text="Total tax collected on this day's payments." />
                       </span>
                     </TableCell>
+                    <TableCell isHeader className="text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400 py-3">
+                      <span className="inline-flex items-center gap-1.5">
+                        AIT
+                        <InfoTooltip text="Advance Income Tax withheld from provider earnings on this day's payments (credited to AIT_GL)." />
+                      </span>
+                    </TableCell>
                     <TableCell isHeader className="text-right text-xs font-medium uppercase text-rose-700 dark:text-rose-400 py-3">
                       <span className="inline-flex items-center gap-1.5">
                         Withdrawals
@@ -574,6 +586,9 @@ export default function MasterFinancialReport() {
                       </TableCell>
                       <TableCell className="text-right text-gray-700 dark:text-gray-300 py-2.5">
                         {fmtBDT(d.distribution.tax)}
+                      </TableCell>
+                      <TableCell className="text-right text-gray-700 dark:text-gray-300 py-2.5">
+                        {fmtBDT(d.distribution.ait ?? "0")}
                       </TableCell>
                       <TableCell className="text-right font-medium text-rose-700 dark:text-rose-400 py-2.5">
                         {fmtBDT(d.outflow.withdrawals)}
@@ -664,6 +679,12 @@ export default function MasterFinancialReport() {
                           <InfoTooltip text="Tax collected on this payment." />
                         </span>
                       </TableCell>
+                      <TableCell isHeader className="text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400 py-3">
+                        <span className="inline-flex items-center gap-1.5">
+                          AIT
+                          <InfoTooltip text="Advance Income Tax withheld from the provider on this payment." />
+                        </span>
+                      </TableCell>
                       <TableCell isHeader className="text-center text-xs font-medium uppercase text-gray-500 dark:text-gray-400 py-3">
                         <span className="inline-flex items-center gap-1.5">
                           Status
@@ -726,6 +747,9 @@ export default function MasterFinancialReport() {
                         </TableCell>
                         <TableCell className="text-right text-gray-600 dark:text-gray-400 py-2.5">
                           {fmtBDT(t.tax)}
+                        </TableCell>
+                        <TableCell className="text-right text-gray-600 dark:text-gray-400 py-2.5">
+                          {fmtBDT(t.ait)}
                         </TableCell>
                         <TableCell className="text-center py-2.5">
                           <Badge color={statusBadgeColor(t.status)} size="sm">
@@ -1022,6 +1046,19 @@ function TransactionDetailView({ detail }: { detail: FinancialTxDetailResponseDt
                   − {fmtBDT(detail.breakdown.tax.amount)}
                 </TableCell>
               </TableRow>
+              {detail.breakdown.ait ? (
+                <TableRow>
+                  <TableCell className="text-gray-700 dark:text-gray-300 py-2">
+                    AIT
+                    <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                      {detail.breakdown.ait.percent}% (withheld from provider)
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-right text-gray-800 dark:text-white/90 py-2">
+                    − {fmtBDT(detail.breakdown.ait.amount)}
+                  </TableCell>
+                </TableRow>
+              ) : null}
               <TableRow>
                 <TableCell className="font-medium text-emerald-700 dark:text-emerald-400 py-2">
                   Provider receives
