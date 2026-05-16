@@ -1,5 +1,5 @@
 /**
- * Get JWT expiry time in milliseconds (UTC).
+ * Get JWT expiry time in milliseconds (from the token’s exp claim).
  * Decodes the payload without verification (client-side only; used for session timeout).
  * Returns null if token is missing, invalid, or has no exp claim.
  */

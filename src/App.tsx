@@ -20,6 +20,7 @@ import UpgradeRequests from "./pages/UpgradeRequests";
 import UpgradeRequestDetail from "./pages/UpgradeRequestDetail";
 import Notifications from "./pages/Notifications";
 import WithdrawalRequests from "./pages/WithdrawalRequests";
+import CancellationRefunds from "./pages/CancellationRefunds";
 import MasterFinancialReport from "./pages/MasterFinancialReport";
 import GlReconciliation from "./pages/GlReconciliation";
 import NurseScheduleList from "./pages/NurseScheduleList";
@@ -159,6 +160,14 @@ export default function App() {
             element={
               <ProtectedRoute allowedRoles={["ADMIN"]}>
                 <WithdrawalRequests />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/cancellation-refunds"
+            element={
+              <ProtectedRoute allowedRoles={["ADMIN"]}>
+                <CancellationRefunds />
               </ProtectedRoute>
             }
           />

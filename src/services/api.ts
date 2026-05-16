@@ -775,6 +775,87 @@ export interface RefundReconcileResult {
   escalated: number;
 }
 
+/** Linked refund transaction statuses (admin refunds queue filter). */
+export type AdminRefundTxStatus = "PENDING" | "COMPLETED" | "FAILED" | "CANCELLED";
+
+export interface CancellationRefundQueueCancellation {
+  id: number;
+  cancelledAt: string;
+  scope: string;
+  serviceRequestId: number | null;
+  longTermOpportunityId: number | null;
+  actor: string;
+  actorUserId: number | null;
+  actorName: string | null;
+  stage: string;
+  statusAtCancel: string;
+  reasonCategory: string | null;
+  reasonNote: string | null;
+  feeAmount: string;
+  refundAmount: string;
+  refundMethod: string;
+  adminNotes: string | null;
+}
+
+export interface CancellationRefundQueueRefundTx {
+  id: number;
+  status: string;
+  amount: string;
+  paymentMethod: string;
+  referenceId: string | null;
+  referenceType: string | null;
+  longTermOpportunityId: number | null;
+  patientId: number | null;
+  providerId: number | null;
+  patientName: string | null;
+  providerName: string | null;
+  gatewayRefundRefId: string | null;
+  gatewayRefundStatus: string | null;
+  purpose: string | null;
+  adminEscalated: boolean;
+  createdAt: string;
+  updatedAt: string | null;
+}
+
+export interface CancellationRefundQueueRow {
+  cancellation: CancellationRefundQueueCancellation;
+  refundTransaction: CancellationRefundQueueRefundTx;
+}
+
+export interface CancellationRefundQueueResponse {
+  summary: {
+    window: { start: string; end: string; filteredBy?: string };
+    counts?: {
+      total: number;
+      pending: number;
+      completed: number;
+      failed: number;
+      cancelled: number;
+    };
+  };
+  data: CancellationRefundQueueRow[];
+  pagination: {
+    limit: number;
+    hasMore: boolean;
+    nextCursor: string | null;
+    page?: number;
+    total?: number;
+  };
+}
+
+export interface CancellationRefundQueueQueryParams {
+  startDate?: string;
+  endDate?: string;
+  status?: AdminRefundTxStatus;
+  patientId?: number;
+  paymentMethod?: "ONLINE" | "CASH";
+  cursor?: string;
+  page?: number;
+  limit?: number;
+  includeSummary?: boolean;
+  includeTotal?: boolean;
+}
+
 export const adminSchedulerApi = {
   /** GET /admin/scheduler/jobs */
   listJobs: async () => {
@@ -787,6 +868,28 @@ export const adminSchedulerApi = {
 };
 
 export const adminCancellationApi = {
+  /** GET /admin/refunds — cancellations with linked REFUND transactions (cursor or page). */
+  listRefundsQueue: async (
+    params?: CancellationRefundQueueQueryParams,
+    config?: { signal?: AbortSignal }
+  ) => {
+    const qp: Record<string, string | number | boolean> = {};
+    if (params?.startDate) qp.startDate = params.startDate;
+    if (params?.endDate) qp.endDate = params.endDate;
+    if (params?.status) qp.status = params.status;
+    if (params?.patientId != null) qp.patientId = params.patientId;
+    if (params?.paymentMethod) qp.paymentMethod = params.paymentMethod;
+    if (params?.cursor) qp.cursor = params.cursor;
+    if (params?.page != null) qp.page = params.page;
+    if (params?.limit != null) qp.limit = params.limit;
+    if (params?.includeSummary === true) qp.includeSummary = true;
+    if (params?.includeTotal === true) qp.includeTotal = true;
+
+    return httpService.get<CancellationRefundQueueResponse>("/admin/refunds", {
+      params: qp,
+      signal: config?.signal,
+    });
+  },
   /** POST /admin/refunds/reconcile — poll SSL Commerz for pending gateway refunds */
   reconcileRefunds: async () => {
     return httpService.post<RefundReconcileResult>("/admin/refunds/reconcile", {});

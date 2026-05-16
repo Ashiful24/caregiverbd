@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import {
   Clock,
   CreditCard,
@@ -16,7 +17,6 @@ import {
   adminSchedulerApi,
   type RefundReconcileResult,
   type SchedulerJobItem,
-  type UpdateSchedulerJobPayload,
 } from "../../services/api";
 import { formatDateTime } from "../../utils/format";
 import { formatIntervalMinutes, numMeta } from "./configFieldHelpers";
@@ -88,7 +88,7 @@ function jobFormFromItem(job: SchedulerJobItem): JobFormState {
   };
 }
 
-function metadataSummary(job: SchedulerJobItem, t: (k: string, o?: object) => string): string[] {
+function metadataSummary(job: SchedulerJobItem, t: TFunction): string[] {
   const m = job.metadata ?? {};
   switch (job.jobKey) {
     case "REFUND_RECONCILE":

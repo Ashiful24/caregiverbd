@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import PageMeta from "../components/common/PageMeta";
 import { DetailModal } from "../components/common/DetailModal";
@@ -26,14 +27,17 @@ import {
   type ProviderListItem,
   type PatientListItem,
 } from "../services/api";
-import { formatDate, formatDateTime } from "../utils/format";
+import {
+  bangladeshCalendarRangeToApiParams,
+  formatDate,
+  formatDateTime,
+} from "../utils/format";
 import {
   fmtBDT,
   KpiCard,
   TX_TYPES,
   TX_STATUSES,
   statusBadgeColor,
-  txTypeLabel,
   toISODateLocal,
   DEFAULT_LIMIT,
   MAX_RANGE_DAYS,
@@ -44,11 +48,13 @@ import {
 // ────────────────────────────────────────────────────────────────────────────
 
 export default function MasterFinancialReport() {
+  const { t } = useTranslation();
+  const M = "financialReports.master";
+
   // ── Financial report (combined: summary + paginated transactions) ─────────
   const [startDate, setStartDate] = useState(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 30);
-    return toISODateLocal(d);
+    const past = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    return toISODateLocal(past);
   });
   const [endDate, setEndDate] = useState(() => toISODateLocal(new Date()));
 
@@ -82,16 +88,17 @@ export default function MasterFinancialReport() {
   );
 
   const validateRange = useCallback((): string | null => {
-    if (!startDate || !endDate) return "Start and end dates are required.";
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()))
-      return "Invalid date format.";
-    if (end < start) return "End date must be after start date.";
-    const diffDays = (end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000);
-    if (diffDays > MAX_RANGE_DAYS) return `Date range cannot exceed ${MAX_RANGE_DAYS} days.`;
+    if (!startDate || !endDate) return t(`${M}.valDatesRequired`);
+    const ymd = /^\d{4}-\d{2}-\d{2}$/;
+    if (!ymd.test(startDate) || !ymd.test(endDate)) return t(`${M}.valInvalidFormat`);
+    if (endDate < startDate) return t(`${M}.valEndBeforeStart`);
+    const utcMidnight = (s: string) =>
+      Date.UTC(Number(s.slice(0, 4)), Number(s.slice(5, 7)) - 1, Number(s.slice(8, 10)));
+    const diffDays = (utcMidnight(endDate) - utcMidnight(startDate)) / (24 * 60 * 60 * 1000);
+    if (diffDays > MAX_RANGE_DAYS)
+      return t(`${M}.valRangeExceeded`, { maxDays: MAX_RANGE_DAYS });
     return null;
-  }, [startDate, endDate]);
+  }, [startDate, endDate, t, M]);
 
   const loadReport = useCallback(
     async (targetPage: number, opts?: { paginationOnly?: boolean }) => {
@@ -103,13 +110,13 @@ export default function MasterFinancialReport() {
       setReportLoading(true);
       setReportError("");
       try {
-        // Send end-of-day for endDate so the entire day is included.
-        // Backend parses with `new Date()` and uses `lte` — without T23:59:59 we'd miss
-        // every transaction on the end-date itself (since they'd be after midnight UTC).
-        const endDateISO = new Date(`${endDate}T23:59:59.999Z`).toISOString();
-        const params = {
+        const { startDate: startApi, endDate: endApi } = bangladeshCalendarRangeToApiParams(
           startDate,
-          endDate: endDateISO,
+          endDate
+        );
+        const params = {
+          startDate: startApi,
+          endDate: endApi,
           providerId: providerId === "" ? undefined : Number(providerId),
           patientId:  patientId  === "" ? undefined : Number(patientId),
           type:          type === "" ? undefined : type,
@@ -132,7 +139,7 @@ export default function MasterFinancialReport() {
           return reportData;
         });
       } catch {
-        setReportError("Failed to load financial report.");
+        setReportError(t(`${M}.errLoadReport`));
       } finally {
         setReportLoading(false);
       }
@@ -147,6 +154,8 @@ export default function MasterFinancialReport() {
       paymentMethod,
       serviceType,
       status,
+      t,
+      M,
     ],
   );
 
@@ -219,11 +228,11 @@ export default function MasterFinancialReport() {
       const data = (res as { data?: FinancialTxDetailResponseDto }).data ?? res;
       setDetail(data as FinancialTxDetailResponseDto);
     } catch {
-      setDetailError("Could not load transaction details.");
+      setDetailError(t(`${M}.errLoadDetail`));
     } finally {
       setDetailLoading(false);
     }
-  }, []);
+  }, [t, M]);
 
   const closeDetail = useCallback(() => {
     setDetailOpen(false);
@@ -245,13 +254,26 @@ export default function MasterFinancialReport() {
   const pagination = report?.transactions.pagination;
   const hasMore = pagination?.hasMore ?? false;
 
+  const paymentsHint =
+    totals == null
+      ? ""
+      : totals.consultationCount === 1
+        ? t(`${M}.kpi.paymentsHint_one`, { count: totals.consultationCount })
+        : t(`${M}.kpi.paymentsHint_other`, { count: totals.consultationCount });
+  const processedHint =
+    totals == null
+      ? ""
+      : totals.withdrawalCount === 1
+        ? t(`${M}.kpi.processedHint_one`, { count: totals.withdrawalCount })
+        : t(`${M}.kpi.processedHint_other`, { count: totals.withdrawalCount });
+
   return (
     <>
       <PageMeta
-        title="Master Financial Report | Hope - BMQAS"
-        description="Admin master financial report: daily money flow and paginated transactions with full breakdown."
+        title={t(`${M}.metaTitle`)}
+        description={t(`${M}.metaDescription`)}
       />
-      <PageBreadcrumb pageTitle="Master Financial Report" />
+      <PageBreadcrumb pageTitle={t(`${M}.pageTitle`)} />
 
       <div className="space-y-6">
 
@@ -270,17 +292,17 @@ export default function MasterFinancialReport() {
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
-                  Master financial report
+                  {t(`${M}.pageTitle`)}
                 </h3>
                 {reportLoading ? (
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-medium text-brand-700 dark:bg-brand-500/10 dark:text-brand-400">
                     <span className="h-3 w-3 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
-                    Loading…
+                    {t(`${M}.loading`)}
                   </span>
                 ) : null}
               </div>
               <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                Daily money flow + paginated transactions · max 90 day range
+                {t(`${M}.subheading`, { maxDays: MAX_RANGE_DAYS })}
               </p>
             </div>
             <button
@@ -289,52 +311,54 @@ export default function MasterFinancialReport() {
               disabled={reportLoading}
               className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
             >
-              Reset filters
+              {t(`${M}.resetFilters`)}
             </button>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
-            <label className="flex flex-col gap-1">
+          {/* Two-row grid: row 1 dates + wide party pickers; row 2 transaction filters — avoids crushed SearchableSelects */}
+          <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-12 lg:items-end">
+            <label className="flex min-w-0 flex-col gap-1 sm:col-span-1 lg:col-span-2">
               <span className="flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400">
-                Start date
-                <InfoTooltip text="The first day to include in the report (inclusive). Combined with End date, the range cannot exceed 90 days." />
+                {t(`${M}.filters.startDate`)}
+                <InfoTooltip text={t(`${M}.filters.ttStartDate`, { maxDays: MAX_RANGE_DAYS })} />
               </span>
               <input
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                className="min-h-[42px] w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
               />
             </label>
-            <label className="flex flex-col gap-1">
+            <label className="flex min-w-0 flex-col gap-1 sm:col-span-1 lg:col-span-2">
               <span className="flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400">
-                End date
-                <InfoTooltip text="The last day to include in the report (inclusive — the entire end day is included). Range from Start date cannot exceed 90 days." />
+                {t(`${M}.filters.endDate`)}
+                <InfoTooltip text={t(`${M}.filters.ttEndDate`, { maxDays: MAX_RANGE_DAYS })} />
               </span>
               <input
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                className="min-h-[42px] w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
               />
             </label>
-            <label className="flex flex-col gap-1">
+            <label className="flex min-w-0 flex-col gap-1 sm:col-span-2 lg:col-span-4">
               <span className="flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400">
-                Provider
-                <InfoTooltip text="Limit the report to transactions involving a specific provider. Type a name to search the dropdown." />
+                {t(`${M}.filters.provider`)}
+                <InfoTooltip text={t(`${M}.filters.ttProvider`)} />
               </span>
               <SearchableSelect<number>
                 value={providerId === "" ? null : providerId}
                 onChange={(v) => setProviderId(v == null ? "" : v)}
-                placeholder="All providers"
-                clearLabel="All providers"
-                searchPlaceholder="Search by name…"
+                placeholder={t(`${M}.filters.allProviders`)}
+                clearLabel={t(`${M}.filters.allProviders`)}
+                searchPlaceholder={t(`${M}.filters.searchByName`)}
+                className="min-h-[42px]"
                 options={providers.map((p) => {
                   const name =
                     p.providerName ||
                     p.fullName ||
                     [p.firstName, p.lastName].filter(Boolean).join(" ") ||
-                    `Provider #${p.id}`;
+                    t(`${M}.detail.providerFallback`, { id: p.id });
                   return {
                     value: p.id,
                     label: name,
@@ -343,21 +367,22 @@ export default function MasterFinancialReport() {
                 })}
               />
             </label>
-            <label className="flex flex-col gap-1">
+            <label className="flex min-w-0 flex-col gap-1 sm:col-span-2 lg:col-span-4">
               <span className="flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400">
-                Patient
-                <InfoTooltip text="Limit the report to transactions involving a specific patient. Type a name to search the dropdown." />
+                {t(`${M}.filters.patient`)}
+                <InfoTooltip text={t(`${M}.filters.ttPatient`)} />
               </span>
               <SearchableSelect<number>
                 value={patientId === "" ? null : patientId}
                 onChange={(v) => setPatientId(v == null ? "" : v)}
-                placeholder="All patients"
-                clearLabel="All patients"
-                searchPlaceholder="Search by name…"
+                placeholder={t(`${M}.filters.allPatients`)}
+                clearLabel={t(`${M}.filters.allPatients`)}
+                searchPlaceholder={t(`${M}.filters.searchByName`)}
+                className="min-h-[42px]"
                 options={patients.map((p) => {
                   const name =
                     [p.firstName, p.lastName].filter(Boolean).join(" ") ||
-                    `Patient #${p.id}`;
+                    t(`${M}.detail.patientFallback`, { id: p.id });
                   return {
                     value: p.id,
                     label: name,
@@ -366,72 +391,72 @@ export default function MasterFinancialReport() {
                 })}
               />
             </label>
-            <label className="flex flex-col gap-1">
+            <label className="flex min-w-0 flex-col gap-1 sm:col-span-1 lg:col-span-3">
               <span className="flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400">
-                Type
-                <InfoTooltip text="Transaction type. Payment = patient paid for a service. Withdrawal = provider cashed out earnings. Refund = money returned to a patient. Commission/Adjustment = platform internal entries." />
+                {t(`${M}.filters.type`)}
+                <InfoTooltip text={t(`${M}.filters.ttType`)} />
               </span>
               <select
                 value={type}
                 onChange={(e) => setType(e.target.value as FinancialTxType | "")}
-                className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                className="min-h-[42px] w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
               >
-                <option value="">All types</option>
-                {TX_TYPES.map((t) => (
-                  <option key={t.value} value={t.value}>
-                    {t.label}
+                <option value="">{t(`${M}.filters.allTypes`)}</option>
+                {TX_TYPES.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {t(`${M}.txType.${opt.value}`, { defaultValue: opt.label })}
                   </option>
                 ))}
               </select>
             </label>
-            <label className="flex flex-col gap-1">
+            <label className="flex min-w-0 flex-col gap-1 sm:col-span-1 lg:col-span-3">
               <span className="flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400">
-                Payment method
-                <InfoTooltip text="Online = paid via gateway (card / mobile banking). Cash = collected in person at the time of service." />
+                {t(`${M}.filters.paymentMethod`)}
+                <InfoTooltip text={t(`${M}.filters.ttPayment`)} />
               </span>
               <select
                 value={paymentMethod}
                 onChange={(e) =>
                   setPaymentMethod(e.target.value as FinancialPaymentMethod | "")
                 }
-                className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                className="min-h-[42px] w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
               >
-                <option value="">All methods</option>
-                <option value="ONLINE">Online</option>
-                <option value="CASH">Cash</option>
+                <option value="">{t(`${M}.filters.allMethods`)}</option>
+                <option value="ONLINE">{t(`${M}.filters.paymentOnline`)}</option>
+                <option value="CASH">{t(`${M}.filters.paymentCash`)}</option>
               </select>
             </label>
-            <label className="flex flex-col gap-1">
+            <label className="flex min-w-0 flex-col gap-1 sm:col-span-1 lg:col-span-3">
               <span className="flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400">
-                Service
-                <InfoTooltip text="Short term = a single shift / consultation. Long term = an ongoing care engagement (multiple shifts grouped under one opportunity)." />
+                {t(`${M}.filters.service`)}
+                <InfoTooltip text={t(`${M}.filters.ttService`)} />
               </span>
               <select
                 value={serviceType}
                 onChange={(e) =>
                   setServiceType(e.target.value as FinancialServiceType | "")
                 }
-                className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                className="min-h-[42px] w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
               >
-                <option value="">All services</option>
-                <option value="SHORT_TERM">Short term</option>
-                <option value="LONG_TERM">Long term</option>
+                <option value="">{t(`${M}.filters.allServices`)}</option>
+                <option value="SHORT_TERM">{t(`${M}.filters.serviceShortTerm`)}</option>
+                <option value="LONG_TERM">{t(`${M}.filters.serviceLongTerm`)}</option>
               </select>
             </label>
-            <label className="flex flex-col gap-1">
+            <label className="flex min-w-0 flex-col gap-1 sm:col-span-1 lg:col-span-3">
               <span className="flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400">
-                Status
-                <InfoTooltip text="If left empty, the summary KPIs only count COMPLETED transactions (realised money), while the list shows all statuses. Choose a specific status to focus on troubleshooting (e.g. PENDING or FAILED)." align="end" />
+                {t(`${M}.filters.status`)}
+                <InfoTooltip text={t(`${M}.filters.ttStatus`)} align="end" />
               </span>
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value as FinancialTxStatus | "")}
-                className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                className="min-h-[42px] w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
               >
-                <option value="">All statuses</option>
+                <option value="">{t(`${M}.filters.allStatuses`)}</option>
                 {TX_STATUSES.map((s) => (
                   <option key={s.value} value={s.value}>
-                    {s.label}
+                    {t(`${M}.txStatus.${s.value}`, { defaultValue: s.label })}
                   </option>
                 ))}
               </select>
@@ -455,38 +480,44 @@ export default function MasterFinancialReport() {
         {totals ? (
           <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
             <KpiCard
-              label="Total inflow"
+              label={t(`${M}.kpi.totalInflow`)}
               value={fmtBDT(totals.totalInflow)}
-              hint={`${fmtBDT(totals.onlinePayments)} online · ${fmtBDT(totals.cashPayments)} cash`}
+              hint={t(`${M}.kpi.inflowHint`, {
+                online: fmtBDT(totals.onlinePayments),
+                cash: fmtBDT(totals.cashPayments),
+              })}
               tone="positive"
-              tooltip="Total amount paid by patients across all selected days. Combines online (gateway) and cash payments. Limited by current filters."
+              tooltip={t(`${M}.kpi.totalInflowTt`)}
             />
             <KpiCard
-              label="Provider payouts"
+              label={t(`${M}.kpi.providerPayouts`)}
               value={fmtBDT(totals.totalProviderFee)}
-              hint={`${totals.consultationCount} payments`}
+              hint={paymentsHint}
               tone="neutral"
-              tooltip="Sum of providerFee — net credited to provider wallets after commission, tax, and AIT. This is what providers actually received from completed services in the selected range."
+              tooltip={t(`${M}.kpi.providerPayoutsTt`)}
             />
             <KpiCard
-              label="AIT withheld"
+              label={t(`${M}.kpi.aitWithheld`)}
               value={fmtBDT(totals.totalAit ?? "0")}
               tone="neutral"
-              tooltip="Advance Income Tax withheld from provider earnings and credited to AIT_GL. Deducted from the provider share after commission (not platform revenue)."
+              tooltip={t(`${M}.kpi.aitWithheldTt`)}
             />
             <KpiCard
-              label="Platform earnings"
+              label={t(`${M}.kpi.platformEarnings`)}
               value={fmtBDT(totals.netPlatformEarnings)}
-              hint={`${fmtBDT(totals.totalCommission)} commission · ${fmtBDT(totals.totalTax)} tax`}
+              hint={t(`${M}.kpi.earningsHint`, {
+                commission: fmtBDT(totals.totalCommission),
+                tax: fmtBDT(totals.totalTax),
+              })}
               tone="positive"
-              tooltip="Commission + tax that the platform collected during the selected range. Hint shows the split. AIT is excluded — it is withheld from providers, not platform income."
+              tooltip={t(`${M}.kpi.platformEarningsTt`)}
             />
             <KpiCard
-              label="Withdrawals"
+              label={t(`${M}.kpi.withdrawals`)}
               value={fmtBDT(totals.totalWithdrawals)}
-              hint={`${totals.withdrawalCount} processed`}
+              hint={processedHint}
               tone="negative"
-              tooltip="Total amount paid out to providers as withdrawals during the selected range. This is money that left the platform."
+              tooltip={t(`${M}.kpi.withdrawalsTt`)}
             />
           </section>
         ) : null}
@@ -495,7 +526,7 @@ export default function MasterFinancialReport() {
         {report?.summary?.byDay && report.summary.byDay.length > 0 ? (
           <section className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] lg:p-6">
             <h3 className="mb-4 text-lg font-semibold text-gray-800 dark:text-white/90">
-              Daily money flow
+              {t(`${M}.dailyFlow.title`)}
             </h3>
             <div className="overflow-x-auto">
               <Table className="min-w-[64rem]">
@@ -503,62 +534,62 @@ export default function MasterFinancialReport() {
                   <TableRow>
                     <TableCell isHeader className="text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400 py-3">
                       <span className="inline-flex items-center gap-1.5">
-                        Date
-                        <InfoTooltip text="The calendar day (server time zone) on which the transactions were created." />
+                        {t(`${M}.dailyFlow.colDate`)}
+                        <InfoTooltip text={t(`${M}.dailyFlow.ttDate`)} />
                       </span>
                     </TableCell>
                     <TableCell isHeader className="text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400 py-3">
                       <span className="inline-flex items-center gap-1.5">
-                        Online
-                        <InfoTooltip text="Total patient payments made via online gateway on this day." />
+                        {t(`${M}.dailyFlow.colOnline`)}
+                        <InfoTooltip text={t(`${M}.dailyFlow.ttOnline`)} />
                       </span>
                     </TableCell>
                     <TableCell isHeader className="text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400 py-3">
                       <span className="inline-flex items-center gap-1.5">
-                        Cash
-                        <InfoTooltip text="Total patient payments collected as cash on this day." />
+                        {t(`${M}.dailyFlow.colCash`)}
+                        <InfoTooltip text={t(`${M}.dailyFlow.ttCash`)} />
                       </span>
                     </TableCell>
                     <TableCell isHeader className="text-right text-xs font-medium uppercase text-emerald-700 dark:text-emerald-400 py-3">
                       <span className="inline-flex items-center gap-1.5">
-                        Inflow
-                        <InfoTooltip text="Online + Cash. Total money that came in from patients on this day." />
+                        {t(`${M}.dailyFlow.colInflow`)}
+                        <InfoTooltip text={t(`${M}.dailyFlow.ttInflow`)} />
                       </span>
                     </TableCell>
                     <TableCell isHeader className="text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400 py-3">
                       <span className="inline-flex items-center gap-1.5">
-                        To providers
-                        <InfoTooltip text="Total provider net earnings (after commission and tax) credited from this day's payments." />
+                        {t(`${M}.dailyFlow.colToProviders`)}
+                        <InfoTooltip text={t(`${M}.dailyFlow.ttToProviders`)} />
                       </span>
                     </TableCell>
                     <TableCell isHeader className="text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400 py-3">
                       <span className="inline-flex items-center gap-1.5">
-                        Commission
-                        <InfoTooltip text="Total platform commission earned on this day's payments." />
+                        {t(`${M}.dailyFlow.colCommission`)}
+                        <InfoTooltip text={t(`${M}.dailyFlow.ttCommission`)} />
                       </span>
                     </TableCell>
                     <TableCell isHeader className="text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400 py-3">
                       <span className="inline-flex items-center gap-1.5">
-                        Tax
-                        <InfoTooltip text="Total tax collected on this day's payments." />
+                        {t(`${M}.dailyFlow.colTax`)}
+                        <InfoTooltip text={t(`${M}.dailyFlow.ttTax`)} />
                       </span>
                     </TableCell>
                     <TableCell isHeader className="text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400 py-3">
                       <span className="inline-flex items-center gap-1.5">
-                        AIT
-                        <InfoTooltip text="Advance Income Tax withheld from provider earnings on this day's payments (credited to AIT_GL)." />
+                        {t(`${M}.dailyFlow.colAit`)}
+                        <InfoTooltip text={t(`${M}.dailyFlow.ttAit`)} />
                       </span>
                     </TableCell>
                     <TableCell isHeader className="text-right text-xs font-medium uppercase text-rose-700 dark:text-rose-400 py-3">
                       <span className="inline-flex items-center gap-1.5">
-                        Withdrawals
-                        <InfoTooltip text="Total provider withdrawals paid out on this day. This is money that left the platform." />
+                        {t(`${M}.dailyFlow.colWithdrawals`)}
+                        <InfoTooltip text={t(`${M}.dailyFlow.ttWithdrawals`)} />
                       </span>
                     </TableCell>
                     <TableCell isHeader className="text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400 py-3">
                       <span className="inline-flex items-center gap-1.5">
-                        #Tx
-                        <InfoTooltip text="Number of transactions counted on this day (payments + withdrawals)." align="end" />
+                        {t(`${M}.dailyFlow.txCount`)}
+                        <InfoTooltip text={t(`${M}.dailyFlow.ttTxCount`)} align="end" />
                       </span>
                     </TableCell>
                   </TableRow>
@@ -609,10 +640,10 @@ export default function MasterFinancialReport() {
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
               <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
-                Transactions
+                {t(`${M}.txnList.title`)}
               </h3>
               <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                Click any row to view full breakdown and ledger trail
+                {t(`${M}.txnList.subtitle`)}
               </p>
             </div>
           </div>
@@ -623,7 +654,7 @@ export default function MasterFinancialReport() {
             </div>
           ) : txList.length === 0 ? (
             <p className="py-6 text-center text-sm text-gray-500 dark:text-gray-400">
-              No transactions match the filters.
+              {t(`${M}.txnList.empty`)}
             </p>
           ) : (
             <>
@@ -633,84 +664,88 @@ export default function MasterFinancialReport() {
                     <TableRow>
                       <TableCell isHeader className="text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400 py-3">
                         <span className="inline-flex items-center gap-1.5">
-                          Date
-                          <InfoTooltip text="When the transaction was created (date and time)." />
+                          {t(`${M}.txnList.colDate`)}
+                          <InfoTooltip text={t(`${M}.txnList.ttDate`)} />
                         </span>
                       </TableCell>
                       <TableCell isHeader className="text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400 py-3">
                         <span className="inline-flex items-center gap-1.5">
-                          Type
-                          <InfoTooltip text="Transaction type (Payment, Withdrawal, etc.) and payment method (Online or Cash) for payments." />
+                          {t(`${M}.txnList.colType`)}
+                          <InfoTooltip text={t(`${M}.txnList.ttType`)} />
                         </span>
                       </TableCell>
                       <TableCell isHeader className="text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400 py-3">
                         <span className="inline-flex items-center gap-1.5">
-                          Patient → Provider
-                          <InfoTooltip text="Patient who paid, and the provider who received the payment. Either side may be empty for non-service transactions (e.g. admin adjustments)." />
+                          {t(`${M}.txnList.colParties`)}
+                          <InfoTooltip text={t(`${M}.txnList.ttParties`)} />
                         </span>
                       </TableCell>
                       <TableCell isHeader className="text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400 py-3">
                         <span className="inline-flex items-center gap-1.5">
-                          Service
-                          <InfoTooltip text="The consultation type (e.g. Professional Nurse), service mode (Short term / Long term), and scheduled date for the underlying service request." />
+                          {t(`${M}.txnList.colService`)}
+                          <InfoTooltip text={t(`${M}.txnList.ttService`)} />
                         </span>
                       </TableCell>
                       <TableCell isHeader className="text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400 py-3">
                         <span className="inline-flex items-center gap-1.5">
-                          Total
-                          <InfoTooltip text="Total fee paid by the patient for this service. Inflow to the platform." />
+                          {t(`${M}.txnList.colTotal`)}
+                          <InfoTooltip text={t(`${M}.txnList.ttTotal`)} />
                         </span>
                       </TableCell>
                       <TableCell isHeader className="text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400 py-3">
                         <span className="inline-flex items-center gap-1.5">
-                          Provider
-                          <InfoTooltip text="Net amount the provider receives from this payment, after platform deductions." />
+                          {t(`${M}.txnList.colProvider`)}
+                          <InfoTooltip text={t(`${M}.txnList.ttProviderNet`)} />
                         </span>
                       </TableCell>
                       <TableCell isHeader className="text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400 py-3">
                         <span className="inline-flex items-center gap-1.5">
-                          Comm
-                          <InfoTooltip text="Commission amount the platform earned on this payment." />
+                          {t(`${M}.txnList.colComm`)}
+                          <InfoTooltip text={t(`${M}.txnList.ttCommission`)} />
                         </span>
                       </TableCell>
                       <TableCell isHeader className="text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400 py-3">
                         <span className="inline-flex items-center gap-1.5">
-                          Tax
-                          <InfoTooltip text="Tax collected on this payment." />
+                          {t(`${M}.txnList.colTax`)}
+                          <InfoTooltip text={t(`${M}.txnList.ttTax`)} />
                         </span>
                       </TableCell>
                       <TableCell isHeader className="text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400 py-3">
                         <span className="inline-flex items-center gap-1.5">
-                          AIT
-                          <InfoTooltip text="Advance Income Tax withheld from the provider on this payment." />
+                          {t(`${M}.txnList.colAit`)}
+                          <InfoTooltip text={t(`${M}.txnList.ttAit`)} />
                         </span>
                       </TableCell>
                       <TableCell isHeader className="text-center text-xs font-medium uppercase text-gray-500 dark:text-gray-400 py-3">
                         <span className="inline-flex items-center gap-1.5">
-                          Status
-                          <InfoTooltip text="Completed = settled, money has moved. Pending = awaiting confirmation. Failed/Cancelled = did not go through (no money moved)." align="end" />
+                          {t(`${M}.txnList.colStatus`)}
+                          <InfoTooltip text={t(`${M}.txnList.ttStatus`)} align="end" />
                         </span>
                       </TableCell>
                     </TableRow>
                   </TableHeader>
                   <TableBody className="divide-y divide-gray-100 dark:divide-gray-800">
-                    {txList.map((t: FinancialReportTxItemDto) => (
+                    {txList.map((row: FinancialReportTxItemDto) => (
                       <TableRow
-                        key={t.transactionId}
-                        onClick={() => openDetail(t.transactionId)}
+                        key={row.transactionId}
+                        onClick={() => openDetail(row.transactionId)}
                         className="cursor-pointer hover:bg-gray-50 dark:hover:bg-white/[0.02]"
                       >
                         <TableCell className="text-gray-700 dark:text-gray-300 py-2.5">
-                          {formatDateTime(t.date)}
+                          {formatDateTime(row.date)}
                         </TableCell>
                         <TableCell className="py-2.5">
                           <div className="flex flex-col">
                             <span className="text-sm font-medium text-gray-800 dark:text-white/90">
-                              {txTypeLabel(t.type)}
+                              {t(`${M}.txType.${row.type}`, { defaultValue: row.type })}
                             </span>
-                            {t.paymentMethod ? (
+                            {row.paymentMethod ? (
                               <span className="text-xs text-gray-500 dark:text-gray-400">
-                                {t.paymentMethod}
+                                {row.paymentMethod === "ONLINE"
+                                  ? t(`${M}.filters.paymentOnline`)
+                                  : row.paymentMethod === "CASH"
+                                    ? t(`${M}.filters.paymentCash`)
+                                    : row.paymentMethod}
                               </span>
                             ) : null}
                           </div>
@@ -718,42 +753,46 @@ export default function MasterFinancialReport() {
                         <TableCell className="py-2.5">
                           <div className="flex flex-col">
                             <span className="text-sm text-gray-800 dark:text-white/90">
-                              {t.patientName ?? "—"}
+                              {row.patientName ?? "—"}
                             </span>
                             <span className="text-xs text-gray-500 dark:text-gray-400">
-                              → {t.providerName ?? "—"}
+                              → {row.providerName ?? "—"}
                             </span>
                           </div>
                         </TableCell>
                         <TableCell className="py-2.5">
                           <div className="flex flex-col">
                             <span className="text-sm text-gray-800 dark:text-white/90">
-                              {t.consultationTypeName ?? "—"}
+                              {row.consultationTypeName ?? "—"}
                             </span>
                             <span className="text-xs text-gray-500 dark:text-gray-400">
-                              {t.serviceType ?? ""}
-                              {t.scheduledDate ? ` · ${formatDate(t.scheduledDate)}` : ""}
+                              {row.serviceType === "SHORT_TERM"
+                                ? t(`${M}.filters.serviceShortTerm`)
+                                : row.serviceType === "LONG_TERM"
+                                  ? t(`${M}.filters.serviceLongTerm`)
+                                  : (row.serviceType ?? "")}
+                              {row.scheduledDate ? ` · ${formatDate(row.scheduledDate)}` : ""}
                             </span>
                           </div>
                         </TableCell>
                         <TableCell className="text-right font-medium text-gray-800 dark:text-white/90 py-2.5">
-                          {fmtBDT(t.totalFee)}
+                          {fmtBDT(row.totalFee)}
                         </TableCell>
                         <TableCell className="text-right text-gray-700 dark:text-gray-300 py-2.5">
-                          {fmtBDT(t.providerFee)}
+                          {fmtBDT(row.providerFee)}
                         </TableCell>
                         <TableCell className="text-right text-gray-600 dark:text-gray-400 py-2.5">
-                          {fmtBDT(t.commission)}
+                          {fmtBDT(row.commission)}
                         </TableCell>
                         <TableCell className="text-right text-gray-600 dark:text-gray-400 py-2.5">
-                          {fmtBDT(t.tax)}
+                          {fmtBDT(row.tax)}
                         </TableCell>
                         <TableCell className="text-right text-gray-600 dark:text-gray-400 py-2.5">
-                          {fmtBDT(t.ait)}
+                          {fmtBDT(row.ait)}
                         </TableCell>
                         <TableCell className="text-center py-2.5">
-                          <Badge color={statusBadgeColor(t.status)} size="sm">
-                            {t.status}
+                          <Badge color={statusBadgeColor(row.status)} size="sm">
+                            {t(`${M}.txStatus.${row.status}`, { defaultValue: row.status })}
                           </Badge>
                         </TableCell>
                       </TableRow>
@@ -765,12 +804,9 @@ export default function MasterFinancialReport() {
               {/* Pagination */}
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Page <span className="font-medium">{page}</span>
+                  {t(`${M}.txnList.paginationPage`, { page })}
                   {pagination?.total != null ? (
-                    <>
-                      {" "}
-                      · <span className="font-medium">{pagination.total}</span> total
-                    </>
+                    <>{" "}{t(`${M}.txnList.paginationTotal`, { total: pagination.total })}</>
                   ) : null}
                 </p>
                 <div className="flex items-center gap-2">
@@ -780,7 +816,7 @@ export default function MasterFinancialReport() {
                     disabled={page <= 1 || reportLoading}
                     onClick={() => goToPage(page - 1)}
                   >
-                    Previous
+                    {t(`${M}.txnList.prev`)}
                   </button>
                   <button
                     type="button"
@@ -788,7 +824,7 @@ export default function MasterFinancialReport() {
                     disabled={!hasMore || reportLoading}
                     onClick={() => goToPage(page + 1)}
                   >
-                    Next
+                    {t(`${M}.txnList.next`)}
                   </button>
                 </div>
               </div>
@@ -802,7 +838,7 @@ export default function MasterFinancialReport() {
 
       {/* ─────────────────────────── DETAIL MODAL ──────────────────────────────── */}
       <DetailModal
-        title="Transaction details"
+        title={t(`${M}.detailModal.title`)}
         isOpen={detailOpen}
         onClose={closeDetail}
         loading={detailLoading}
@@ -819,14 +855,25 @@ export default function MasterFinancialReport() {
 // ────────────────────────────────────────────────────────────────────────────
 
 function TransactionDetailView({ detail }: { detail: FinancialTxDetailResponseDto }) {
+  const { t } = useTranslation();
+  const M = "financialReports.master";
+
   return (
     <div className="space-y-5">
       {/* Header strip */}
       <div className="flex flex-wrap items-center gap-3">
-        <Badge color={statusBadgeColor(detail.status)}>{detail.status}</Badge>
-        <Badge color="info">{txTypeLabel(detail.type)}</Badge>
+        <Badge color={statusBadgeColor(detail.status)}>
+          {t(`${M}.txStatus.${detail.status}`, { defaultValue: detail.status })}
+        </Badge>
+        <Badge color="info">{t(`${M}.txType.${detail.type}`, { defaultValue: detail.type })}</Badge>
         {detail.paymentMethod ? (
-          <Badge color="light">{detail.paymentMethod}</Badge>
+          <Badge color="light">
+            {detail.paymentMethod === "ONLINE"
+              ? t(`${M}.filters.paymentOnline`)
+              : detail.paymentMethod === "CASH"
+                ? t(`${M}.filters.paymentCash`)
+                : detail.paymentMethod}
+          </Badge>
         ) : null}
         <span className="text-sm text-gray-500 dark:text-gray-400">
           #{detail.transactionId} · {formatDateTime(detail.createdAt)}
@@ -836,33 +883,33 @@ function TransactionDetailView({ detail }: { detail: FinancialTxDetailResponseDt
       {/* Top KPI strip */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <KpiCard
-          label="Amount"
+          label={t(`${M}.detail.amount`)}
           value={fmtBDT(detail.amount)}
-          tooltip="The authoritative transaction amount stored on the transaction row itself. Used for accounting purposes."
+          tooltip={t(`${M}.detail.ttAmount`)}
         />
         {detail.breakdown ? (
           <>
             <KpiCard
-              label="Total fee"
+              label={t(`${M}.detail.totalFee`)}
               value={fmtBDT(detail.breakdown.totalFee)}
               tone="neutral"
-              tooltip="The full amount the patient paid for this service. Equal to the service fee plus any commission/tax that was charged on top (exclusive)."
+              tooltip={t(`${M}.detail.ttTotalFee`)}
             />
             <KpiCard
-              label="Provider fee"
+              label={t(`${M}.detail.providerFee`)}
               value={fmtBDT(detail.breakdown.providerFee)}
               tone="positive"
-              tooltip="Net amount the provider actually receives after all platform deductions. This is what gets credited to the provider wallet."
+              tooltip={t(`${M}.detail.ttProviderFee`)}
             />
             <KpiCard
-              label="Platform"
+              label={t(`${M}.detail.platform`)}
               value={fmtBDT(
                 Number(detail.breakdown.commission.amount) +
                   Number(detail.breakdown.tax.amount),
               )}
               hint={`${fmtBDT(detail.breakdown.commission.amount)} + ${fmtBDT(detail.breakdown.tax.amount)}`}
               tone="neutral"
-              tooltip="Commission + tax. The platform's earnings on this single transaction."
+              tooltip={t(`${M}.detail.ttPlatform`)}
             />
           </>
         ) : null}
@@ -874,12 +921,13 @@ function TransactionDetailView({ detail }: { detail: FinancialTxDetailResponseDt
           <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
             <div className="mb-2 flex items-center gap-1.5">
               <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                Patient
+                {t(`${M}.detail.patient`)}
               </p>
-              <InfoTooltip text="The patient who paid for this service." />
+              <InfoTooltip text={t(`${M}.detail.ttPatientBrief`)} />
             </div>
             <p className="text-sm font-medium text-gray-800 dark:text-white/90">
-              {detail.patient.name ?? `Patient #${detail.patient.id}`}
+              {detail.patient.name ??
+                t(`${M}.detail.patientFallback`, { id: detail.patient.id })}
             </p>
             {detail.patient.email ? (
               <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
@@ -892,12 +940,13 @@ function TransactionDetailView({ detail }: { detail: FinancialTxDetailResponseDt
           <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
             <div className="mb-2 flex items-center gap-1.5">
               <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                Provider
+                {t(`${M}.detail.provider`)}
               </p>
-              <InfoTooltip text="The provider who delivered this service and received the net payment." />
+              <InfoTooltip text={t(`${M}.detail.ttProviderBrief`)} />
             </div>
             <p className="text-sm font-medium text-gray-800 dark:text-white/90">
-              {detail.provider.name ?? `Provider #${detail.provider.id}`}
+              {detail.provider.name ??
+                t(`${M}.detail.providerFallback`, { id: detail.provider.id })}
             </p>
             {detail.provider.email ? (
               <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
@@ -913,15 +962,15 @@ function TransactionDetailView({ detail }: { detail: FinancialTxDetailResponseDt
         <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
           <div className="mb-2 flex items-center gap-1.5">
             <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-              Service request
+              {t(`${M}.detail.serviceRequest`)}
             </p>
-            <InfoTooltip text="The service request (shift / consultation) that this payment is tied to. Contains the snapshotted rate and fee breakdown at booking time." />
+            <InfoTooltip text={t(`${M}.detail.ttServiceRequestBrief`)} />
           </div>
           <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
             <div>
               <div className="flex items-center gap-1">
-                <p className="text-gray-500 dark:text-gray-400">ID</p>
-                <InfoTooltip text="Internal database ID of the service request. Useful for cross-referencing with other admin tools or logs." />
+                <p className="text-gray-500 dark:text-gray-400">{t(`${M}.detail.fldId`)}</p>
+                <InfoTooltip text={t(`${M}.detail.ttFldId`)} />
               </div>
               <p className="font-medium text-gray-800 dark:text-white/90">
                 #{detail.serviceRequest.id}
@@ -929,8 +978,8 @@ function TransactionDetailView({ detail }: { detail: FinancialTxDetailResponseDt
             </div>
             <div>
               <div className="flex items-center gap-1">
-                <p className="text-gray-500 dark:text-gray-400">Type</p>
-                <InfoTooltip text="SHORT_TERM = single shift / consultation. LONG_TERM = a shift inside an ongoing care engagement." />
+                <p className="text-gray-500 dark:text-gray-400">{t(`${M}.detail.fldType`)}</p>
+                <InfoTooltip text={t(`${M}.detail.ttFldType`)} />
               </div>
               <p className="font-medium text-gray-800 dark:text-white/90">
                 {detail.serviceRequest.referenceType ?? "—"}
@@ -938,8 +987,8 @@ function TransactionDetailView({ detail }: { detail: FinancialTxDetailResponseDt
             </div>
             <div>
               <div className="flex items-center gap-1">
-                <p className="text-gray-500 dark:text-gray-400">Status</p>
-                <InfoTooltip text="Current status of the service request (e.g. PAID, COMPLETED, IN_PROGRESS). Money has settled only when status reflects a paid state." />
+                <p className="text-gray-500 dark:text-gray-400">{t(`${M}.detail.fldStatus`)}</p>
+                <InfoTooltip text={t(`${M}.detail.ttFldStatus`)} />
               </div>
               <p className="font-medium text-gray-800 dark:text-white/90">
                 {detail.serviceRequest.status}
@@ -947,8 +996,8 @@ function TransactionDetailView({ detail }: { detail: FinancialTxDetailResponseDt
             </div>
             <div>
               <div className="flex items-center gap-1">
-                <p className="text-gray-500 dark:text-gray-400">Scheduled</p>
-                <InfoTooltip text="The date the service was scheduled to take place." />
+                <p className="text-gray-500 dark:text-gray-400">{t(`${M}.detail.fldScheduled`)}</p>
+                <InfoTooltip text={t(`${M}.detail.ttFldScheduled`)} />
               </div>
               <p className="font-medium text-gray-800 dark:text-white/90">
                 {detail.serviceRequest.scheduledDate
@@ -958,8 +1007,8 @@ function TransactionDetailView({ detail }: { detail: FinancialTxDetailResponseDt
             </div>
             <div>
               <div className="flex items-center gap-1">
-                <p className="text-gray-500 dark:text-gray-400">Rate</p>
-                <InfoTooltip text="Provider's billing rate at the time of booking. CONSULTATION = flat fee per visit. HOURLY = rate per hour multiplied by shift duration." />
+                <p className="text-gray-500 dark:text-gray-400">{t(`${M}.detail.fldRate`)}</p>
+                <InfoTooltip text={t(`${M}.detail.ttFldRate`)} />
               </div>
               <p className="font-medium text-gray-800 dark:text-white/90">
                 {fmtBDT(detail.serviceRequest.rate)}{" "}
@@ -970,8 +1019,8 @@ function TransactionDetailView({ detail }: { detail: FinancialTxDetailResponseDt
             </div>
             <div>
               <div className="flex items-center gap-1">
-                <p className="text-gray-500 dark:text-gray-400">Shift duration</p>
-                <InfoTooltip text="Length of the shift in hours. Used together with HOURLY rate to compute the service fee. Always 1 for CONSULTATION rates." />
+                <p className="text-gray-500 dark:text-gray-400">{t(`${M}.detail.fldShiftDur`)}</p>
+                <InfoTooltip text={t(`${M}.detail.ttFldShiftDur`)} />
               </div>
               <p className="font-medium text-gray-800 dark:text-white/90">
                 {detail.serviceRequest.shiftDuration ?? "—"} h
@@ -980,8 +1029,8 @@ function TransactionDetailView({ detail }: { detail: FinancialTxDetailResponseDt
             {detail.serviceRequest.longTermOpportunityId ? (
               <div>
                 <div className="flex items-center gap-1">
-                  <p className="text-gray-500 dark:text-gray-400">Opportunity</p>
-                  <InfoTooltip text="Long-term opportunity ID. All shifts under the same ongoing engagement share this ID." />
+                  <p className="text-gray-500 dark:text-gray-400">{t(`${M}.detail.fldOpportunity`)}</p>
+                  <InfoTooltip text={t(`${M}.detail.ttFldOpportunity`)} />
                 </div>
                 <p className="font-medium text-gray-800 dark:text-white/90">
                   #{detail.serviceRequest.longTermOpportunityId}
@@ -991,8 +1040,8 @@ function TransactionDetailView({ detail }: { detail: FinancialTxDetailResponseDt
             {detail.consultationTypeName ? (
               <div>
                 <div className="flex items-center gap-1">
-                  <p className="text-gray-500 dark:text-gray-400">Consultation</p>
-                  <InfoTooltip text="The consultation type (e.g. Professional Nurse, Home Care Assistant) that determines the commission rate applied." />
+                  <p className="text-gray-500 dark:text-gray-400">{t(`${M}.detail.fldConsultation`)}</p>
+                  <InfoTooltip text={t(`${M}.detail.ttFldConsultation`)} />
                 </div>
                 <p className="font-medium text-gray-800 dark:text-white/90">
                   {detail.consultationTypeName}
@@ -1008,15 +1057,15 @@ function TransactionDetailView({ detail }: { detail: FinancialTxDetailResponseDt
         <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
           <div className="mb-3 flex items-center gap-1.5">
             <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-              Fee breakdown
+              {t(`${M}.detail.feeBreakdown`)}
             </p>
-            <InfoTooltip text="How the patient's total fee is split between the provider and the platform. 'Inclusive' means the deduction comes out of the provider's earnings; 'Exclusive' means it was added on top of the patient's bill." />
+            <InfoTooltip text={t(`${M}.detail.ttFeeBreakdown`)} />
           </div>
           <Table>
             <TableBody className="divide-y divide-gray-100 dark:divide-gray-800">
               <TableRow>
                 <TableCell className="text-gray-700 dark:text-gray-300 py-2">
-                  Total fee (patient paid)
+                  {t(`${M}.detail.rowTotalFee`)}
                 </TableCell>
                 <TableCell className="text-right font-medium text-gray-800 dark:text-white/90 py-2">
                   {fmtBDT(detail.breakdown.totalFee)}
@@ -1024,10 +1073,12 @@ function TransactionDetailView({ detail }: { detail: FinancialTxDetailResponseDt
               </TableRow>
               <TableRow>
                 <TableCell className="text-gray-700 dark:text-gray-300 py-2">
-                  Commission
+                  {t(`${M}.detail.rowCommission`)}
                   <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
                     {detail.breakdown.commission.percent}%{" "}
-                    {detail.breakdown.commission.inclusive ? "(inclusive)" : "(exclusive)"}
+                    {detail.breakdown.commission.inclusive
+                      ? t(`${M}.detail.inclusive`)
+                      : t(`${M}.detail.exclusive`)}
                   </span>
                 </TableCell>
                 <TableCell className="text-right text-gray-800 dark:text-white/90 py-2">
@@ -1036,10 +1087,12 @@ function TransactionDetailView({ detail }: { detail: FinancialTxDetailResponseDt
               </TableRow>
               <TableRow>
                 <TableCell className="text-gray-700 dark:text-gray-300 py-2">
-                  Tax
+                  {t(`${M}.detail.rowTax`)}
                   <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
                     {detail.breakdown.tax.percent}%{" "}
-                    {detail.breakdown.tax.inclusive ? "(inclusive)" : "(exclusive)"}
+                    {detail.breakdown.tax.inclusive
+                      ? t(`${M}.detail.inclusive`)
+                      : t(`${M}.detail.exclusive`)}
                   </span>
                 </TableCell>
                 <TableCell className="text-right text-gray-800 dark:text-white/90 py-2">
@@ -1049,9 +1102,9 @@ function TransactionDetailView({ detail }: { detail: FinancialTxDetailResponseDt
               {detail.breakdown.ait ? (
                 <TableRow>
                   <TableCell className="text-gray-700 dark:text-gray-300 py-2">
-                    AIT
+                    {t(`${M}.detail.rowAit`)}
                     <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
-                      {detail.breakdown.ait.percent}% (withheld from provider)
+                      {detail.breakdown.ait.percent}% {t(`${M}.detail.aitWithheldSuffix`)}
                     </span>
                   </TableCell>
                   <TableCell className="text-right text-gray-800 dark:text-white/90 py-2">
@@ -1061,7 +1114,7 @@ function TransactionDetailView({ detail }: { detail: FinancialTxDetailResponseDt
               ) : null}
               <TableRow>
                 <TableCell className="font-medium text-emerald-700 dark:text-emerald-400 py-2">
-                  Provider receives
+                  {t(`${M}.detail.providerReceives`)}
                 </TableCell>
                 <TableCell className="text-right font-semibold text-emerald-700 dark:text-emerald-400 py-2">
                   {fmtBDT(detail.breakdown.providerFee)}
@@ -1077,9 +1130,9 @@ function TransactionDetailView({ detail }: { detail: FinancialTxDetailResponseDt
         <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
           <div className="mb-3 flex items-center gap-1.5">
             <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-              Ledger trail
+              {t(`${M}.detail.ledgerTrail`)}
             </p>
-            <InfoTooltip text="Every accounting movement that this transaction caused. Each row is a transfer from one wallet to another (double-entry: debit one, credit the other by the same amount)." />
+            <InfoTooltip text={t(`${M}.detail.ttLedgerTrail`)} />
           </div>
           <div className="overflow-x-auto">
             <Table className="min-w-[44rem]">
@@ -1087,26 +1140,26 @@ function TransactionDetailView({ detail }: { detail: FinancialTxDetailResponseDt
                 <TableRow>
                   <TableCell isHeader className="text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400 py-2">
                     <span className="inline-flex items-center gap-1.5">
-                      Debit (from)
-                      <InfoTooltip text="The wallet that money was taken FROM. Shows the balance before and after the deduction." />
+                      {t(`${M}.detail.colDebit`)}
+                      <InfoTooltip text={t(`${M}.detail.ttDebit`)} />
                     </span>
                   </TableCell>
                   <TableCell isHeader className="text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400 py-2">
                     <span className="inline-flex items-center gap-1.5">
-                      Credit (to)
-                      <InfoTooltip text="The wallet that money was added TO. Shows the balance before and after the addition." />
+                      {t(`${M}.detail.colCredit`)}
+                      <InfoTooltip text={t(`${M}.detail.ttCredit`)} />
                     </span>
                   </TableCell>
                   <TableCell isHeader className="text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400 py-2">
                     <span className="inline-flex items-center gap-1.5">
-                      Amount
-                      <InfoTooltip text="The amount transferred. Same number is debited from one wallet and credited to the other (double-entry)." />
+                      {t(`${M}.detail.colAmount`)}
+                      <InfoTooltip text={t(`${M}.detail.ttLedgerAmount`)} />
                     </span>
                   </TableCell>
                   <TableCell isHeader className="text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400 py-2">
                     <span className="inline-flex items-center gap-1.5">
-                      Description
-                      <InfoTooltip text="Optional human-readable note about why this entry exists (e.g. 'Provider fee credit', 'Commission deduction')." align="end" />
+                      {t(`${M}.detail.colDescription`)}
+                      <InfoTooltip text={t(`${M}.detail.ttDescription`)} align="end" />
                     </span>
                   </TableCell>
                 </TableRow>
