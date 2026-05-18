@@ -18,7 +18,7 @@ import {
   subMonths,
   subWeeks,
 } from "date-fns";
-import { AngleLeftIcon, AngleRightIcon, ArrowRightIcon, TimeIcon } from "../../icons";
+import { AngleLeftIcon, AngleRightIcon, TimeIcon } from "../../icons";
 import {
   parseEventRange,
   rangesOverlap,
@@ -26,7 +26,9 @@ import {
 } from "../../data/nurseScheduleSeed";
 import {
   adminLongTermOpportunitiesApi,
+  normalizeServiceRequestFeeEstimate,
   providersApi,
+  serviceRequestsApi,
   type ProviderListItem,
 } from "../../services/api";
 import { buildEventsFromScheduleDetails } from "../../utils/longTermScheduleEvents";
@@ -39,6 +41,18 @@ import { ScheduleDayView } from "./ScheduleDayView";
 
 export type ScheduleViewMode = "month" | "week" | "day";
 
+export const SCHEDULE_SHIFT_HOURS_OPTIONS = [4, 8, 12, 24] as const;
+export type ScheduleShiftHours = (typeof SCHEDULE_SHIFT_HOURS_OPTIONS)[number];
+
+function isScheduleShiftHours(value: number): value is ScheduleShiftHours {
+  return (SCHEDULE_SHIFT_HOURS_OPTIONS as readonly number[]).includes(value);
+}
+
+function resolveDefaultShiftHours(value?: number | null): ScheduleShiftHours {
+  if (value != null && isScheduleShiftHours(value)) return value;
+  return 8;
+}
+
 type Props = {
   requestId: string;
   title: string;
@@ -46,6 +60,8 @@ type Props = {
   requestStartDate: string;
   requestEndDate: string;
   baseServiceAmount?: string | number | null;
+  consultationTypeId?: number | null;
+  defaultShiftDurationHours?: number | null;
   initialEvents?: ScheduleEventRecord[];
   /** After create, parent can persist schedule-details payload (request row + initialEvents). */
   onScheduleDetailsSynced?: (scheduleDetailsPayload: unknown) => void;
@@ -98,6 +114,16 @@ function parseFeeFromLabel(feeLabel?: string): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+function applyShiftToModalDraft(draft: ModalDraft, shiftHours: number): ModalDraft {
+  const start = combineDateHour(draft.startDateStr, draft.startHour);
+  const end = addHours(start, shiftHours);
+  return {
+    ...draft,
+    endDateStr: format(end, "yyyy-MM-dd"),
+    endHour: end.getHours(),
+  };
+}
+
 function eventToProviderSlot(event: ScheduleEventRecord): {
   providerId: number;
   date: string;
@@ -120,6 +146,8 @@ export function ScheduleCalendar({
   requestStartDate,
   requestEndDate,
   baseServiceAmount,
+  consultationTypeId: requestConsultationTypeId,
+  defaultShiftDurationHours,
   initialEvents = [],
   onScheduleDetailsSynced,
 }: Props) {
@@ -176,6 +204,12 @@ export function ScheduleCalendar({
   const [removingEvent, setRemovingEvent] = useState(false);
   const [removeReason, setRemoveReason] = useState("");
   const [removeError, setRemoveError] = useState<string | null>(null);
+  const [selectedShiftHours, setSelectedShiftHours] = useState<ScheduleShiftHours>(() =>
+    resolveDefaultShiftHours(defaultShiftDurationHours)
+  );
+  const [feeEstimateAmount, setFeeEstimateAmount] = useState<number | null>(null);
+  const [feeEstimateLoading, setFeeEstimateLoading] = useState(false);
+  const [feeEstimateError, setFeeEstimateError] = useState<string | null>(null);
   const isScheduleModalOpen = modalDraft != null;
 
   const requestStart = useMemo(
@@ -253,20 +287,41 @@ export function ScheduleCalendar({
   }, [modalDraft]);
 
   const selectedNurse = nurses.find((n) => n.id === selectedNurseId) ?? null;
-  const selectedNurseRate = parseMoney(selectedNurse?.rate);
-  const selectedDurationHours = computedRange
-    ? Math.max(0, differenceInMinutes(computedRange.end, computedRange.start) / 60)
-    : 0;
-  const selectedTotalAmount = selectedNurseRate * selectedDurationHours;
+
+  const resolvedConsultationTypeId = useMemo(() => {
+    const fromProvider = selectedNurse?.consultationTypeId;
+    if (fromProvider != null && fromProvider > 0) return fromProvider;
+    if (requestConsultationTypeId != null && requestConsultationTypeId > 0) {
+      return requestConsultationTypeId;
+    }
+    return null;
+  }, [selectedNurse?.consultationTypeId, requestConsultationTypeId]);
+
+  const selectedServiceFee = feeEstimateAmount ?? 0;
   const totalServiceAmount = parseMoney(baseServiceAmount) + locallyAddedAmount;
+
+  const computedEndPreview = useMemo(() => {
+    if (!modalDraft) return null;
+    const end = combineDateHour(modalDraft.endDateStr, modalDraft.endHour);
+    return format(end, "PPp", { locale: dateLoc });
+  }, [modalDraft, dateLoc]);
 
   const rangeValidForSave = useMemo(() => {
     if (!computedRange) return false;
     const { start, end } = computedRange;
-    if (differenceInMinutes(end, start) < 60) return false;
+    const durationMins = differenceInMinutes(end, start);
+    if (durationMins !== selectedShiftHours * 60) return false;
     if (start.getTime() < requestStart.getTime() || end.getTime() > requestEnd.getTime()) return false;
     return true;
-  }, [computedRange, requestStart, requestEnd]);
+  }, [computedRange, requestStart, requestEnd, selectedShiftHours]);
+
+  const canSaveEvent =
+    Boolean(selectedNurseId) &&
+    rangeValidForSave &&
+    !savingEvent &&
+    !feeEstimateLoading &&
+    feeEstimateAmount != null &&
+    !feeEstimateError;
 
   useEffect(() => {
     if (!isScheduleModalOpen) {
@@ -302,9 +357,74 @@ export function ScheduleCalendar({
     return () => ac.abort();
   }, [isScheduleModalOpen, supervisorId]);
 
+  useEffect(() => {
+    if (!isScheduleModalOpen || !selectedNurseId) {
+      setFeeEstimateAmount(null);
+      setFeeEstimateError(null);
+      setFeeEstimateLoading(false);
+      return;
+    }
+
+    if (!resolvedConsultationTypeId) {
+      setFeeEstimateAmount(null);
+      setFeeEstimateError(t("scheduleCalendar.errMissingConsultationType"));
+      setFeeEstimateLoading(false);
+      return;
+    }
+
+    const ac = new AbortController();
+    setFeeEstimateLoading(true);
+    setFeeEstimateError(null);
+
+    void serviceRequestsApi
+      .getShortTermFeeEstimate(
+        {
+          providerId: selectedNurseId,
+          shiftDuration: selectedShiftHours,
+          consultationTypeId: resolvedConsultationTypeId,
+        },
+        { signal: ac.signal }
+      )
+      .then((res) => {
+        const normalized = normalizeServiceRequestFeeEstimate(res.data);
+        if (!normalized?.subTotal) {
+          setFeeEstimateAmount(null);
+          setFeeEstimateError(t("scheduleCalendar.feeEstimateFailed"));
+          return;
+        }
+        const fee = parseMoney(normalized.subTotal);
+        setFeeEstimateAmount(Number.isFinite(fee) ? fee : null);
+        if (!Number.isFinite(fee)) {
+          setFeeEstimateError(t("scheduleCalendar.feeEstimateFailed"));
+        }
+      })
+      .catch((err: unknown) => {
+        if (err instanceof Error && err.name === "AbortError") return;
+        setFeeEstimateAmount(null);
+        setFeeEstimateError(
+          extractApiErrorMessage(err) ?? t("scheduleCalendar.feeEstimateFailed")
+        );
+      })
+      .finally(() => {
+        if (!ac.signal.aborted) setFeeEstimateLoading(false);
+      });
+
+    return () => ac.abort();
+  }, [
+    isScheduleModalOpen,
+    selectedNurseId,
+    selectedShiftHours,
+    resolvedConsultationTypeId,
+    t,
+  ]);
+
   const closeModal = () => {
     setModalDraft(null);
     setSelectedNurseId(null);
+    setSelectedShiftHours(resolveDefaultShiftHours(defaultShiftDurationHours));
+    setFeeEstimateAmount(null);
+    setFeeEstimateError(null);
+    setFeeEstimateLoading(false);
     setFormError(null);
     setNurses([]);
     setAvailabilityByNurse({});
@@ -391,48 +511,58 @@ export function ScheduleCalendar({
 
   const openModalFromHour = (day: Date, hour24: number) => {
     if (!dayInRange(day)) return;
+    const shift = resolveDefaultShiftHours(defaultShiftDurationHours);
     const start = addHours(startOfDay(day), hour24);
-    const end = addHours(start, 1);
     setFormError(null);
-    setModalDraft({
-      startDateStr: format(start, "yyyy-MM-dd"),
-      startHour: hour24,
-      endDateStr: format(end, "yyyy-MM-dd"),
-      endHour: end.getHours(),
-    });
+    setSelectedShiftHours(shift);
+    setFeeEstimateAmount(null);
+    setFeeEstimateError(null);
+    setModalDraft(
+      applyShiftToModalDraft(
+        {
+          startDateStr: format(start, "yyyy-MM-dd"),
+          startHour: hour24,
+          endDateStr: format(start, "yyyy-MM-dd"),
+          endHour: hour24,
+        },
+        shift
+      )
+    );
     setSelectedNurseId(null);
   };
 
   const openModalFromDay = (day: Date) => {
     if (!dayInRange(day)) return;
+    const shift = resolveDefaultShiftHours(defaultShiftDurationHours);
     const start = addHours(startOfDay(day), 9);
-    const end = addHours(start, 1);
     setFormError(null);
-    setModalDraft({
-      startDateStr: format(start, "yyyy-MM-dd"),
-      startHour: 9,
-      endDateStr: format(end, "yyyy-MM-dd"),
-      endHour: end.getHours(),
-    });
+    setSelectedShiftHours(shift);
+    setFeeEstimateAmount(null);
+    setFeeEstimateError(null);
+    setModalDraft(
+      applyShiftToModalDraft(
+        {
+          startDateStr: format(start, "yyyy-MM-dd"),
+          startHour: 9,
+          endDateStr: format(start, "yyyy-MM-dd"),
+          endHour: 9,
+        },
+        shift
+      )
+    );
     setSelectedNurseId(null);
   };
 
-  const ensureEndAfterStart = (next: ModalDraft): ModalDraft => {
-    const start = combineDateHour(next.startDateStr, next.startHour);
-    const end = combineDateHour(next.endDateStr, next.endHour);
-    if (differenceInMinutes(end, start) < 60) {
-      const fixed = addHours(start, 1);
-      return {
-        ...next,
-        endDateStr: format(fixed, "yyyy-MM-dd"),
-        endHour: fixed.getHours(),
-      };
-    }
-    return next;
+  const patchDraft = (partial: Partial<ModalDraft>) => {
+    setModalDraft((d) =>
+      d ? applyShiftToModalDraft({ ...d, ...partial }, selectedShiftHours) : d
+    );
+    setFormError(null);
   };
 
-  const patchDraft = (partial: Partial<ModalDraft>) => {
-    setModalDraft((d) => (d ? ensureEndAfterStart({ ...d, ...partial }) : d));
+  const handleShiftHoursChange = (hours: ScheduleShiftHours) => {
+    setSelectedShiftHours(hours);
+    setModalDraft((d) => (d ? applyShiftToModalDraft(d, hours) : d));
     setFormError(null);
   };
 
@@ -454,7 +584,14 @@ export function ScheduleCalendar({
     setAvailabilityLoadingId(providerId);
     setAvailabilityErrorByNurse((prev) => ({ ...prev, [providerId]: "" }));
     try {
-      const res = await providersApi.getAvailability(providerId, modalDraft.startDateStr);
+      const startTime = format(
+        combineDateHour(modalDraft.startDateStr, modalDraft.startHour),
+        "HH:mm"
+      );
+      const res = await providersApi.getAvailability(providerId, modalDraft.startDateStr, {
+        time: startTime,
+        shiftDuration: selectedShiftHours,
+      });
       const data = res.data as unknown;
       const slotsRaw =
         Array.isArray(data)
@@ -502,8 +639,12 @@ export function ScheduleCalendar({
   const saveEvent = async () => {
     if (!modalDraft || !computedRange || !selectedNurseId) return;
     const { start, end } = computedRange;
-    if (differenceInMinutes(end, start) < 60) {
-      setFormError(t("scheduleCalendar.errMinHour"));
+    if (!isScheduleShiftHours(selectedShiftHours)) {
+      setFormError(t("scheduleCalendar.errSelectShift"));
+      return;
+    }
+    if (differenceInMinutes(end, start) !== selectedShiftHours * 60) {
+      setFormError(t("scheduleCalendar.errSelectShift"));
       return;
     }
     if (start.getTime() < requestStart.getTime() || end.getTime() > requestEnd.getTime()) {
@@ -515,8 +656,12 @@ export function ScheduleCalendar({
       setFormError(t("scheduleCalendar.errSelectNurse"));
       return;
     }
+    if (feeEstimateLoading || feeEstimateAmount == null) {
+      setFormError(t("scheduleCalendar.errFeeEstimateRequired"));
+      return;
+    }
     const nurseId = String(nurse.id);
-    const eventAmount = parseMoney(nurse.rate) * (differenceInMinutes(end, start) / 60);
+    const eventAmount = feeEstimateAmount;
     if (eventOverlapsNurse(displayEvents, nurseId, start, end)) {
       setFormError(t("scheduleCalendar.errOverlap"));
       return;
@@ -709,16 +854,43 @@ export function ScheduleCalendar({
               {t("scheduleCalendar.scheduleVisitHelp")}
             </p>
             <p className="mt-2 text-sm font-medium text-brand-700 dark:text-brand-400">
-              {selectedNurse
-                ? t("scheduleCalendar.totalAmountLine", {
-                    hours: String(selectedDurationHours),
-                    rate: formatMoney(selectedNurseRate),
-                    total: formatMoney(selectedTotalAmount),
-                  })
-                : t("scheduleCalendar.selectProviderForTotal")}
+              {!selectedNurse
+                ? t("scheduleCalendar.selectProviderForTotal")
+                : feeEstimateLoading
+                  ? t("scheduleCalendar.feeEstimateLoading")
+                  : feeEstimateError
+                    ? feeEstimateError
+                    : feeEstimateAmount != null
+                      ? t("scheduleCalendar.subTotalLine", {
+                          hours: String(selectedShiftHours),
+                          total: formatMoney(selectedServiceFee),
+                        })
+                      : t("scheduleCalendar.selectProviderForTotal")}
             </p>
 
             <div className="mt-5 space-y-4">
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  {t("scheduleCalendar.shiftDuration")}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {SCHEDULE_SHIFT_HOURS_OPTIONS.map((hours) => (
+                    <button
+                      key={hours}
+                      type="button"
+                      onClick={() => handleShiftHoursChange(hours)}
+                      className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
+                        selectedShiftHours === hours
+                          ? "border-brand-500 bg-brand-50 text-brand-800 dark:border-brand-500 dark:bg-brand-950/50 dark:text-brand-100"
+                          : "border-gray-200 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+                      }`}
+                    >
+                      {t("scheduleCalendar.shiftHoursOption", { hours: String(hours) })}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
                 <TimeIcon className="size-5 shrink-0 text-gray-400" aria-hidden />
                 <input
@@ -738,25 +910,12 @@ export function ScheduleCalendar({
                     </option>
                   ))}
                 </select>
-                <ArrowRightIcon className="size-4 shrink-0 text-gray-400" aria-hidden />
-                <input
-                  type="date"
-                  value={modalDraft.endDateStr}
-                  onChange={(e) => patchDraft({ endDateStr: e.target.value })}
-                  className={modalTimeInputClass}
-                />
-                <select
-                  value={modalDraft.endHour}
-                  onChange={(e) => patchDraft({ endHour: Number(e.target.value) })}
-                  className={modalTimeInputClass}
-                >
-                  {hourOptions.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-                <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{durationLabel}</span>
+                <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                  {durationLabel}
+                  {computedEndPreview
+                    ? ` · ${t("scheduleCalendar.shiftEndPreview", { end: computedEndPreview })}`
+                    : null}
+                </span>
               </div>
 
               {/* <div className="flex flex-wrap items-center gap-2">
@@ -888,7 +1047,7 @@ export function ScheduleCalendar({
               </button>
               <button
                 type="button"
-                disabled={!selectedNurseId || !rangeValidForSave || savingEvent}
+                disabled={!canSaveEvent}
                 onClick={() => void saveEvent()}
                 className="rounded-md bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
