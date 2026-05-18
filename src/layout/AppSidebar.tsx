@@ -101,7 +101,24 @@ const navSections: NavSection[] = [
       { icon: <ListIcon />, nameKey: "navigation.appointments", path: "/appointments", allowedRoles: ["ADMIN"] },
       { icon: <PageIcon />, nameKey: "navigation.upgradeRequests", path: "/upgrade-requests", allowedRoles: ["ADMIN"] },
       { icon: <TaskIcon />, nameKey: "navigation.withdrawalRequests", path: "/withdrawal-requests", allowedRoles: ["ADMIN"] },
-      { icon: <PageIcon />, nameKey: "navigation.cancellationRefunds", path: "/cancellation-refunds", allowedRoles: ["ADMIN"] },
+      {
+        icon: <PageIcon />,
+        nameKey: "navigation.cancellations",
+        submenuId: "cancellations",
+        allowedRoles: ["ADMIN"],
+        subItems: [
+          {
+            nameKey: "navigation.providerCancelRequests",
+            path: "/provider-cancel-requests",
+            allowedRoles: ["ADMIN"],
+          },
+          {
+            nameKey: "navigation.cancellationRefunds",
+            path: "/cancellation-refunds",
+            allowedRoles: ["ADMIN"],
+          },
+        ],
+      },
     ],
   },
   {
@@ -148,6 +165,11 @@ const AppSidebar: React.FC = () => {
     (path: string) => {
       if (path === "/schedule") {
         return location.pathname === "/schedule" || location.pathname.startsWith("/schedule/");
+      }
+      if (path === "/provider-cancel-requests") {
+        return (
+          location.pathname === path || location.pathname.startsWith(`${path}/`)
+        );
       }
       return location.pathname === path;
     },

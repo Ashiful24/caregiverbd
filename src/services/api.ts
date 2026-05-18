@@ -867,6 +867,121 @@ export const adminSchedulerApi = {
   },
 };
 
+// ============== Admin: Provider cancel review ==============
+
+export type ProviderCancelReviewStatus =
+  | "PENDING"
+  | "APPROVED"
+  | "REJECTED"
+  | "REASSIGNED"
+  | "ALL";
+
+export interface ProviderCancelReviewListItem {
+  id: number;
+  reviewStatus: string | null;
+  createdAt: string | null;
+  reasonCategory: string | null;
+  reasonNote: string | null;
+  serviceRequest: {
+    id: number;
+    status: string | null;
+    statusAtRequest: string;
+    scheduledDate: string | null;
+    scheduledTime: string | null;
+    scope: string;
+    serviceCategory: string;
+    fee: string | null;
+  };
+  provider: { id: number; userId: number | null; name: string } | null;
+  patient: { id: number; userId: number; name: string };
+}
+
+export interface ProviderCancelReviewListResponse {
+  summary?: {
+    pending: number;
+    approvedToday: number;
+    rejectedToday: number;
+    reassignedToday: number;
+  };
+  data: ProviderCancelReviewListItem[];
+  page: number;
+  limit: number;
+  total?: number;
+  hasNext: boolean;
+  nextCursor?: string;
+}
+
+export interface ProviderCancelReviewListQueryParams {
+  status?: ProviderCancelReviewStatus;
+  providerId?: number;
+  patientId?: number;
+  page?: number;
+  limit?: number;
+  cursor?: string;
+  includeSummary?: boolean;
+  includeTotal?: boolean;
+}
+
+export interface ProviderCancelReviewSuggestedReplacement {
+  providerId: number;
+  name: string;
+  isAvailable: boolean;
+}
+
+export interface ProviderCancelReviewHistoryItem {
+  id: number;
+  reviewStatus: string | null;
+  createdAt: string | null;
+  reasonCategory: string | null;
+}
+
+export interface ProviderCancelReviewDetail extends ProviderCancelReviewListItem {
+  refundPreview: {
+    feeAmount: string;
+    refundAmount: string;
+    refundMethod: string;
+    note: string;
+  };
+  cancelHistory: ProviderCancelReviewHistoryItem[];
+  suggestedReplacements: ProviderCancelReviewSuggestedReplacement[];
+}
+
+export const adminProviderCancelApi = {
+  list: async (
+    params?: ProviderCancelReviewListQueryParams,
+    config?: { signal?: AbortSignal }
+  ) => {
+    const qp: Record<string, string | number | boolean> = {};
+    if (params?.status) qp.status = params.status;
+    if (params?.providerId != null) qp.providerId = params.providerId;
+    if (params?.patientId != null) qp.patientId = params.patientId;
+    if (params?.cursor) qp.cursor = params.cursor;
+    if (params?.page != null) qp.page = params.page;
+    if (params?.limit != null) qp.limit = params.limit;
+    if (params?.includeSummary === true) qp.includeSummary = true;
+    if (params?.includeTotal === true) qp.includeTotal = true;
+    return httpService.get<ProviderCancelReviewListResponse>(
+      "/admin/provider-cancel-requests",
+      { params: qp, signal: config?.signal }
+    );
+  },
+  detail: async (id: number, config?: { signal?: AbortSignal }) => {
+    return httpService.get<ProviderCancelReviewDetail>(
+      `/admin/provider-cancel-requests/${id}`,
+      { signal: config?.signal }
+    );
+  },
+  approve: async (id: number, body?: { adminNotes?: string }) => {
+    return httpService.post(`/admin/provider-cancel-requests/${id}/approve`, body ?? {});
+  },
+  reject: async (id: number, body: { adminNotes: string }) => {
+    return httpService.post(`/admin/provider-cancel-requests/${id}/reject`, body);
+  },
+  reassign: async (id: number, body: { newProviderId: number; adminNotes?: string }) => {
+    return httpService.post(`/admin/provider-cancel-requests/${id}/reassign`, body);
+  },
+};
+
 export const adminCancellationApi = {
   /** GET /admin/refunds — cancellations with linked REFUND transactions (cursor or page). */
   listRefundsQueue: async (

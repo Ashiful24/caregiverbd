@@ -4,6 +4,7 @@ export type CmdGroup =
   | "core"
   | "people"
   | "operations"
+  | "cancellations"
   | "configuration"
   | "reports"
   | "account";
@@ -92,12 +93,20 @@ export const NAV_COMMANDS: NavCommand[] = [
     keywords: ["payout", "wallet"],
   },
   {
+    id: "provider-cancel-requests",
+    path: "/provider-cancel-requests",
+    titleKey: "navigation.providerCancelRequests",
+    group: "cancellations",
+    allowedRoles: ["ADMIN"],
+    keywords: ["provider", "cancel", "review", "reassign", "cancellation"],
+  },
+  {
     id: "cancellation-refunds",
     path: "/cancellation-refunds",
     titleKey: "navigation.cancellationRefunds",
-    group: "operations",
+    group: "cancellations",
     allowedRoles: ["ADMIN"],
-    keywords: ["refund", "cancel"],
+    keywords: ["refund", "cancel", "cancellation", "gateway"],
   },
   {
     id: "consultation-types",
@@ -177,6 +186,7 @@ const GROUP_ORDER: CmdGroup[] = [
   "core",
   "people",
   "operations",
+  "cancellations",
   "configuration",
   "reports",
   "account",
