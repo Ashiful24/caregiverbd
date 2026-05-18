@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import PageMeta from "../components/common/PageMeta";
+import { SearchableSelect } from "../components/form/SearchableSelect";
 import Badge from "../components/ui/badge/Badge";
 import { ConfirmModal } from "../components/ui/confirm-modal";
 import {
@@ -14,7 +15,9 @@ import {
 } from "../components/ui/table";
 import {
   adminProviderCancelApi,
+  providersApi,
   type ProviderCancelReviewDetail,
+  type ProviderListItem,
 } from "../services/api";
 import { formatDateTime, formatStatusLabel } from "../utils/format";
 import { fmtBDT } from "./financial/shared";
@@ -54,6 +57,8 @@ export default function ProviderCancelRequestDetail() {
     null
   );
   const [successMessage, setSuccessMessage] = useState("");
+  const [replacementProviders, setReplacementProviders] = useState<ProviderListItem[]>([]);
+  const [loadingReplacementProviders, setLoadingReplacementProviders] = useState(false);
 
   const fetchDetail = useCallback(async () => {
     if (!requestId || Number.isNaN(requestId)) {
@@ -68,12 +73,7 @@ export default function ProviderCancelRequestDetail() {
       const res = await adminProviderCancelApi.detail(requestId);
       const body = unwrapDetail(res);
       setDetail(body);
-      const firstAvailable = body.suggestedReplacements?.find((r) => r.isAvailable);
-      if (firstAvailable) {
-        setNewProviderId(firstAvailable.providerId);
-      } else if (body.suggestedReplacements?.[0]) {
-        setNewProviderId(body.suggestedReplacements[0].providerId);
-      }
+      setNewProviderId("");
     } catch (err: unknown) {
       const message =
         err && typeof err === "object" && "message" in err
@@ -90,7 +90,111 @@ export default function ProviderCancelRequestDetail() {
     fetchDetail();
   }, [fetchDetail]);
 
+  const consultationTypeId = detail?.serviceRequest.consultationTypeId;
   const isPending = detail?.reviewStatus === "PENDING";
+
+  useEffect(() => {
+    if (!consultationTypeId || detail?.reviewStatus !== "PENDING") {
+      setReplacementProviders([]);
+      return;
+    }
+    const controller = new AbortController();
+    (async () => {
+      setLoadingReplacementProviders(true);
+      try {
+        const res = await providersApi.getList(
+          { consultationTypeId, status: "active", limit: 200, page: 1 },
+          { signal: controller.signal }
+        );
+        const body = (res?.data as { providers?: ProviderListItem[] }) ?? res;
+        const list =
+          (body as { providers?: ProviderListItem[] }).providers ??
+          (res as { providers?: ProviderListItem[] }).providers ??
+          [];
+        setReplacementProviders(Array.isArray(list) ? list : []);
+      } catch {
+        if (!controller.signal.aborted) setReplacementProviders([]);
+      } finally {
+        if (!controller.signal.aborted) setLoadingReplacementProviders(false);
+      }
+    })();
+    return () => controller.abort();
+  }, [consultationTypeId, detail?.reviewStatus]);
+
+  const availabilityByProviderId = useMemo(() => {
+    const map = new Map<number, boolean>();
+    for (const r of detail?.suggestedReplacements ?? []) {
+      map.set(r.providerId, r.isAvailable);
+    }
+    return map;
+  }, [detail?.suggestedReplacements]);
+
+  const reassignProviderOptions = useMemo(() => {
+    if (!detail) return [];
+    const excludeId = detail.provider?.id;
+    const byId = new Map<
+      number,
+      { value: number; label: string; hint?: string; sortKey: string }
+    >();
+
+    const providerLabel = (p: ProviderListItem) =>
+      [p.firstName, p.lastName].filter(Boolean).join(" ") ||
+      p.name ||
+      p.providerName ||
+      `Provider #${p.id}`;
+
+    const hintFor = (providerId: number, fallback?: string) => {
+      if (availabilityByProviderId.has(providerId)) {
+        return availabilityByProviderId.get(providerId)
+          ? t("providerCancelRequests.availableAtSlot")
+          : t("providerCancelRequests.busyAtSlot");
+      }
+      return fallback ?? t("providerCancelRequests.scheduleUnknown");
+    };
+
+    for (const p of replacementProviders) {
+      if (p.id === excludeId) continue;
+      const avail = availabilityByProviderId.get(p.id);
+      const sortKey =
+        avail === true ? `0-${providerLabel(p)}` : avail === false ? `2-${providerLabel(p)}` : `1-${providerLabel(p)}`;
+      byId.set(p.id, {
+        value: p.id,
+        label: providerLabel(p),
+        hint: hintFor(p.id, p.consultationTypeName ?? undefined),
+        sortKey,
+      });
+    }
+
+    for (const s of detail.suggestedReplacements) {
+      if (s.providerId === excludeId || byId.has(s.providerId)) continue;
+      const sortKey = s.isAvailable ? `0-${s.name}` : `2-${s.name}`;
+      byId.set(s.providerId, {
+        value: s.providerId,
+        label: s.name,
+        hint: s.isAvailable
+          ? t("providerCancelRequests.availableAtSlot")
+          : t("providerCancelRequests.busyAtSlot"),
+        sortKey,
+      });
+    }
+
+    return Array.from(byId.values())
+      .sort((a, b) => a.sortKey.localeCompare(b.sortKey))
+      .map(({ value, label, hint }) => ({ value, label, hint }));
+  }, [availabilityByProviderId, detail, replacementProviders, t]);
+
+  const selectedReassignProvider = useMemo(() => {
+    if (newProviderId === "") return null;
+    return reassignProviderOptions.find((o) => o.value === newProviderId) ?? null;
+  }, [newProviderId, reassignProviderOptions]);
+
+  useEffect(() => {
+    if (!isPending || reassignProviderOptions.length === 0) return;
+    const stillValid =
+      newProviderId !== "" && reassignProviderOptions.some((o) => o.value === newProviderId);
+    if (stillValid) return;
+    setNewProviderId(reassignProviderOptions[0].value);
+  }, [isPending, newProviderId, reassignProviderOptions]);
 
   const runAction = async () => {
     if (!confirmAction || !requestId || Number.isNaN(requestId)) return;
@@ -115,16 +219,21 @@ export default function ProviderCancelRequestDetail() {
       } else if (confirmAction === "reassign") {
         const pid = newProviderId === "" ? NaN : Number(newProviderId);
         if (!Number.isFinite(pid) || pid < 1) {
-          setError(t("providerCancelRequests.reassignProviderRequired"));
+          setError(t("providerCancelRequests.reassignProviderSelectRequired"));
           setActionBusy(false);
           setConfirmAction(null);
           return;
         }
-        await adminProviderCancelApi.reassign(requestId, {
+        const reassignRes = await adminProviderCancelApi.reassign(requestId, {
           newProviderId: pid,
           adminNotes: adminNotes.trim() || undefined,
         });
-        setSuccessMessage(t("providerCancelRequests.reassignSuccess"));
+        const txId = reassignRes.data?.reassignTransactionId;
+        setSuccessMessage(
+          txId != null
+            ? t("providerCancelRequests.reassignSuccessWithTx", { txId })
+            : t("providerCancelRequests.reassignSuccessNoTransfer")
+        );
       }
       setConfirmAction(null);
       setAdminNotes("");
@@ -261,6 +370,15 @@ export default function ProviderCancelRequestDetail() {
               </span>{" "}
               {fmtBDT(sr.fee)}
             </p>
+            <p>
+              <span className="text-gray-500 dark:text-gray-400">
+                {t("providerCancelRequests.consultationType")}:
+              </span>{" "}
+              {sr.consultationTypeName ?? "—"}
+              {sr.serviceCategory ? (
+                <span className="text-gray-500"> ({formatStatusLabel(sr.serviceCategory)})</span>
+              ) : null}
+            </p>
             <p className="sm:col-span-2">
               <span className="text-gray-500 dark:text-gray-400">
                 {t("providerCancelRequests.colReason")}:
@@ -341,52 +459,41 @@ export default function ProviderCancelRequestDetail() {
               {t("providerCancelRequests.adminActions")}
             </h3>
 
-            {detail.suggestedReplacements.length > 0 ? (
-              <div className="mb-4">
-                <p className="mb-2 text-xs font-medium text-gray-600 dark:text-gray-400">
-                  {t("providerCancelRequests.suggestedReplacements")}
+            <div className="mb-4 rounded-xl border border-gray-100 bg-gray-50/60 p-4 dark:border-gray-800 dark:bg-gray-900/30">
+              <p className="mb-1 text-sm font-medium text-gray-800 dark:text-white/90">
+                {t("providerCancelRequests.reassignProvider")}
+              </p>
+              <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
+                {t("providerCancelRequests.reassignProviderHelp", {
+                  type: sr.consultationTypeName ?? formatStatusLabel(sr.serviceCategory),
+                })}
+              </p>
+              {loadingReplacementProviders ? (
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  {t("providerCancelRequests.loadingProviders")}
                 </p>
-                <ul className="space-y-1 text-sm">
-                  {detail.suggestedReplacements.map((r) => (
-                    <li key={r.providerId} className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setNewProviderId(r.providerId)}
-                        className={`rounded px-2 py-0.5 text-left hover:bg-gray-100 dark:hover:bg-gray-800 ${
-                          newProviderId === r.providerId
-                            ? "bg-brand-50 font-medium text-brand-700 dark:bg-brand-950/40 dark:text-brand-300"
-                            : ""
-                        }`}
-                      >
-                        {r.name} (#{r.providerId})
-                      </button>
-                      <Badge size="sm" color={r.isAvailable ? "success" : "light"}>
-                        {r.isAvailable
-                          ? t("providerCancelRequests.available")
-                          : t("providerCancelRequests.busy")}
-                      </Badge>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-
-            <div className="mb-4 grid gap-4 sm:grid-cols-2">
-              <label className="block text-sm">
-              <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
-                {t("providerCancelRequests.reassignProviderId")}
-              </span>
-              <input
-                type="number"
-                min={1}
-                value={newProviderId === "" ? "" : newProviderId}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setNewProviderId(v === "" ? "" : Number(v));
-                }}
-                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
-              />
-            </label>
+              ) : reassignProviderOptions.length === 0 ? (
+                <p className="text-sm text-amber-700 dark:text-amber-400">
+                  {t("providerCancelRequests.noReplacementProviders")}
+                </p>
+              ) : (
+                <>
+                  <SearchableSelect<number>
+                    value={newProviderId === "" ? null : newProviderId}
+                    onChange={(id) => setNewProviderId(id ?? "")}
+                    placeholder={t("providerCancelRequests.reassignSelectPlaceholder")}
+                    clearLabel={t("providerCancelRequests.reassignClear")}
+                    searchPlaceholder={t("providerCancelRequests.reassignSearchPlaceholder")}
+                    className="min-h-[42px]"
+                    options={reassignProviderOptions}
+                  />
+                  {selectedReassignProvider?.hint ? (
+                    <p className="mt-2 text-xs text-gray-600 dark:text-gray-400">
+                      {selectedReassignProvider.hint}
+                    </p>
+                  ) : null}
+                </>
+              )}
             </div>
 
             <label className="mb-4 block text-sm">
@@ -413,7 +520,9 @@ export default function ProviderCancelRequestDetail() {
               </button>
               <button
                 type="button"
-                disabled={actionBusy}
+                disabled={
+                  actionBusy || newProviderId === "" || reassignProviderOptions.length === 0
+                }
                 onClick={() => setConfirmAction("reassign")}
                 className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-800 hover:bg-gray-50 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
               >
@@ -449,7 +558,11 @@ export default function ProviderCancelRequestDetail() {
               })
             : confirmAction === "reject"
               ? t("providerCancelRequests.confirmRejectBody")
-              : t("providerCancelRequests.confirmReassignBody")
+              : t("providerCancelRequests.confirmReassignBody", {
+                  provider:
+                    selectedReassignProvider?.label ??
+                    (newProviderId !== "" ? `#${newProviderId}` : ""),
+                })
         }
         confirmLabel={t("providerCancelRequests.confirm")}
         cancelLabel={t("providerCancelRequests.cancel")}

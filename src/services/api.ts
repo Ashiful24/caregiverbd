@@ -889,6 +889,8 @@ export interface ProviderCancelReviewListItem {
     scheduledDate: string | null;
     scheduledTime: string | null;
     scope: string;
+    consultationTypeId: number;
+    consultationTypeName: string;
     serviceCategory: string;
     fee: string | null;
   };
@@ -935,6 +937,15 @@ export interface ProviderCancelReviewHistoryItem {
   reasonCategory: string | null;
 }
 
+export interface ProviderCancelReviewReassignResult {
+  id: number;
+  reviewStatus: "REASSIGNED";
+  serviceRequestId: number;
+  newProviderId: number;
+  /** PROVIDER_REASSIGN transaction id when net earnings were transferred */
+  reassignTransactionId: number | null;
+}
+
 export interface ProviderCancelReviewDetail extends ProviderCancelReviewListItem {
   refundPreview: {
     feeAmount: string;
@@ -978,7 +989,10 @@ export const adminProviderCancelApi = {
     return httpService.post(`/admin/provider-cancel-requests/${id}/reject`, body);
   },
   reassign: async (id: number, body: { newProviderId: number; adminNotes?: string }) => {
-    return httpService.post(`/admin/provider-cancel-requests/${id}/reassign`, body);
+    return httpService.post<ProviderCancelReviewReassignResult>(
+      `/admin/provider-cancel-requests/${id}/reassign`,
+      body
+    );
   },
 };
 
