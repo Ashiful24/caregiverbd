@@ -15,6 +15,14 @@ export function eventTypeClasses(type: ScheduleEventType): string {
   }
 }
 
+export function eventDisplayClasses(type: ScheduleEventType, pending?: boolean): string {
+  const base = eventTypeClasses(type);
+  if (pending) {
+    return `${base} border-dashed ring-1 ring-amber-400/60 dark:ring-amber-500/50`;
+  }
+  return base;
+}
+
 export function eventTypeDotClass(type: ScheduleEventType): string {
   switch (type) {
     case "visit":

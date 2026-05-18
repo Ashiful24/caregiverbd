@@ -22,10 +22,11 @@ export default function AuthLayout({
             <div className="flex flex-col items-center max-w-xs">
               <Link to="/" className="block mb-4">
                 <img
-                  width={231}
-                  height={48}
-                  src="/images/logo/auth-logo.svg"
-                  alt="Logo"
+                  width={260}
+                  height={92}
+                  src="/images/logo/ontor-logo-horizontal.png"
+                  alt="Ontor Care"
+                  className="bg-white rounded-2xl px-6 py-4"
                 />
               </Link>
               <p className="text-center text-gray-400 dark:text-white/60">
