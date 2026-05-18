@@ -31,6 +31,8 @@ import {
 } from "../../services/api";
 import { buildEventsFromScheduleDetails } from "../../utils/longTermScheduleEvents";
 import { useAuth } from "../../context/AuthContext";
+import { useUnsavedDraftNavigationGuard } from "../../hooks/useUnsavedDraftNavigationGuard";
+import { ConfirmModal } from "../ui/confirm-modal";
 import { ScheduleMonthView } from "./ScheduleMonthView";
 import { ScheduleWeekView } from "./ScheduleWeekView";
 import { ScheduleDayView } from "./ScheduleDayView";
@@ -197,6 +199,17 @@ export function ScheduleCalendar({
     () => [...events, ...pendingEvents],
     [events, pendingEvents]
   );
+
+  const hasPendingDrafts = pendingEvents.length > 0;
+  const { dialogOpen: leaveDialogOpen, cancelLeave, confirmLeave } =
+    useUnsavedDraftNavigationGuard(hasPendingDrafts);
+
+  const discardPendingDrafts = useCallback(() => {
+    setPendingEvents([]);
+    setLocallyAddedAmount(0);
+    setSubmitError(null);
+    setSubmitSuccess(false);
+  }, []);
 
   const parseMoney = (v: unknown): number => {
     const raw = String(v ?? "").trim();
@@ -939,6 +952,19 @@ export function ScheduleCalendar({
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={leaveDialogOpen}
+        onClose={cancelLeave}
+        title={t("scheduleCalendar.leaveDraftTitle")}
+        message={t("scheduleCalendar.leaveDraftMessage", { count: pendingEvents.length })}
+        cancelLabel={t("scheduleCalendar.leaveDraftStay")}
+        confirmLabel={t("scheduleCalendar.leaveDraftLeave")}
+        confirmVariant="danger"
+        onConfirm={() => {
+          confirmLeave(discardPendingDrafts);
+        }}
+      />
     </div>
   );
 }

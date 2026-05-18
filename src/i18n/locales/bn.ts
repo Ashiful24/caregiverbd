@@ -319,6 +319,11 @@ const bn = {
     submitSuccess: "শিডিউল সফলভাবে সংরক্ষিত হয়েছে।",
     removePendingTitle: "ড্রাফট স্লট সরান",
     removePendingConfirm: "আপনি কি এই অসংরক্ষিত স্লটটি ড্রাফট থেকে সরাতে চান?",
+    leaveDraftTitle: "অসংরক্ষিত ড্রাফট শিডিউল",
+    leaveDraftMessage:
+      "আপনার {{count}}টি ড্রাফট স্লট জমা দেওয়া হয়নি। এই পৃষ্ঠা ছেড়ে গেলে সেগুলো হারিয়ে যাবে।",
+    leaveDraftStay: "পৃষ্ঠায় থাকুন",
+    leaveDraftLeave: "সংরক্ষণ ছাড়াই চলে যান",
     removeSlotTitle: "শিডিউল স্লট সরান",
     removeSlotConfirm: "আপনি কি নিশ্চিতভাবে এই স্লটটি সরাতে চান?",
     reason: "কারণ",

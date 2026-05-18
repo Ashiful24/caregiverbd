@@ -319,6 +319,11 @@ const en = {
     submitSuccess: "Schedule saved successfully.",
     removePendingTitle: "Remove draft slot",
     removePendingConfirm: "Remove this unsaved slot from your draft?",
+    leaveDraftTitle: "Unsaved draft schedule",
+    leaveDraftMessage:
+      "You have {{count}} draft slot(s) that are not submitted. If you leave this page, they will be lost.",
+    leaveDraftStay: "Stay on page",
+    leaveDraftLeave: "Leave without saving",
     removeSlotTitle: "Remove schedule slot",
     removeSlotConfirm: "Are you sure you want to remove this slot?",
     reason: "Reason",
