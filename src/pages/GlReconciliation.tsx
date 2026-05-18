@@ -87,7 +87,7 @@ export default function GlReconciliation() {
         ) : glSummary ? (
           <div className="space-y-5">
             {/* Profit summary KPIs */}
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
               <KpiCard
                 label="Commission earned"
                 value={fmtBDT(glSummary.profitSummary.commissionBalance)}
@@ -98,13 +98,19 @@ export default function GlReconciliation() {
                 label="Tax collected"
                 value={fmtBDT(glSummary.profitSummary.taxBalance)}
                 tone="positive"
-                tooltip="Total tax (e.g. VAT) collected on behalf of the platform across all completed services. Sourced from the TAX_GL ledger wallet."
+                tooltip="Total tax (e.g. VAT) collected on behalf of the platform across all completed services. Sourced from the VAT_GL ledger wallet."
               />
               <KpiCard
                 label="Total platform earnings"
                 value={fmtBDT(glSummary.profitSummary.totalPlatformEarnings)}
                 tone="positive"
-                tooltip="Commission + tax. The platform's total income across all time."
+                tooltip="Commission + tax. The platform's total income across all time. AIT is excluded — it is withheld from providers."
+              />
+              <KpiCard
+                label="AIT withheld"
+                value={fmtBDT(glSummary.profitSummary.aitBalance ?? "0")}
+                tone="neutral"
+                tooltip="Advance Income Tax withheld from provider earnings across all time. Sourced from the AIT_GL ledger wallet."
               />
               <KpiCard
                 label="Payouts processed"
@@ -125,7 +131,7 @@ export default function GlReconciliation() {
                   <InfoTooltip text="Compares the platform's GL wallet balances (financial source of truth) against the totals stored on service_requests rows (business source of truth). If they drift, the ledger and business data are out of sync — the most critical inconsistency." />
                 </div>
               </div>
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <div className="rounded-lg bg-gray-50 p-3 dark:bg-white/[0.02]">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
@@ -218,6 +224,52 @@ export default function GlReconciliation() {
                     </div>
                   </div>
                 </div>
+                <div className="rounded-lg bg-gray-50 p-3 dark:bg-white/[0.02]">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        AIT
+                      </span>
+                      <InfoTooltip text="Cross-check between AIT_GL wallet balance and the sum of aitAmount on PAID/COMPLETED service_requests." />
+                    </div>
+                    <HealthDot healthy={glSummary.crossSystemValidation.aitInSync ?? true} />
+                  </div>
+                  <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
+                    <div>
+                      <div className="flex items-center gap-1">
+                        <p className="text-gray-500 dark:text-gray-400">From SR</p>
+                        <InfoTooltip text="Sum of aitAmount across all PAID/COMPLETED service_requests." />
+                      </div>
+                      <p className="font-medium text-gray-800 dark:text-white/90">
+                        {fmtBDT(glSummary.crossSystemValidation.srAitTotal ?? "0")}
+                      </p>
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1">
+                        <p className="text-gray-500 dark:text-gray-400">From GL</p>
+                        <InfoTooltip text="Current balance of the AIT_GL ledger wallet." />
+                      </div>
+                      <p className="font-medium text-gray-800 dark:text-white/90">
+                        {fmtBDT(glSummary.crossSystemValidation.glAitBalance ?? "0")}
+                      </p>
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1">
+                        <p className="text-gray-500 dark:text-gray-400">Drift</p>
+                        <InfoTooltip text="From GL − From SR. Must be 0. Non-zero indicates an AIT record mismatch between business and finance." />
+                      </div>
+                      <p
+                        className={`font-medium ${
+                          glSummary.crossSystemValidation.aitInSync !== false
+                            ? "text-emerald-700 dark:text-emerald-400"
+                            : "text-rose-700 dark:text-rose-400"
+                        }`}
+                      >
+                        {fmtBDT(glSummary.crossSystemValidation.aitDrift ?? "0")}
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -229,7 +281,7 @@ export default function GlReconciliation() {
                     <TableCell isHeader className="text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400 py-3">
                       <span className="inline-flex items-center gap-1.5">
                         Wallet
-                        <InfoTooltip text="The GL (general ledger) wallet name. ONLINE_PAYMENT_GL receives online payments, COMMISSION_GL holds platform commission, TAX_GL holds tax, PAYOUT_GL tracks provider withdrawals, HOPE_GL is the platform control wallet." />
+                        <InfoTooltip text="The GL (general ledger) wallet name. ONLINE_PAYMENT_GL receives online payments, COMMISSION_GL holds platform commission, VAT_GL holds tax, AIT_GL holds Advance Income Tax withheld from providers, PAYOUT_GL tracks provider withdrawals, HOPE_GL is the platform control wallet." />
                       </span>
                     </TableCell>
                     <TableCell isHeader className="text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400 py-3">

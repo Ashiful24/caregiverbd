@@ -25,7 +25,15 @@ type NavItem = {
   nameKey: string;
   icon: React.ReactNode;
   path?: string;
-  subItems?: { nameKey: string; path: string; pro?: boolean; new?: boolean }[];
+  /** Stable id when `subItems` is set — must match expansion state keys (section index ≠ item index). */
+  submenuId?: string;
+  subItems?: {
+    nameKey: string;
+    path: string;
+    pro?: boolean;
+    new?: boolean;
+    allowedRoles?: string[];
+  }[];
   allowedRoles?: string[];
 };
 
@@ -93,16 +101,44 @@ const navSections: NavSection[] = [
       { icon: <ListIcon />, nameKey: "navigation.appointments", path: "/appointments", allowedRoles: ["ADMIN"] },
       { icon: <PageIcon />, nameKey: "navigation.upgradeRequests", path: "/upgrade-requests", allowedRoles: ["ADMIN"] },
       { icon: <TaskIcon />, nameKey: "navigation.withdrawalRequests", path: "/withdrawal-requests", allowedRoles: ["ADMIN"] },
+      {
+        icon: <PageIcon />,
+        nameKey: "navigation.cancellations",
+        submenuId: "cancellations",
+        allowedRoles: ["ADMIN"],
+        subItems: [
+          {
+            nameKey: "navigation.providerCancelRequests",
+            path: "/provider-cancel-requests",
+            allowedRoles: ["ADMIN"],
+          },
+          {
+            nameKey: "navigation.cancellationRefunds",
+            path: "/cancellation-refunds",
+            allowedRoles: ["ADMIN"],
+          },
+        ],
+      },
     ],
   },
   {
     titleKey: "navigation.reports",
     items: [
       {
-        icon: <ListIcon />, nameKey: "Financial Reports",
+        icon: <ListIcon />,
+        nameKey: "navigation.financialReports",
+        submenuId: "financial-reports",
         subItems: [
-          { icon: <GridIcon />, nameKey: "Master Report", path: "/financial-reports",allowedRoles: ["ADMIN"] },
-          { icon: <GridIcon />, nameKey: "GL Reconciliation", path: "/gl-reconciliation",allowedRoles: ["ADMIN"] },
+          {
+            nameKey: "navigation.masterFinancialReport",
+            path: "/financial-reports",
+            allowedRoles: ["ADMIN"],
+          },
+          {
+            nameKey: "navigation.glReconciliation",
+            path: "/gl-reconciliation",
+            allowedRoles: ["ADMIN"],
+          },
         ],
       },
     ],
@@ -119,10 +155,7 @@ const AppSidebar: React.FC = () => {
   const location = useLocation();
   const currentRole = String(user?.role ?? "").toUpperCase();
 
-  const [openSubmenu, setOpenSubmenu] = useState<{
-    type: "main" | "reference";
-    index: number;
-  } | null>(null);
+  const [openSubmenu, setOpenSubmenu] = useState<string | null>(null);
   const [subMenuHeight, setSubMenuHeight] = useState<Record<string, number>>(
     {}
   );
@@ -133,77 +166,79 @@ const AppSidebar: React.FC = () => {
       if (path === "/schedule") {
         return location.pathname === "/schedule" || location.pathname.startsWith("/schedule/");
       }
+      if (path === "/provider-cancel-requests") {
+        return (
+          location.pathname === path || location.pathname.startsWith(`${path}/`)
+        );
+      }
       return location.pathname === path;
     },
     [location.pathname]
   );
 
-  useEffect(() => {
-    let submenuMatched = false;
-    navSections.forEach((section, sectionIndex) => {
-      section.items.forEach((nav) => {
-        if (nav.subItems) {
-          nav.subItems.forEach((subItem) => {
-            if (isActive(subItem.path)) {
-              setOpenSubmenu({ type: "main", index: sectionIndex });
-              submenuMatched = true;
-            }
-          });
+  const matchedSubmenuForRoute = useCallback((): string | null => {
+    const role = currentRole;
+    const itemVisible = (item: NavItem) => {
+      if (!item.allowedRoles?.length) return true;
+      return item.allowedRoles.map((r) => r.toUpperCase()).includes(role);
+    };
+    const subItemVisible = (subItem: {
+      path: string;
+      allowedRoles?: string[];
+    }) => {
+      if (!subItem.allowedRoles?.length) return true;
+      return subItem.allowedRoles.map((r) => r.toUpperCase()).includes(role);
+    };
+
+    for (const section of navSections) {
+      for (const nav of section.items) {
+        if (!itemVisible(nav) || !nav.subItems?.length || !nav.submenuId) continue;
+        for (const subItem of nav.subItems) {
+          if (!subItemVisible(subItem)) continue;
+          if (isActive(subItem.path)) return nav.submenuId;
         }
-      });
-    });
-    if (!submenuMatched) {
-      setOpenSubmenu(null);
+      }
     }
-  }, [location, isActive]);
+    return null;
+  }, [currentRole, isActive]);
 
   useEffect(() => {
-    if (openSubmenu !== null) {
-      const key = `${openSubmenu.type}-${openSubmenu.index}`;
-      if (subMenuRefs.current[key]) {
-        setSubMenuHeight((prevHeights) => ({
-          ...prevHeights,
-          [key]: subMenuRefs.current[key]?.scrollHeight || 0,
-        }));
-      }
+    const id = matchedSubmenuForRoute();
+    setOpenSubmenu(id);
+  }, [matchedSubmenuForRoute]);
+
+  useEffect(() => {
+    if (openSubmenu == null) return;
+    const el = subMenuRefs.current[openSubmenu];
+    if (el) {
+      setSubMenuHeight((prev) => ({
+        ...prev,
+        [openSubmenu]: el.scrollHeight || 0,
+      }));
     }
   }, [openSubmenu]);
 
-  const handleSubmenuToggle = (index: number, menuType: "main" | "reference") => {
-    setOpenSubmenu((prevOpenSubmenu) => {
-      if (
-        prevOpenSubmenu &&
-        prevOpenSubmenu.type === menuType &&
-        prevOpenSubmenu.index === index
-      ) {
-        return null;
-      }
-      return { type: menuType, index };
-    });
+  const handleSubmenuToggle = (submenuId: string) => {
+    setOpenSubmenu((prev) => (prev === submenuId ? null : submenuId));
   };
 
-  const renderMenuItems = (items: NavItem[], menuType: "main" | "reference") => (
+  const renderMenuItems = (items: NavItem[], _menuType: "main" | "reference") => (
     <ul className="flex flex-col gap-4">
-      {items.map((nav, index) => (
+      {items.map((nav) => (
         <li key={nav.nameKey}>
-          {nav.subItems ? (
+          {nav.subItems && nav.submenuId ? (
             <button
-              onClick={() => handleSubmenuToggle(index, menuType)}
+              type="button"
+              onClick={() => handleSubmenuToggle(nav.submenuId!)}
               className={`menu-item group ${
-                openSubmenu?.type === menuType && openSubmenu?.index === index
-                  ? "menu-item-active"
-                  : "menu-item-inactive"
+                openSubmenu === nav.submenuId ? "menu-item-active" : "menu-item-inactive"
               } cursor-pointer ${
-                !isExpanded && !isHovered
-                  ? "lg:justify-center"
-                  : "lg:justify-start"
+                !isExpanded && !isHovered ? "lg:justify-center" : "lg:justify-start"
               }`}
             >
               <span
                 className={`menu-item-icon-size  ${
-                  openSubmenu?.type === menuType && openSubmenu?.index === index
-                    ? "menu-item-icon-active"
-                    : "menu-item-icon-inactive"
+                  openSubmenu === nav.submenuId ? "menu-item-icon-active" : "menu-item-icon-inactive"
                 }`}
               >
                 {nav.icon}
@@ -214,10 +249,7 @@ const AppSidebar: React.FC = () => {
               {(isExpanded || isHovered || isMobileOpen) && (
                 <ChevronDownIcon
                   className={`ml-auto w-5 h-5 transition-transform duration-200 ${
-                    openSubmenu?.type === menuType &&
-                    openSubmenu?.index === index
-                      ? "rotate-180 text-white"
-                      : ""
+                    openSubmenu === nav.submenuId ? "rotate-180 text-white" : ""
                   }`}
                 />
               )}
@@ -232,9 +264,7 @@ const AppSidebar: React.FC = () => {
               >
                 <span
                   className={`menu-item-icon-size ${
-                    isActive(nav.path)
-                      ? "menu-item-icon-active"
-                      : "menu-item-icon-inactive"
+                    isActive(nav.path) ? "menu-item-icon-active" : "menu-item-icon-inactive"
                   }`}
                 >
                   {nav.icon}
@@ -245,16 +275,16 @@ const AppSidebar: React.FC = () => {
               </Link>
             )
           )}
-          {nav.subItems && (isExpanded || isHovered || isMobileOpen) && (
+          {nav.subItems && nav.submenuId && (isExpanded || isHovered || isMobileOpen) && (
             <div
               ref={(el) => {
-                subMenuRefs.current[`${menuType}-${index}`] = el;
+                subMenuRefs.current[nav.submenuId!] = el;
               }}
               className="overflow-hidden transition-all duration-300"
               style={{
                 height:
-                  openSubmenu?.type === menuType && openSubmenu?.index === index
-                    ? `${subMenuHeight[`${menuType}-${index}`]}px`
+                  openSubmenu === nav.submenuId
+                    ? `${subMenuHeight[nav.submenuId] ?? 0}px`
                     : "0px",
               }}
             >
