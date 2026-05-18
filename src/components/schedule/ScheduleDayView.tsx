@@ -5,7 +5,7 @@ import { bn } from "date-fns/locale/bn";
 import { enUS } from "date-fns/locale/en-US";
 import type { ScheduleEventRecord } from "../../data/nurseScheduleSeed";
 import { parseEventRange } from "../../data/nurseScheduleSeed";
-import { eventTypeClasses } from "./scheduleEventStyles";
+import { eventDisplayClasses } from "./scheduleEventStyles";
 
 const START_HOUR = 0;
 const END_HOUR = 24;
@@ -127,7 +127,7 @@ export function ScheduleDayView({
                       }
                     }}
                     key={e.id}
-                    className={`pointer-events-auto absolute left-2 right-3 overflow-hidden rounded-lg border px-2 py-1.5 shadow-sm sm:left-3 sm:right-4 cursor-pointer ${eventTypeClasses(e.type)}`}
+                    className={`pointer-events-auto absolute left-2 right-3 overflow-hidden rounded-lg border px-2 py-1.5 shadow-sm sm:left-3 sm:right-4 cursor-pointer ${eventDisplayClasses(e.type, e.pending)}`}
                     style={{
                       top: `${layout.topPct}%`,
                       height: `${layout.heightPct}%`,

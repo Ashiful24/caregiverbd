@@ -90,56 +90,25 @@ function eventOverlapsNurse(
   });
 }
 
-function extractCreatedScheduleMeta(data: unknown): {
-  scheduleSlotId?: number;
-  longTermCalendarSlotId?: string;
-} {
-  if (!data || typeof data !== "object") return {};
-  const root = data as Record<string, unknown>;
-  const candidates: unknown[] = [];
-  const pushArray = (v: unknown) => {
-    if (Array.isArray(v)) candidates.push(...v);
-  };
-  pushArray(root.schedule);
-  pushArray(root.slots);
-  pushArray(root.data);
-  if (root.data && typeof root.data === "object") {
-    const d = root.data as Record<string, unknown>;
-    pushArray(d.schedule);
-    pushArray(d.slots);
-  }
-  if (candidates.length === 0) candidates.push(root);
+function parseFeeFromLabel(feeLabel?: string): number {
+  if (!feeLabel?.trim()) return 0;
+  const n = Number(feeLabel.replace(/[^\d.-]/g, ""));
+  return Number.isFinite(n) ? n : 0;
+}
 
-  for (const c of candidates) {
-    if (!c || typeof c !== "object") continue;
-    const o = c as Record<string, unknown>;
-    const providerSchedule =
-      o.providerSchedule && typeof o.providerSchedule === "object"
-        ? (o.providerSchedule as Record<string, unknown>)
-        : null;
-    const serviceRequest =
-      o.serviceRequest && typeof o.serviceRequest === "object"
-        ? (o.serviceRequest as Record<string, unknown>)
-        : null;
-    const scheduleSlotIdRaw =
-      serviceRequest?.scheduleSlotId ??
-      serviceRequest?.schedule_slot_id ??
-      providerSchedule?.id ??
-      o.scheduleSlotId ??
-      o.id;
-    const scheduleSlotId = Number(scheduleSlotIdRaw);
-    const longTermCalendarSlotId = String(
-      serviceRequest?.longTermCalendarSlotId ?? serviceRequest?.long_term_calendar_slot_id ?? ""
-    ).trim();
-    if ((Number.isFinite(scheduleSlotId) && scheduleSlotId > 0) || longTermCalendarSlotId) {
-      return {
-        scheduleSlotId:
-          Number.isFinite(scheduleSlotId) && scheduleSlotId > 0 ? scheduleSlotId : undefined,
-        longTermCalendarSlotId: longTermCalendarSlotId || undefined,
-      };
-    }
-  }
-  return {};
+function eventToProviderSlot(event: ScheduleEventRecord): {
+  providerId: number;
+  date: string;
+  startTime: string;
+  endTime: string;
+} {
+  const { start, end } = parseEventRange(event);
+  return {
+    providerId: Number(event.nurseId),
+    date: format(start, "yyyy-MM-dd"),
+    startTime: format(start, "HH:mm"),
+    endTime: format(end, "HH:mm"),
+  };
 }
 
 export function ScheduleCalendar({
@@ -185,6 +154,7 @@ export function ScheduleCalendar({
   const [view, setView] = useState<ScheduleViewMode>("month");
   const [anchor, setAnchor] = useState(() => startOfDay(new Date()));
   const [events, setEvents] = useState<ScheduleEventRecord[]>(initialEvents);
+  const [pendingEvents, setPendingEvents] = useState<ScheduleEventRecord[]>([]);
   const [modalDraft, setModalDraft] = useState<ModalDraft | null>(null);
   const [selectedNurseId, setSelectedNurseId] = useState<number | null>(null);
   const [nurses, setNurses] = useState<ProviderListItem[]>([]);
@@ -196,6 +166,9 @@ export function ScheduleCalendar({
   );
   const [formError, setFormError] = useState<string | null>(null);
   const [savingEvent, setSavingEvent] = useState(false);
+  const [submittingSchedule, setSubmittingSchedule] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
   const [locallyAddedAmount, setLocallyAddedAmount] = useState(0);
   const [removeTarget, setRemoveTarget] = useState<ScheduleEventRecord | null>(null);
   const [removingEvent, setRemovingEvent] = useState(false);
@@ -214,8 +187,16 @@ export function ScheduleCalendar({
 
   useEffect(() => {
     setEvents(initialEvents);
+    setPendingEvents([]);
     setLocallyAddedAmount(0);
+    setSubmitError(null);
+    setSubmitSuccess(false);
   }, [initialEvents, requestId]);
+
+  const displayEvents = useMemo(
+    () => [...events, ...pendingEvents],
+    [events, pendingEvents]
+  );
 
   const parseMoney = (v: unknown): number => {
     const raw = String(v ?? "").trim();
@@ -332,7 +313,19 @@ export function ScheduleCalendar({
   };
 
   const handleConfirmRemove = async () => {
-    if (!removeTarget?.scheduleSlotId) {
+    if (!removeTarget) return;
+
+    if (removeTarget.pending) {
+      const removedAmount = parseFeeFromLabel(removeTarget.feeLabel);
+      setPendingEvents((prev) => prev.filter((e) => e.id !== removeTarget.id));
+      if (removedAmount > 0) {
+        setLocallyAddedAmount((prev) => Math.max(0, prev - removedAmount));
+      }
+      handleCloseRemove();
+      return;
+    }
+
+    if (!removeTarget.scheduleSlotId) {
       setRemoveError(t("scheduleCalendar.errMissingSlot"));
       return;
     }
@@ -350,6 +343,36 @@ export function ScheduleCalendar({
       setRemoveError(extractApiErrorMessage(err) ?? t("scheduleCalendar.errRemove"));
     } finally {
       setRemovingEvent(false);
+    }
+  };
+
+  const syncEventsFromScheduleDetails = async () => {
+    const nurseFallback = t("scheduleCalendar.nurseFallback");
+    const detailsRes = await adminLongTermOpportunitiesApi.getScheduleDetails(requestId);
+    const raw = detailsRes.data;
+    if (raw != null && typeof raw === "object") {
+      const fresh = buildEventsFromScheduleDetails(raw, requestId, nurseFallback);
+      setEvents(fresh);
+      onScheduleDetailsSynced?.(raw);
+    }
+  };
+
+  const submitPendingSchedule = async () => {
+    if (pendingEvents.length === 0) return;
+    setSubmittingSchedule(true);
+    setSubmitError(null);
+    setSubmitSuccess(false);
+    try {
+      const slots = pendingEvents.map(eventToProviderSlot);
+      await adminLongTermOpportunitiesApi.createProviderSchedule(requestId, { slots });
+      setPendingEvents([]);
+      setLocallyAddedAmount(0);
+      await syncEventsFromScheduleDetails();
+      setSubmitSuccess(true);
+    } catch (err: unknown) {
+      setSubmitError(extractApiErrorMessage(err) ?? t("scheduleCalendar.errSubmit"));
+    } finally {
+      setSubmittingSchedule(false);
     }
   };
 
@@ -481,50 +504,27 @@ export function ScheduleCalendar({
     }
     const nurseId = String(nurse.id);
     const eventAmount = parseMoney(nurse.rate) * (differenceInMinutes(end, start) / 60);
-    if (eventOverlapsNurse(events, nurseId, start, end)) {
+    if (eventOverlapsNurse(displayEvents, nurseId, start, end)) {
       setFormError(t("scheduleCalendar.errOverlap"));
       return;
     }
     setSavingEvent(true);
     setFormError(null);
+    setSubmitSuccess(false);
     try {
-      const createRes = await adminLongTermOpportunitiesApi.createProviderSchedule(requestId, {
-        slots: [
-          {
-            providerId: nurse.id,
-            date: format(start, "yyyy-MM-dd"),
-            startTime: format(start, "HH:mm"),
-            endTime: format(end, "HH:mm"),
-          },
-        ],
-      });
-      const nurseFallback = t("scheduleCalendar.nurseFallback");
-      try {
-        const detailsRes = await adminLongTermOpportunitiesApi.getScheduleDetails(requestId);
-        const raw = detailsRes.data;
-        if (raw != null && typeof raw === "object") {
-          const fresh = buildEventsFromScheduleDetails(raw, requestId, nurseFallback);
-          setEvents(fresh);
-          onScheduleDetailsSynced?.(raw);
-        } else {
-          throw new Error("empty schedule details");
-        }
-      } catch {
-        const created = extractCreatedScheduleMeta(createRes.data);
-        const newEvent: ScheduleEventRecord = {
-          id: created.longTermCalendarSlotId ?? `evt-${requestId}-${Date.now()}`,
-          requestId,
-          nurseId,
-          nurseName: providerLabel(nurse),
-          title: providerLabel(nurse),
-          feeLabel: eventAmount > 0 ? formatMoney(eventAmount) : undefined,
-          start: start.toISOString(),
-          end: end.toISOString(),
-          type: "visit",
-          scheduleSlotId: created.scheduleSlotId,
-        };
-        setEvents((prev) => [...prev, newEvent]);
-      }
+      const newEvent: ScheduleEventRecord = {
+        id: `pending-${requestId}-${Date.now()}`,
+        requestId,
+        nurseId,
+        nurseName: providerLabel(nurse),
+        title: providerLabel(nurse),
+        feeLabel: eventAmount > 0 ? formatMoney(eventAmount) : undefined,
+        start: start.toISOString(),
+        end: end.toISOString(),
+        type: "visit",
+        pending: true,
+      };
+      setPendingEvents((prev) => [...prev, newEvent]);
       if (eventAmount > 0) {
         setLocallyAddedAmount((prev) => prev + eventAmount);
       }
@@ -632,7 +632,7 @@ export function ScheduleCalendar({
         {view === "month" && (
           <ScheduleMonthView
             visibleMonth={visibleMonth}
-            events={events}
+            events={displayEvents}
             dayInRange={dayInRange}
             onSelectDay={openModalFromDay}
             onEventClick={handleOpenRemove}
@@ -641,7 +641,7 @@ export function ScheduleCalendar({
         {view === "week" && (
           <ScheduleWeekView
             weekAnchor={anchor}
-            events={events}
+            events={displayEvents}
             dayInRange={dayInRange}
             onSelectHour={openModalFromHour}
             onEventClick={handleOpenRemove}
@@ -650,13 +650,41 @@ export function ScheduleCalendar({
         {view === "day" && (
           <ScheduleDayView
             day={anchor}
-            events={events}
+            events={displayEvents}
             dayInRange={dayInRange}
             onSelectHour={openModalFromHour}
             onEventClick={handleOpenRemove}
           />
         )}
       </div>
+
+      {pendingEvents.length > 0 && (
+        <div className="sticky bottom-4 z-10 flex flex-col gap-2 rounded-xl border border-amber-200 bg-amber-50 p-4 shadow-lg dark:border-amber-800/60 dark:bg-amber-950/40 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">
+              {t("scheduleCalendar.pendingBanner", { count: pendingEvents.length })}
+            </p>
+            {submitError ? (
+              <p className="mt-1 text-sm text-red-600 dark:text-red-400">{submitError}</p>
+            ) : null}
+            {submitSuccess ? (
+              <p className="mt-1 text-sm text-green-700 dark:text-green-400">
+                {t("scheduleCalendar.submitSuccess")}
+              </p>
+            ) : null}
+          </div>
+          <button
+            type="button"
+            disabled={submittingSchedule}
+            onClick={() => void submitPendingSchedule()}
+            className="shrink-0 rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {submittingSchedule
+              ? t("scheduleCalendar.submittingSchedule")
+              : t("scheduleCalendar.submitSchedule")}
+          </button>
+        </div>
+      )}
 
       {modalDraft && computedRange && (
         <div className="fixed inset-0 z-[10060] flex items-center justify-center bg-black/40 p-4">
@@ -862,25 +890,31 @@ export function ScheduleCalendar({
         <div className="fixed inset-0 z-[10070] flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-4 shadow-xl dark:border-gray-800 dark:bg-gray-900">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              {t("scheduleCalendar.removeSlotTitle")}
+              {removeTarget.pending
+                ? t("scheduleCalendar.removePendingTitle")
+                : t("scheduleCalendar.removeSlotTitle")}
             </h3>
             <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
-              {t("scheduleCalendar.removeSlotConfirm")}
+              {removeTarget.pending
+                ? t("scheduleCalendar.removePendingConfirm")
+                : t("scheduleCalendar.removeSlotConfirm")}
             </p>
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               {removeTarget.title} ({format(parseEventRange(removeTarget).start, "PPp", { locale: dateLoc })}{" "}
               - {format(parseEventRange(removeTarget).end, "p", { locale: dateLoc })})
             </p>
-            <label className="mt-3 block text-xs font-medium text-gray-500 dark:text-gray-400">
-              {t("scheduleCalendar.reason")}
-              <input
-                type="text"
-                value={removeReason}
-                onChange={(e) => setRemoveReason(e.target.value)}
-                placeholder={t("scheduleCalendar.optionalReasonPlaceholder")}
-                className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
-              />
-            </label>
+            {!removeTarget.pending ? (
+              <label className="mt-3 block text-xs font-medium text-gray-500 dark:text-gray-400">
+                {t("scheduleCalendar.reason")}
+                <input
+                  type="text"
+                  value={removeReason}
+                  onChange={(e) => setRemoveReason(e.target.value)}
+                  placeholder={t("scheduleCalendar.optionalReasonPlaceholder")}
+                  className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                />
+              </label>
+            ) : null}
             {removeError ? (
               <p className="mt-2 text-sm text-red-600 dark:text-red-400">{removeError}</p>
             ) : null}
