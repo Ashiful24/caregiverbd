@@ -31,6 +31,8 @@ export type ScheduleEventRecord = {
   end: string;
   type: ScheduleEventType;
   scheduleSlotId?: number;
+  /** Local draft only — not persisted until batch submit. */
+  pending?: boolean;
 };
 
 const NURSES: NurseRecord[] = [

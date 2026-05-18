@@ -13,7 +13,7 @@ import {
 } from "date-fns";
 import type { ScheduleEventRecord } from "../../data/nurseScheduleSeed";
 import { parseEventRange } from "../../data/nurseScheduleSeed";
-import { eventTypeClasses, eventTypeDotClass } from "./scheduleEventStyles";
+import { eventDisplayClasses, eventTypeDotClass } from "./scheduleEventStyles";
 
 type Props = {
   visibleMonth: Date;
@@ -132,7 +132,7 @@ export function ScheduleMonthView({
                         }
                       }}
                       title={`${e.title}${e.feeLabel ? ` | ${t("scheduleCalendar.feeLine", { amount: e.feeLabel })}` : ""} (${format(parseEventRange(e).start, "HH:mm")}–${format(parseEventRange(e).end, "HH:mm")})`}
-                      className={`rounded px-1.5 py-0.5 text-[10px] font-medium leading-tight sm:text-xs cursor-pointer ${eventTypeClasses(e.type)}`}
+                      className={`rounded px-1.5 py-0.5 text-[10px] font-medium leading-tight sm:text-xs cursor-pointer ${eventDisplayClasses(e.type, e.pending)}`}
                     >
                       <div className="truncate">
                         <span className={`mr-1 inline-block size-1.5 rounded-full align-middle ${eventTypeDotClass(e.type)}`} />

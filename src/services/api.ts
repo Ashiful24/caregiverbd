@@ -745,6 +745,286 @@ export const adminSystemConfigApi = {
   },
 };
 
+// ============== Admin: Scheduler jobs ==============
+
+export interface SchedulerJobItem {
+  id: number;
+  jobKey: string;
+  description: string | null;
+  runEveryMinutes: number;
+  isEnabled: boolean;
+  metadata: Record<string, unknown> | null;
+  lastRunAt: string | null;
+  nextRunAt: string | null;
+  createdAt: string;
+  updatedAt: string | null;
+}
+
+export interface UpdateSchedulerJobPayload {
+  runEveryMinutes?: number;
+  isEnabled?: boolean;
+  description?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface RefundReconcileResult {
+  scanned: number;
+  settled: number;
+  failed: number;
+  pending: number;
+  escalated: number;
+}
+
+/** Linked refund transaction statuses (admin refunds queue filter). */
+export type AdminRefundTxStatus = "PENDING" | "COMPLETED" | "FAILED" | "CANCELLED";
+
+export interface CancellationRefundQueueCancellation {
+  id: number;
+  cancelledAt: string;
+  scope: string;
+  serviceRequestId: number | null;
+  longTermOpportunityId: number | null;
+  actor: string;
+  actorUserId: number | null;
+  actorName: string | null;
+  stage: string;
+  statusAtCancel: string;
+  reasonCategory: string | null;
+  reasonNote: string | null;
+  feeAmount: string;
+  refundAmount: string;
+  refundMethod: string;
+  adminNotes: string | null;
+}
+
+export interface CancellationRefundQueueRefundTx {
+  id: number;
+  status: string;
+  amount: string;
+  paymentMethod: string;
+  referenceId: string | null;
+  referenceType: string | null;
+  longTermOpportunityId: number | null;
+  patientId: number | null;
+  providerId: number | null;
+  patientName: string | null;
+  providerName: string | null;
+  gatewayRefundRefId: string | null;
+  gatewayRefundStatus: string | null;
+  purpose: string | null;
+  adminEscalated: boolean;
+  createdAt: string;
+  updatedAt: string | null;
+}
+
+export interface CancellationRefundQueueRow {
+  cancellation: CancellationRefundQueueCancellation;
+  refundTransaction: CancellationRefundQueueRefundTx;
+}
+
+export interface CancellationRefundQueueResponse {
+  summary: {
+    window: { start: string; end: string; filteredBy?: string };
+    counts?: {
+      total: number;
+      pending: number;
+      completed: number;
+      failed: number;
+      cancelled: number;
+    };
+  };
+  data: CancellationRefundQueueRow[];
+  pagination: {
+    limit: number;
+    hasMore: boolean;
+    nextCursor: string | null;
+    page?: number;
+    total?: number;
+  };
+}
+
+export interface CancellationRefundQueueQueryParams {
+  startDate?: string;
+  endDate?: string;
+  status?: AdminRefundTxStatus;
+  patientId?: number;
+  paymentMethod?: "ONLINE" | "CASH";
+  cursor?: string;
+  page?: number;
+  limit?: number;
+  includeSummary?: boolean;
+  includeTotal?: boolean;
+}
+
+export const adminSchedulerApi = {
+  /** GET /admin/scheduler/jobs */
+  listJobs: async () => {
+    return httpService.get<SchedulerJobItem[]>("/admin/scheduler/jobs");
+  },
+  /** PATCH /admin/scheduler/jobs/:id */
+  updateJob: async (id: number, data: UpdateSchedulerJobPayload) => {
+    return httpService.patch<SchedulerJobItem>(`/admin/scheduler/jobs/${id}`, data);
+  },
+};
+
+// ============== Admin: Provider cancel review ==============
+
+export type ProviderCancelReviewStatus =
+  | "PENDING"
+  | "APPROVED"
+  | "REJECTED"
+  | "REASSIGNED"
+  | "ALL";
+
+export interface ProviderCancelReviewListItem {
+  id: number;
+  reviewStatus: string | null;
+  createdAt: string | null;
+  reasonCategory: string | null;
+  reasonNote: string | null;
+  serviceRequest: {
+    id: number;
+    status: string | null;
+    statusAtRequest: string;
+    scheduledDate: string | null;
+    scheduledTime: string | null;
+    scope: string;
+    consultationTypeId: number;
+    consultationTypeName: string;
+    serviceCategory: string;
+    fee: string | null;
+  };
+  provider: { id: number; userId: number | null; name: string } | null;
+  patient: { id: number; userId: number; name: string };
+}
+
+export interface ProviderCancelReviewListResponse {
+  summary?: {
+    pending: number;
+    approvedToday: number;
+    rejectedToday: number;
+    reassignedToday: number;
+  };
+  data: ProviderCancelReviewListItem[];
+  page: number;
+  limit: number;
+  total?: number;
+  hasNext: boolean;
+  nextCursor?: string;
+}
+
+export interface ProviderCancelReviewListQueryParams {
+  status?: ProviderCancelReviewStatus;
+  providerId?: number;
+  patientId?: number;
+  page?: number;
+  limit?: number;
+  cursor?: string;
+  includeSummary?: boolean;
+  includeTotal?: boolean;
+}
+
+export interface ProviderCancelReviewSuggestedReplacement {
+  providerId: number;
+  name: string;
+  isAvailable: boolean;
+}
+
+export interface ProviderCancelReviewHistoryItem {
+  id: number;
+  reviewStatus: string | null;
+  createdAt: string | null;
+  reasonCategory: string | null;
+}
+
+export interface ProviderCancelReviewReassignResult {
+  id: number;
+  reviewStatus: "REASSIGNED";
+  serviceRequestId: number;
+  newProviderId: number;
+  /** PROVIDER_REASSIGN transaction id when net earnings were transferred */
+  reassignTransactionId: number | null;
+}
+
+export interface ProviderCancelReviewDetail extends ProviderCancelReviewListItem {
+  refundPreview: {
+    feeAmount: string;
+    refundAmount: string;
+    refundMethod: string;
+    note: string;
+  };
+  cancelHistory: ProviderCancelReviewHistoryItem[];
+  suggestedReplacements: ProviderCancelReviewSuggestedReplacement[];
+}
+
+export const adminProviderCancelApi = {
+  list: async (
+    params?: ProviderCancelReviewListQueryParams,
+    config?: { signal?: AbortSignal }
+  ) => {
+    const qp: Record<string, string | number | boolean> = {};
+    if (params?.status) qp.status = params.status;
+    if (params?.providerId != null) qp.providerId = params.providerId;
+    if (params?.patientId != null) qp.patientId = params.patientId;
+    if (params?.cursor) qp.cursor = params.cursor;
+    if (params?.page != null) qp.page = params.page;
+    if (params?.limit != null) qp.limit = params.limit;
+    if (params?.includeSummary === true) qp.includeSummary = true;
+    if (params?.includeTotal === true) qp.includeTotal = true;
+    return httpService.get<ProviderCancelReviewListResponse>(
+      "/admin/provider-cancel-requests",
+      { params: qp, signal: config?.signal }
+    );
+  },
+  detail: async (id: number, config?: { signal?: AbortSignal }) => {
+    return httpService.get<ProviderCancelReviewDetail>(
+      `/admin/provider-cancel-requests/${id}`,
+      { signal: config?.signal }
+    );
+  },
+  approve: async (id: number, body?: { adminNotes?: string }) => {
+    return httpService.post(`/admin/provider-cancel-requests/${id}/approve`, body ?? {});
+  },
+  reject: async (id: number, body: { adminNotes: string }) => {
+    return httpService.post(`/admin/provider-cancel-requests/${id}/reject`, body);
+  },
+  reassign: async (id: number, body: { newProviderId: number; adminNotes?: string }) => {
+    return httpService.post<ProviderCancelReviewReassignResult>(
+      `/admin/provider-cancel-requests/${id}/reassign`,
+      body
+    );
+  },
+};
+
+export const adminCancellationApi = {
+  /** GET /admin/refunds — cancellations with linked REFUND transactions (cursor or page). */
+  listRefundsQueue: async (
+    params?: CancellationRefundQueueQueryParams,
+    config?: { signal?: AbortSignal }
+  ) => {
+    const qp: Record<string, string | number | boolean> = {};
+    if (params?.startDate) qp.startDate = params.startDate;
+    if (params?.endDate) qp.endDate = params.endDate;
+    if (params?.status) qp.status = params.status;
+    if (params?.patientId != null) qp.patientId = params.patientId;
+    if (params?.paymentMethod) qp.paymentMethod = params.paymentMethod;
+    if (params?.cursor) qp.cursor = params.cursor;
+    if (params?.page != null) qp.page = params.page;
+    if (params?.limit != null) qp.limit = params.limit;
+    if (params?.includeSummary === true) qp.includeSummary = true;
+    if (params?.includeTotal === true) qp.includeTotal = true;
+
+    return httpService.get<CancellationRefundQueueResponse>("/admin/refunds", {
+      params: qp,
+      signal: config?.signal,
+    });
+  },
+  /** POST /admin/refunds/reconcile — poll SSL Commerz for pending gateway refunds */
+  reconcileRefunds: async () => {
+    return httpService.post<RefundReconcileResult>("/admin/refunds/reconcile", {});
+  },
+};
+
 // ============== Admin: Verification Document Types ==============
 
 /** Admin-managed verification document type (add, update, deactivate). */
@@ -1815,7 +2095,55 @@ export const serviceRequestsApi = {
   confirmPayment: async (id: number) => {
     return httpService.post<ServiceRequest>(`/service-requests/${id}/confirm-payment`);
   },
+
+  /**
+   * GET /v1/service-requests/fee-estimate/short-term
+   * Query: providerId, shiftDuration (hours), consultationTypeId
+   */
+  getShortTermFeeEstimate: async (
+    params: {
+      providerId: number;
+      shiftDuration: number;
+      consultationTypeId: number;
+    },
+    config?: { signal?: AbortSignal }
+  ) => {
+    return httpService.get<ServiceRequestFeeEstimateResponse>(
+      "/service-requests/fee-estimate/short-term",
+      {
+        params: {
+          providerId: params.providerId,
+          shiftDuration: params.shiftDuration,
+          consultationTypeId: params.consultationTypeId,
+        },
+        signal: config?.signal,
+      }
+    );
+  },
 };
+
+/** Unwrap fee-estimate payload (root or nested under `data`). */
+export function normalizeServiceRequestFeeEstimate(
+  raw: unknown
+): ServiceRequestFeeEstimateResponse | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const inner =
+    o.data && typeof o.data === "object" && !Array.isArray(o.data)
+      ? (o.data as Record<string, unknown>)
+      : o;
+  const subTotal = String(inner.subTotal ?? inner.sub_total ?? "").trim();
+  if (!subTotal) return null;
+  return {
+    rateType: String(inner.rateType ?? inner.rate_type ?? "") || undefined,
+    unitRate: String(inner.unitRate ?? inner.unit_rate ?? "") || undefined,
+    shiftDuration: Number(inner.shiftDuration ?? inner.shift_duration) || undefined,
+    serviceFee: String(inner.serviceFee ?? inner.service_fee ?? "") || undefined,
+    subTotal,
+    currency: String(inner.currency ?? "") || undefined,
+    providerNet: String(inner.providerNet ?? inner.provider_net ?? "") || undefined,
+  };
+}
 
 // ============== Verification Documents API ==============
 
@@ -2203,6 +2531,20 @@ export type LongTermOpportunityStatusFilter =
   | "CANCELLED"
   | "EXPIRED";
 
+/** GET /v1/service-requests/fee-estimate/short-term */
+export interface ServiceRequestFeeEstimateResponse {
+  rateType?: string;
+  unitRate?: string;
+  shiftDuration?: number;
+  serviceFee?: string;
+  vat?: { amount?: string; percent?: string; inclusive?: boolean };
+  commission?: { amount?: string; percent?: string; inclusive?: boolean };
+  ait?: { amount?: string; percent?: string };
+  providerNet?: string;
+  subTotal?: string;
+  currency?: string;
+}
+
 export interface LongTermOpportunityListItem {
   id: number;
   status: string;
@@ -2210,6 +2552,7 @@ export interface LongTermOpportunityListItem {
   patientName?: string | null;
   location?: string | null;
   amount?: string | null;
+  consultationTypeId?: number | null;
   preferredStartTime?: string | null;
   shiftDurationHours?: number | null;
   timeRange?: string | null;
@@ -2319,6 +2662,11 @@ export function normalizeLongTermOpportunityRow(raw: unknown): LongTermOpportuni
     assignedNursesLabel = an.trim();
   }
 
+  const consultationTypeIdRaw = o.consultationTypeId ?? o.consultation_type_id;
+  const consultationTypeId = Number(consultationTypeIdRaw);
+  const consultationTypeIdNorm =
+    Number.isFinite(consultationTypeId) && consultationTypeId > 0 ? consultationTypeId : null;
+
   return {
     id: Number.isFinite(id) && id > 0 ? id : 0,
     status,
@@ -2326,6 +2674,7 @@ export function normalizeLongTermOpportunityRow(raw: unknown): LongTermOpportuni
     patientName,
     location,
     amount: strOpt(o.fee ?? o.amount ?? o.totalFee ?? o.total_fee),
+    consultationTypeId: consultationTypeIdNorm,
     preferredStartTime,
     shiftDurationHours,
     timeRange,
@@ -2843,6 +3192,7 @@ export interface GlProfitSummaryDto {
   commissionBalance: string;
   taxBalance: string;
   totalPlatformEarnings: string;
+  aitBalance: string;
   totalPayoutsProcessed: string;
 }
 
@@ -2855,6 +3205,10 @@ export interface GlCrossSystemValidationDto {
   glTaxBalance: string;
   taxDrift: string;
   taxInSync: boolean;
+  srAitTotal: string;
+  glAitBalance: string;
+  aitDrift: string;
+  aitInSync: boolean;
 }
 
 export interface GlOverallHealthDto {
@@ -2934,6 +3288,7 @@ export interface FinancialReportTotalsDto {
   totalProviderFee: string;
   totalCommission: string;
   totalTax: string;
+  totalAit: string;
   totalWithdrawals: string;
   netPlatformEarnings: string;
   consultationCount: number;
@@ -2943,7 +3298,7 @@ export interface FinancialReportTotalsDto {
 export interface FinancialReportDayDto {
   date: string;
   inflow: { onlinePayments: string; cashPayments: string; total: string };
-  distribution: { providerFee: string; commission: string; tax: string };
+  distribution: { providerFee: string; commission: string; tax: string; ait: string };
   outflow: { withdrawals: string };
   transactionCount: number;
 }
@@ -2971,6 +3326,7 @@ export interface FinancialReportTxItemDto {
   providerFee: string | null;
   commission: string | null;
   tax: string | null;
+  ait: string | null;
 }
 
 export interface FinancialReportPaginationDto {
@@ -3003,6 +3359,7 @@ export interface FinancialTxDetailBreakdownDto {
   totalFee: string;
   commission: FinancialTxDetailBreakdownPart;
   tax: FinancialTxDetailBreakdownPart;
+  ait: FinancialTxDetailBreakdownPart;
   providerFee: string;
 }
 

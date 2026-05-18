@@ -23,7 +23,7 @@ import {
   uploadFileToStorage,
 } from "../services/api";
 import { getAssetUrl } from "../utils/assetUrl";
-import { formatDate, formatStatusLabel } from "../utils/format";
+import { formatDate, formatStatusLabel, toBangladeshISODateOptional } from "../utils/format";
 
 const LIMIT_OPTIONS = [10, 20, 50];
 const MAX_PROOF_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
@@ -115,16 +115,14 @@ export default function WithdrawalRequests() {
   const from = total === 0 ? 0 : (page - 1) * limit + 1;
   const to = Math.min(page * limit, total);
 
-  const toISODateLocal = (date: Date | null): string | undefined => {
-    if (!date) return undefined;
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, "0");
-    const d = String(date.getDate()).padStart(2, "0");
-    return `${y}-${m}-${d}`;
-  };
-
-  const startDateParam = useMemo(() => toISODateLocal(dateRange.startDate), [dateRange.startDate]);
-  const endDateParam = useMemo(() => toISODateLocal(dateRange.endDate), [dateRange.endDate]);
+  const startDateParam = useMemo(
+    () => toBangladeshISODateOptional(dateRange.startDate),
+    [dateRange.startDate]
+  );
+  const endDateParam = useMemo(
+    () => toBangladeshISODateOptional(dateRange.endDate),
+    [dateRange.endDate]
+  );
 
   const fetchList = useCallback(
     async (signal?: AbortSignal) => {

@@ -156,7 +156,9 @@ export default function NurseScheduleCalendarPage() {
     (raw: unknown) => {
       if (!requestId) return;
       const row = resolveOpportunityFromScheduleDetails(raw);
-      if (row.id > 0) setRequest(row);
+      if (row.id > 0) {
+        setRequest((prev) => (prev ? { ...prev, ...row } : row));
+      }
       setInitialEvents(buildEventsFromScheduleDetails(raw, requestId, nurseFallback));
     },
     [requestId, nurseFallback]
@@ -224,6 +226,8 @@ export default function NurseScheduleCalendarPage() {
           requestStartDate={requestStartDate}
           requestEndDate={requestEndDate}
           baseServiceAmount={request.amount}
+          consultationTypeId={request.consultationTypeId}
+          defaultShiftDurationHours={request.shiftDurationHours}
           initialEvents={initialEvents}
           onScheduleDetailsSynced={handleScheduleDetailsSynced}
         />

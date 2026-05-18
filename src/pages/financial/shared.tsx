@@ -3,16 +3,15 @@ import type {
   FinancialTxType,
   FinancialTxStatus,
 } from "../../services/api";
+import { toBangladeshISODate } from "../../utils/format";
 
 // ────────────────────────────────────────────────────────────────────────────
 // Pure helpers
 // ────────────────────────────────────────────────────────────────────────────
 
+/** Bangladesh calendar day as `YYYY-MM-DD` (for date pickers / API filters). */
 export function toISODateLocal(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
+  return toBangladeshISODate(date);
 }
 
 /** Format BDT amount string. Handles "1234.56" and number. Falls back to em-dash for null. */
