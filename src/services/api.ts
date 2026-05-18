@@ -2095,7 +2095,55 @@ export const serviceRequestsApi = {
   confirmPayment: async (id: number) => {
     return httpService.post<ServiceRequest>(`/service-requests/${id}/confirm-payment`);
   },
+
+  /**
+   * GET /v1/service-requests/fee-estimate/short-term
+   * Query: providerId, shiftDuration (hours), consultationTypeId
+   */
+  getShortTermFeeEstimate: async (
+    params: {
+      providerId: number;
+      shiftDuration: number;
+      consultationTypeId: number;
+    },
+    config?: { signal?: AbortSignal }
+  ) => {
+    return httpService.get<ServiceRequestFeeEstimateResponse>(
+      "/service-requests/fee-estimate/short-term",
+      {
+        params: {
+          providerId: params.providerId,
+          shiftDuration: params.shiftDuration,
+          consultationTypeId: params.consultationTypeId,
+        },
+        signal: config?.signal,
+      }
+    );
+  },
 };
+
+/** Unwrap fee-estimate payload (root or nested under `data`). */
+export function normalizeServiceRequestFeeEstimate(
+  raw: unknown
+): ServiceRequestFeeEstimateResponse | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const inner =
+    o.data && typeof o.data === "object" && !Array.isArray(o.data)
+      ? (o.data as Record<string, unknown>)
+      : o;
+  const subTotal = String(inner.subTotal ?? inner.sub_total ?? "").trim();
+  if (!subTotal) return null;
+  return {
+    rateType: String(inner.rateType ?? inner.rate_type ?? "") || undefined,
+    unitRate: String(inner.unitRate ?? inner.unit_rate ?? "") || undefined,
+    shiftDuration: Number(inner.shiftDuration ?? inner.shift_duration) || undefined,
+    serviceFee: String(inner.serviceFee ?? inner.service_fee ?? "") || undefined,
+    subTotal,
+    currency: String(inner.currency ?? "") || undefined,
+    providerNet: String(inner.providerNet ?? inner.provider_net ?? "") || undefined,
+  };
+}
 
 // ============== Verification Documents API ==============
 
@@ -2483,6 +2531,20 @@ export type LongTermOpportunityStatusFilter =
   | "CANCELLED"
   | "EXPIRED";
 
+/** GET /v1/service-requests/fee-estimate/short-term */
+export interface ServiceRequestFeeEstimateResponse {
+  rateType?: string;
+  unitRate?: string;
+  shiftDuration?: number;
+  serviceFee?: string;
+  vat?: { amount?: string; percent?: string; inclusive?: boolean };
+  commission?: { amount?: string; percent?: string; inclusive?: boolean };
+  ait?: { amount?: string; percent?: string };
+  providerNet?: string;
+  subTotal?: string;
+  currency?: string;
+}
+
 export interface LongTermOpportunityListItem {
   id: number;
   status: string;
@@ -2490,6 +2552,7 @@ export interface LongTermOpportunityListItem {
   patientName?: string | null;
   location?: string | null;
   amount?: string | null;
+  consultationTypeId?: number | null;
   preferredStartTime?: string | null;
   shiftDurationHours?: number | null;
   timeRange?: string | null;
@@ -2599,6 +2662,11 @@ export function normalizeLongTermOpportunityRow(raw: unknown): LongTermOpportuni
     assignedNursesLabel = an.trim();
   }
 
+  const consultationTypeIdRaw = o.consultationTypeId ?? o.consultation_type_id;
+  const consultationTypeId = Number(consultationTypeIdRaw);
+  const consultationTypeIdNorm =
+    Number.isFinite(consultationTypeId) && consultationTypeId > 0 ? consultationTypeId : null;
+
   return {
     id: Number.isFinite(id) && id > 0 ? id : 0,
     status,
@@ -2606,6 +2674,7 @@ export function normalizeLongTermOpportunityRow(raw: unknown): LongTermOpportuni
     patientName,
     location,
     amount: strOpt(o.fee ?? o.amount ?? o.totalFee ?? o.total_fee),
+    consultationTypeId: consultationTypeIdNorm,
     preferredStartTime,
     shiftDurationHours,
     timeRange,

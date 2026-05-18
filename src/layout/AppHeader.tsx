@@ -115,14 +115,10 @@ const AppHeader: React.FC = () => {
 
             <Link to="/" className="lg:hidden">
               <img
-                className="dark:hidden"
-                src="./images/logo/logo.png"
-                alt="Logo"
-              />
-              <img
-                className="hidden dark:block"
-                src="./images/logo/logo-dark.png"
-                alt="Logo"
+                src="./images/logo/ontor-logo-horizontal.png"
+                alt="Ontor Care"
+                width={120}
+                height={42}
               />
             </Link>
 
@@ -157,8 +153,10 @@ const AppHeader: React.FC = () => {
                 />
               </svg>
             </button>
+          </div>
 
-            <div className="hidden lg:block">
+          <div className="hidden lg:block">
+            <form>
               <div className="relative">
                 <button
                   type="button"
@@ -183,7 +181,7 @@ const AppHeader: React.FC = () => {
                   )}
                 </span>
               </div>
-            </div>
+            </form>
           </div>
           <div
             className={`${
