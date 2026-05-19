@@ -490,11 +490,11 @@ export default function MasterFinancialReport() {
               tooltip={t(`${M}.kpi.totalInflowTt`)}
             />
             <KpiCard
-              label={t(`${M}.kpi.providerPayouts`)}
-              value={fmtBDT(totals.totalProviderFee)}
+              label={t(`${M}.kpi.providerEarningsAllocated`)}
+              value={fmtBDT(totals.totalProviderEarningsAllocated)}
               hint={paymentsHint}
               tone="neutral"
-              tooltip={t(`${M}.kpi.providerPayoutsTt`)}
+              tooltip={t(`${M}.kpi.providerEarningsAllocatedTt`)}
             />
             <KpiCard
               label={t(`${M}.kpi.aitWithheld`)}
@@ -610,7 +610,7 @@ export default function MasterFinancialReport() {
                         {fmtBDT(d.inflow.total)}
                       </TableCell>
                       <TableCell className="text-right text-gray-700 dark:text-gray-300 py-2.5">
-                        {fmtBDT(d.distribution.providerFee)}
+                        {fmtBDT(d.distribution.providerEarningsAllocated)}
                       </TableCell>
                       <TableCell className="text-right text-gray-700 dark:text-gray-300 py-2.5">
                         {fmtBDT(d.distribution.commission)}
@@ -860,8 +860,11 @@ function TransactionDetailView({ detail }: { detail: FinancialTxDetailResponseDt
 
   return (
     <div className="space-y-5">
-      {/* Header strip */}
-      <div className="flex flex-wrap items-center gap-3">
+      {/* Header strip — amount lives here too, no separate card. */}
+      <div className="flex flex-wrap items-baseline gap-3">
+        <span className="text-2xl font-semibold text-gray-900 dark:text-white">
+          {fmtBDT(detail.amount)}
+        </span>
         <Badge color={statusBadgeColor(detail.status)}>
           {t(`${M}.txStatus.${detail.status}`, { defaultValue: detail.status })}
         </Badge>
@@ -878,41 +881,6 @@ function TransactionDetailView({ detail }: { detail: FinancialTxDetailResponseDt
         <span className="text-sm text-gray-500 dark:text-gray-400">
           #{detail.transactionId} · {formatDateTime(detail.createdAt)}
         </span>
-      </div>
-
-      {/* Top KPI strip */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <KpiCard
-          label={t(`${M}.detail.amount`)}
-          value={fmtBDT(detail.amount)}
-          tooltip={t(`${M}.detail.ttAmount`)}
-        />
-        {detail.breakdown ? (
-          <>
-            <KpiCard
-              label={t(`${M}.detail.totalFee`)}
-              value={fmtBDT(detail.breakdown.totalFee)}
-              tone="neutral"
-              tooltip={t(`${M}.detail.ttTotalFee`)}
-            />
-            <KpiCard
-              label={t(`${M}.detail.providerFee`)}
-              value={fmtBDT(detail.breakdown.providerFee)}
-              tone="positive"
-              tooltip={t(`${M}.detail.ttProviderFee`)}
-            />
-            <KpiCard
-              label={t(`${M}.detail.platform`)}
-              value={fmtBDT(
-                Number(detail.breakdown.commission.amount) +
-                  Number(detail.breakdown.tax.amount),
-              )}
-              hint={`${fmtBDT(detail.breakdown.commission.amount)} + ${fmtBDT(detail.breakdown.tax.amount)}`}
-              tone="neutral"
-              tooltip={t(`${M}.detail.ttPlatform`)}
-            />
-          </>
-        ) : null}
       </div>
 
       {/* Parties */}
@@ -1053,7 +1021,17 @@ function TransactionDetailView({ detail }: { detail: FinancialTxDetailResponseDt
       ) : null}
 
       {/* Fee breakdown */}
-      {detail.breakdown ? (
+      {detail.breakdown ? (() => {
+        // Realized state: the fee was actually deducted only after the service
+        // was COMPLETED (or for CASH which settles at completion). Otherwise
+        // the money is still held in SERVICE_HOLD_GL and the breakdown below
+        // shows the PLANNED split, not what's been collected.
+        const isCompleted = detail.serviceRequest?.status === "COMPLETED";
+        const heldInEscrow =
+          !isCompleted &&
+          detail.type === "CONSULTATION_PAYMENT" &&
+          detail.status === "COMPLETED"; // payment received but service not yet done
+        return (
         <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
           <div className="mb-3 flex items-center gap-1.5">
             <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
@@ -1061,6 +1039,19 @@ function TransactionDetailView({ detail }: { detail: FinancialTxDetailResponseDt
             </p>
             <InfoTooltip text={t(`${M}.detail.ttFeeBreakdown`)} />
           </div>
+
+          {/* Status banner — makes "planned vs realized" obvious */}
+          {heldInEscrow ? (
+            <div className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
+              <span className="font-medium">⏳ {t(`${M}.detail.escrowBanner`)}</span>{" "}
+              {t(`${M}.detail.escrowBannerHint`)}
+            </div>
+          ) : isCompleted ? (
+            <div className="mb-3 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-300">
+              <span className="font-medium">✓ {t(`${M}.detail.realizedBanner`)}</span>{" "}
+              {t(`${M}.detail.realizedBannerHint`)}
+            </div>
+          ) : null}
           <Table>
             <TableBody className="divide-y divide-gray-100 dark:divide-gray-800">
               <TableRow>
@@ -1114,7 +1105,9 @@ function TransactionDetailView({ detail }: { detail: FinancialTxDetailResponseDt
               ) : null}
               <TableRow>
                 <TableCell className="font-medium text-emerald-700 dark:text-emerald-400 py-2">
-                  {t(`${M}.detail.providerReceives`)}
+                  {heldInEscrow
+                    ? t(`${M}.detail.providerWillReceive`)
+                    : t(`${M}.detail.providerReceives`)}
                 </TableCell>
                 <TableCell className="text-right font-semibold text-emerald-700 dark:text-emerald-400 py-2">
                   {fmtBDT(detail.breakdown.providerFee)}
@@ -1123,7 +1116,8 @@ function TransactionDetailView({ detail }: { detail: FinancialTxDetailResponseDt
             </TableBody>
           </Table>
         </div>
-      ) : null}
+        );
+      })() : null}
 
       {/* Ledger trail */}
       {detail.ledgerEntries.length > 0 ? (

@@ -1108,9 +1108,9 @@ const en = {
         totalInflowTt:
           "All money patients paid in the selected period (online gateway + cash), after your other filters.",
         inflowHint: "{{online}} online · {{cash}} cash",
-        providerPayouts: "Provider payouts",
-        providerPayoutsTt:
-          "Sum of amounts credited to providers after commission, tax, and AIT — what providers actually received from paid services.",
+        providerEarningsAllocated: "Provider earnings (allocated)",
+        providerEarningsAllocatedTt:
+          "Amounts earmarked to providers after commission, tax, and AIT for the selected period. Online payments are held in escrow until each service is COMPLETED — see the Live Wallet Balances panel for what's actually been released.",
         paymentsHint_one: "{{count}} payment",
         paymentsHint_other: "{{count}} payments",
         aitWithheld: "AIT withheld",
@@ -1187,15 +1187,6 @@ const en = {
         title: "Transaction details",
       },
       detail: {
-        amount: "Amount",
-        totalFee: "Total fee",
-        providerFee: "Provider fee",
-        platform: "Platform",
-        ttAmount:
-          "The main amount stored on the transaction — what accounting and reconciliation use.",
-        ttTotalFee: "Everything the patient paid for this booking, including any add‑ons billed on top.",
-        ttProviderFee: "Amount that reaches the provider’s wallet after deductions.",
-        ttPlatform: "Commission plus tax earned by the platform on this transaction.",
         patient: "Patient",
         ttPatientBrief: "The patient account that paid.",
         patientFallback: "Patient #{{id}}",
@@ -1224,6 +1215,12 @@ const en = {
         feeBreakdown: "Fee breakdown",
         ttFeeBreakdown:
           "How the bill splits between provider earnings and platform charges. ‘Inclusive’ = taken from quoted provider earnings; ‘exclusive’ = added on the patient bill.",
+        escrowBanner: "Held in escrow — not yet collected.",
+        escrowBannerHint:
+          "Patient has paid, but the service is not COMPLETED yet. The amounts below show the PLANNED split. When the service completes, commission / VAT / AIT will be deducted and the rest released to the provider's claimable wallet.",
+        realizedBanner: "Settled — fees collected.",
+        realizedBannerHint:
+          "Service is COMPLETED. Commission / VAT / AIT have been deducted and the remainder is in the provider's claimable wallet.",
         rowTotalFee: "Total fee (patient paid)",
         rowCommission: "Commission",
         rowTax: "Tax",
@@ -1232,6 +1229,7 @@ const en = {
         inclusive: "(inclusive)",
         exclusive: "(exclusive)",
         providerReceives: "Provider receives",
+        providerWillReceive: "Provider will receive (after completion)",
         ledgerTrail: "Ledger trail",
         ttLedgerTrail:
           "Each line is money moving between internal wallets (double‑entry). Use it to trace how the total was split.",

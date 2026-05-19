@@ -3317,7 +3317,14 @@ export interface FinancialReportTotalsDto {
   onlinePayments: string;
   cashPayments: string;
   totalInflow: string;
-  totalProviderFee: string;
+  /**
+   * Amount earmarked to provider CLAIMABLE wallets in the period — snapshot.
+   * NOT yet withdrawn. For online payments, the money is still in escrow
+   * (SERVICE_HOLD_GL) until the service is COMPLETED; only then does it
+   * actually appear in provider CLAIMABLE. See liveBalances for realized.
+   * Renamed from `totalProviderFee`.
+   */
+  totalProviderEarningsAllocated: string;
   totalCommission: string;
   totalTax: string;
   totalAit: string;
@@ -3330,7 +3337,13 @@ export interface FinancialReportTotalsDto {
 export interface FinancialReportDayDto {
   date: string;
   inflow: { onlinePayments: string; cashPayments: string; total: string };
-  distribution: { providerFee: string; commission: string; tax: string; ait: string };
+  distribution: {
+    /** Renamed from `providerFee`. Allocated, NOT withdrawn. */
+    providerEarningsAllocated: string;
+    commission: string;
+    tax: string;
+    ait: string;
+  };
   outflow: { withdrawals: string };
   transactionCount: number;
 }
@@ -3409,7 +3422,6 @@ export interface FinancialTxDetailServiceRequestDto {
 export interface FinancialTxDetailPartyDto {
   id: number;
   name: string | null;
-  phone: string | null;
   email: string | null;
 }
 
@@ -3417,15 +3429,12 @@ export interface FinancialTxDetailLedgerEntryDto {
   ledgerId: number;
   debitWalletType: string;
   creditWalletType: string;
-  debitWalletId: number;
-  creditWalletId: number;
   amount: string;
   debitBalanceBefore: string | null;
   debitBalanceAfter: string;
   creditBalanceBefore: string | null;
   creditBalanceAfter: string;
   description: string | null;
-  createdAt: string | null;
 }
 
 export interface FinancialTxDetailResponseDto {
@@ -3441,7 +3450,6 @@ export interface FinancialTxDetailResponseDto {
   provider: FinancialTxDetailPartyDto | null;
   breakdown: FinancialTxDetailBreakdownDto | null;
   ledgerEntries: FinancialTxDetailLedgerEntryDto[];
-  metadata: Record<string, unknown> | null;
 }
 
 export interface ProviderTransactionLedgerEntryDto {
