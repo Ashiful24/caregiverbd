@@ -3188,25 +3188,53 @@ export interface GlWalletReconciliationDto {
   isHealthy: boolean;
 }
 
-export interface GlProfitSummaryDto {
-  commissionBalance: string;
-  taxBalance: string;
-  totalPlatformEarnings: string;
-  aitBalance: string;
-  totalPayoutsProcessed: string;
+export interface GlMoneySummaryDto {
+  /** SERVICE_HOLD_GL — payments held in escrow until service completes */
+  inEscrow: string;
+  /** COMMISSION_GL — platform commission earned (released at completion) */
+  commissionEarned: string;
+  /** VAT_GL — tax collected on service fees */
+  taxCollected: string;
+  /** AIT_GL — advance income tax withheld from provider earnings */
+  aitWithheld: string;
+  /** commission + tax + cancellation fees — total direct platform revenue */
+  totalPlatformRevenue: string;
+  /** PAYOUT_GL — cumulative provider withdrawals processed */
+  providerPayoutsProcessed: string;
+  /** REFUND_GL — staged refunds awaiting gateway disbursement */
+  stagedRefunds: string;
+  /** CANCELLATION_FEE_GL — cancellation fee revenue collected */
+  cancellationFees: string;
 }
 
-export interface GlCrossSystemValidationDto {
-  srCommissionTotal: string;
-  glCommissionBalance: string;
+export interface GlEscrowIntegrityDto {
+  /** Sum of sr.fee for PAID/IN_PROGRESS short-term SRs whose payment used usesHoldGl=true */
+  shortTermExpected: string;
+  /** Sum of sr.fee for PAID/IN_PROGRESS LTO SRs whose parent payment used usesHoldGl=true */
+  ltoExpected: string;
+  /** shortTermExpected + ltoExpected — total money that should be in escrow */
+  totalExpected: string;
+  /** Actual SERVICE_HOLD_GL wallet balance */
+  actualBalance: string;
+  /** actualBalance − totalExpected; must be 0. Non-zero = escrow corruption. */
+  drift: string;
+  inSync: boolean;
+}
+
+export interface GlEarningsIntegrityDto {
+  /** Sum of commissionAmount for SRs whose commission has been released to COMMISSION_GL */
+  commissionReleased: string;
+  commissionBalance: string;
   commissionDrift: string;
   commissionInSync: boolean;
-  srTaxTotal: string;
-  glTaxBalance: string;
+  /** Sum of taxAmount for SRs whose tax has been released to VAT_GL */
+  taxReleased: string;
+  taxBalance: string;
   taxDrift: string;
   taxInSync: boolean;
-  srAitTotal: string;
-  glAitBalance: string;
+  /** Sum of aitAmount for SRs whose AIT has been released to AIT_GL */
+  aitReleased: string;
+  aitBalance: string;
   aitDrift: string;
   aitInSync: boolean;
 }
@@ -3214,7 +3242,10 @@ export interface GlCrossSystemValidationDto {
 export interface GlOverallHealthDto {
   healthy: boolean;
   walletsDriftFree: boolean;
-  crossSystemInSync: boolean;
+  /** SERVICE_HOLD_GL balance matches expected hold from active SRs (both short-term and LTO) */
+  escrowInSync: boolean;
+  /** COMMISSION_GL, VAT_GL, AIT_GL balances match released SR sums */
+  earningsInSync: boolean;
   driftedWallets: string[];
 }
 
@@ -3229,8 +3260,9 @@ export interface GlReconciliationHealthDto {
 
 export interface GlReconciliationSummaryResponseDto {
   wallets: GlWalletReconciliationDto[];
-  profitSummary: GlProfitSummaryDto;
-  crossSystemValidation: GlCrossSystemValidationDto;
+  moneySummary: GlMoneySummaryDto;
+  escrowIntegrity: GlEscrowIntegrityDto;
+  earningsIntegrity: GlEarningsIntegrityDto;
   overallHealth: GlOverallHealthDto;
   reconciliationHealth: GlReconciliationHealthDto;
 }
@@ -3285,7 +3317,14 @@ export interface FinancialReportTotalsDto {
   onlinePayments: string;
   cashPayments: string;
   totalInflow: string;
-  totalProviderFee: string;
+  /**
+   * Amount earmarked to provider CLAIMABLE wallets in the period — snapshot.
+   * NOT yet withdrawn. For online payments, the money is still in escrow
+   * (SERVICE_HOLD_GL) until the service is COMPLETED; only then does it
+   * actually appear in provider CLAIMABLE. See liveBalances for realized.
+   * Renamed from `totalProviderFee`.
+   */
+  totalProviderEarningsAllocated: string;
   totalCommission: string;
   totalTax: string;
   totalAit: string;
@@ -3298,7 +3337,13 @@ export interface FinancialReportTotalsDto {
 export interface FinancialReportDayDto {
   date: string;
   inflow: { onlinePayments: string; cashPayments: string; total: string };
-  distribution: { providerFee: string; commission: string; tax: string; ait: string };
+  distribution: {
+    /** Renamed from `providerFee`. Allocated, NOT withdrawn. */
+    providerEarningsAllocated: string;
+    commission: string;
+    tax: string;
+    ait: string;
+  };
   outflow: { withdrawals: string };
   transactionCount: number;
 }
@@ -3377,7 +3422,6 @@ export interface FinancialTxDetailServiceRequestDto {
 export interface FinancialTxDetailPartyDto {
   id: number;
   name: string | null;
-  phone: string | null;
   email: string | null;
 }
 
@@ -3385,15 +3429,12 @@ export interface FinancialTxDetailLedgerEntryDto {
   ledgerId: number;
   debitWalletType: string;
   creditWalletType: string;
-  debitWalletId: number;
-  creditWalletId: number;
   amount: string;
   debitBalanceBefore: string | null;
   debitBalanceAfter: string;
   creditBalanceBefore: string | null;
   creditBalanceAfter: string;
   description: string | null;
-  createdAt: string | null;
 }
 
 export interface FinancialTxDetailResponseDto {
@@ -3409,7 +3450,6 @@ export interface FinancialTxDetailResponseDto {
   provider: FinancialTxDetailPartyDto | null;
   breakdown: FinancialTxDetailBreakdownDto | null;
   ledgerEntries: FinancialTxDetailLedgerEntryDto[];
-  metadata: Record<string, unknown> | null;
 }
 
 export interface ProviderTransactionLedgerEntryDto {

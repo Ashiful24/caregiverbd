@@ -13,9 +13,169 @@ import {
 import {
   adminFinancialApi,
   type GlReconciliationSummaryResponseDto,
+  type GlEscrowIntegrityDto,
+  type GlEarningsIntegrityDto,
 } from "../services/api";
 import { fmtBDT, KpiCard, HealthDot } from "./financial/shared";
 
+// ── Escrow integrity panel ────────────────────────────────────────────────────
+function EscrowIntegrityPanel({ v }: { v: GlEscrowIntegrityDto }) {
+  return (
+    <div className="space-y-3">
+      {/* Short-term / LTO breakdown row */}
+      <div className="grid gap-3 sm:grid-cols-3">
+        <div className="rounded-lg bg-gray-50 p-3 dark:bg-white/[0.02]">
+          <div className="flex items-center gap-1 mb-1.5">
+            <span className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+              Short-term expected
+            </span>
+            <InfoTooltip text="Sum of sr.fee for PAID or IN_PROGRESS short-term service requests whose CONSULTATION_PAYMENT transaction has usesHoldGl = true. These fees are parked in SERVICE_HOLD_GL and have not yet been released to the provider." />
+          </div>
+          <p className="text-sm font-semibold text-gray-800 dark:text-white/90">
+            {fmtBDT(v.shortTermExpected)}
+          </p>
+        </div>
+        <div className="rounded-lg bg-gray-50 p-3 dark:bg-white/[0.02]">
+          <div className="flex items-center gap-1 mb-1.5">
+            <span className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+              LTO expected
+            </span>
+            <InfoTooltip text="Sum of sr.fee for PAID or IN_PROGRESS LTO shifts whose parent CONSULTATION_PAYMENT transaction has usesHoldGl = true. Released per shift when each shift is marked COMPLETED." />
+          </div>
+          <p className="text-sm font-semibold text-gray-800 dark:text-white/90">
+            {fmtBDT(v.ltoExpected)}
+          </p>
+        </div>
+        <div className="rounded-lg bg-gray-50 p-3 dark:bg-white/[0.02]">
+          <div className="flex items-center gap-1 mb-1.5">
+            <span className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+              Total expected
+            </span>
+            <InfoTooltip text="Short-term + LTO. The total BDT amount that must be sitting in SERVICE_HOLD_GL right now." />
+          </div>
+          <p className="text-sm font-semibold text-gray-800 dark:text-white/90">
+            {fmtBDT(v.totalExpected)}
+          </p>
+        </div>
+      </div>
+      {/* Actual balance + drift row */}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="rounded-lg bg-gray-50 p-3 dark:bg-white/[0.02]">
+          <div className="flex items-center gap-1 mb-1.5">
+            <span className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+              Actual (SERVICE_HOLD_GL)
+            </span>
+            <InfoTooltip text="Current balance of the SERVICE_HOLD_GL ledger wallet. Should exactly equal Total expected." />
+          </div>
+          <p className="text-sm font-semibold text-gray-800 dark:text-white/90">
+            {fmtBDT(v.actualBalance)}
+          </p>
+        </div>
+        <div className="rounded-lg bg-gray-50 p-3 dark:bg-white/[0.02]">
+          <div className="flex items-center gap-1 mb-1.5">
+            <span className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+              Drift
+            </span>
+            <InfoTooltip text="Actual − Expected. Must be 0. Negative: a shift fee left SERVICE_HOLD_GL without an SR reaching COMPLETED/CANCELLED. Positive: money entered SERVICE_HOLD_GL without a matching active SR." />
+          </div>
+          <p
+            className={`text-sm font-semibold ${
+              v.inSync
+                ? "text-emerald-700 dark:text-emerald-400"
+                : "text-rose-700 dark:text-rose-400"
+            }`}
+          >
+            {fmtBDT(v.drift)}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Earnings integrity panel ──────────────────────────────────────────────────
+function EarningsIntegrityPanel({ v }: { v: GlEarningsIntegrityDto }) {
+  const rows = [
+    {
+      label: "Commission",
+      released: v.commissionReleased,
+      balance: v.commissionBalance,
+      drift: v.commissionDrift,
+      inSync: v.commissionInSync,
+      releasedTip: "Sum of commissionAmount on COMPLETED SRs + PAID SRs whose payment did NOT use hold-GL. These are the SRs whose commission has been transferred to COMMISSION_GL.",
+      balanceTip: "Current COMMISSION_GL ledger wallet balance.",
+      driftTip: "GL Balance − Released sum. Must be 0. Non-zero means ledger and business data disagree on how much commission the platform has earned.",
+    },
+    {
+      label: "Tax (VAT)",
+      released: v.taxReleased,
+      balance: v.taxBalance,
+      drift: v.taxDrift,
+      inSync: v.taxInSync,
+      releasedTip: "Sum of taxAmount on SRs whose tax has been released to VAT_GL.",
+      balanceTip: "Current VAT_GL ledger wallet balance.",
+      driftTip: "GL Balance − Released sum. Must be 0.",
+    },
+    {
+      label: "AIT",
+      released: v.aitReleased,
+      balance: v.aitBalance,
+      drift: v.aitDrift,
+      inSync: v.aitInSync,
+      releasedTip: "Sum of aitAmount on SRs whose AIT has been released to AIT_GL.",
+      balanceTip: "Current AIT_GL ledger wallet balance.",
+      driftTip: "GL Balance − Released sum. Must be 0.",
+    },
+  ];
+
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {rows.map((r) => (
+        <div key={r.label} className="rounded-lg bg-gray-50 p-3 dark:bg-white/[0.02]">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+              {r.label}
+            </span>
+            <HealthDot healthy={r.inSync} />
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-xs">
+            <div>
+              <div className="flex items-center gap-1">
+                <p className="text-gray-500 dark:text-gray-400">Released</p>
+                <InfoTooltip text={r.releasedTip} />
+              </div>
+              <p className="font-medium text-gray-800 dark:text-white/90">{fmtBDT(r.released)}</p>
+            </div>
+            <div>
+              <div className="flex items-center gap-1">
+                <p className="text-gray-500 dark:text-gray-400">GL balance</p>
+                <InfoTooltip text={r.balanceTip} />
+              </div>
+              <p className="font-medium text-gray-800 dark:text-white/90">{fmtBDT(r.balance)}</p>
+            </div>
+            <div>
+              <div className="flex items-center gap-1">
+                <p className="text-gray-500 dark:text-gray-400">Drift</p>
+                <InfoTooltip text={r.driftTip} />
+              </div>
+              <p
+                className={`font-medium ${
+                  r.inSync
+                    ? "text-emerald-700 dark:text-emerald-400"
+                    : "text-rose-700 dark:text-rose-400"
+                }`}
+              >
+                {fmtBDT(r.drift)}
+              </p>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Page ──────────────────────────────────────────────────────────────────────
 export default function GlReconciliation() {
   const [glSummary, setGlSummary] = useState<GlReconciliationSummaryResponseDto | null>(null);
   const [loading, setLoading] = useState(true);
@@ -44,7 +204,7 @@ export default function GlReconciliation() {
     <>
       <PageMeta
         title="GL Reconciliation | Hope - BMQAS"
-        description="Live snapshot of platform ledger health: wallet balances, drift checks, and cross-system validation."
+        description="Live snapshot of platform ledger health: wallet balances, escrow integrity, and earnings validation."
       />
       <PageBreadcrumb pageTitle="GL Reconciliation" />
 
@@ -86,194 +246,93 @@ export default function GlReconciliation() {
           <p className="text-rose-600 dark:text-rose-400">{error}</p>
         ) : glSummary ? (
           <div className="space-y-5">
-            {/* Profit summary KPIs */}
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+
+            {/* ── Money summary KPIs ──────────────────────────────────────────── */}
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              <KpiCard
+                label="In escrow"
+                value={fmtBDT(glSummary.moneySummary.inEscrow)}
+                tone="neutral"
+                hint="Payments awaiting service completion"
+                tooltip="SERVICE_HOLD_GL balance — total held in escrow for both short-term and LTO payments. Released to the provider's wallet only when each service reaches COMPLETED."
+              />
               <KpiCard
                 label="Commission earned"
-                value={fmtBDT(glSummary.profitSummary.commissionBalance)}
+                value={fmtBDT(glSummary.moneySummary.commissionEarned)}
                 tone="positive"
-                tooltip="Total commission the platform has collected across all completed services. Sourced from the COMMISSION_GL ledger wallet."
+                tooltip="COMMISSION_GL balance — platform commission released at service completion."
               />
               <KpiCard
                 label="Tax collected"
-                value={fmtBDT(glSummary.profitSummary.taxBalance)}
+                value={fmtBDT(glSummary.moneySummary.taxCollected)}
                 tone="positive"
-                tooltip="Total tax (e.g. VAT) collected on behalf of the platform across all completed services. Sourced from the VAT_GL ledger wallet."
-              />
-              <KpiCard
-                label="Total platform earnings"
-                value={fmtBDT(glSummary.profitSummary.totalPlatformEarnings)}
-                tone="positive"
-                tooltip="Commission + tax. The platform's total income across all time. AIT is excluded — it is withheld from providers."
+                tooltip="VAT_GL balance — VAT/tax released at service completion."
               />
               <KpiCard
                 label="AIT withheld"
-                value={fmtBDT(glSummary.profitSummary.aitBalance ?? "0")}
+                value={fmtBDT(glSummary.moneySummary.aitWithheld)}
                 tone="neutral"
-                tooltip="Advance Income Tax withheld from provider earnings across all time. Sourced from the AIT_GL ledger wallet."
+                tooltip="AIT_GL balance — advance income tax withheld from provider earnings at completion."
+              />
+              <KpiCard
+                label="Total platform revenue"
+                value={fmtBDT(glSummary.moneySummary.totalPlatformRevenue)}
+                tone="positive"
+                hint="Commission + tax + cancellation fees"
+                tooltip="Sum of COMMISSION_GL + VAT_GL + CANCELLATION_FEE_GL balances — all direct platform income."
               />
               <KpiCard
                 label="Payouts processed"
-                value={fmtBDT(glSummary.profitSummary.totalPayoutsProcessed)}
+                value={fmtBDT(glSummary.moneySummary.providerPayoutsProcessed)}
                 tone="neutral"
-                hint="To providers via withdrawals"
-                tooltip="Total amount disbursed to providers as withdrawals. Sourced from PAYOUT_GL — money that has left the system."
+                hint="Provider withdrawals"
+                tooltip="PAYOUT_GL balance — cumulative provider withdrawals processed. Money that has left the platform to provider bank accounts."
+              />
+              <KpiCard
+                label="Staged refunds"
+                value={fmtBDT(glSummary.moneySummary.stagedRefunds)}
+                tone="neutral"
+                hint="Awaiting gateway payout"
+                tooltip="REFUND_GL balance — refunds staged and pending gateway disbursement to patients."
+              />
+              <KpiCard
+                label="Cancellation fees"
+                value={fmtBDT(glSummary.moneySummary.cancellationFees)}
+                tone="neutral"
+                hint="Revenue from cancellations"
+                tooltip="CANCELLATION_FEE_GL balance — cancellation fee revenue retained by the platform."
               />
             </div>
 
-            {/* Cross-system validation */}
+            {/* ── Escrow integrity ────────────────────────────────────────────── */}
             <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
               <div className="mb-3 flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
                   <p className="text-sm font-medium text-gray-800 dark:text-white/90">
-                    Cross-system validation
+                    Escrow integrity
                   </p>
-                  <InfoTooltip text="Compares the platform's GL wallet balances (financial source of truth) against the totals stored on service_requests rows (business source of truth). If they drift, the ledger and business data are out of sync — the most critical inconsistency." />
+                  <InfoTooltip text="SERVICE_HOLD_GL balance must equal the sum of sr.fee for every service that has been paid for but not yet delivered (PAID or IN_PROGRESS). Covers both short-term and LTO service requests with usesHoldGl=true. A non-zero drift means a fee moved out of escrow without the corresponding SR status change, or vice versa." />
                 </div>
+                <HealthDot healthy={glSummary.escrowIntegrity.inSync} />
               </div>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <div className="rounded-lg bg-gray-50 p-3 dark:bg-white/[0.02]">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                        Commission
-                      </span>
-                      <InfoTooltip text="Cross-check between the COMMISSION_GL wallet balance and the sum of commissionAmount on PAID/COMPLETED service_requests. Must match exactly." />
-                    </div>
-                    <HealthDot healthy={glSummary.crossSystemValidation.commissionInSync} />
-                  </div>
-                  <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
-                    <div>
-                      <div className="flex items-center gap-1">
-                        <p className="text-gray-500 dark:text-gray-400">From SR</p>
-                        <InfoTooltip text="Sum of commissionAmount across all PAID/COMPLETED service_requests." />
-                      </div>
-                      <p className="font-medium text-gray-800 dark:text-white/90">
-                        {fmtBDT(glSummary.crossSystemValidation.srCommissionTotal)}
-                      </p>
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-1">
-                        <p className="text-gray-500 dark:text-gray-400">From GL</p>
-                        <InfoTooltip text="Current balance of the COMMISSION_GL ledger wallet." />
-                      </div>
-                      <p className="font-medium text-gray-800 dark:text-white/90">
-                        {fmtBDT(glSummary.crossSystemValidation.glCommissionBalance)}
-                      </p>
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-1">
-                        <p className="text-gray-500 dark:text-gray-400">Drift</p>
-                        <InfoTooltip text="From GL − From SR. Must be 0. Non-zero means a payment moved through the ledger without a matching service_request record, or vice versa." />
-                      </div>
-                      <p
-                        className={`font-medium ${
-                          glSummary.crossSystemValidation.commissionInSync
-                            ? "text-emerald-700 dark:text-emerald-400"
-                            : "text-rose-700 dark:text-rose-400"
-                        }`}
-                      >
-                        {fmtBDT(glSummary.crossSystemValidation.commissionDrift)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                <div className="rounded-lg bg-gray-50 p-3 dark:bg-white/[0.02]">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                        Tax
-                      </span>
-                      <InfoTooltip text="Cross-check between TAX_GL wallet balance and the sum of taxAmount on PAID/COMPLETED service_requests." />
-                    </div>
-                    <HealthDot healthy={glSummary.crossSystemValidation.taxInSync} />
-                  </div>
-                  <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
-                    <div>
-                      <div className="flex items-center gap-1">
-                        <p className="text-gray-500 dark:text-gray-400">From SR</p>
-                        <InfoTooltip text="Sum of taxAmount across all PAID/COMPLETED service_requests." />
-                      </div>
-                      <p className="font-medium text-gray-800 dark:text-white/90">
-                        {fmtBDT(glSummary.crossSystemValidation.srTaxTotal)}
-                      </p>
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-1">
-                        <p className="text-gray-500 dark:text-gray-400">From GL</p>
-                        <InfoTooltip text="Current balance of the TAX_GL ledger wallet." />
-                      </div>
-                      <p className="font-medium text-gray-800 dark:text-white/90">
-                        {fmtBDT(glSummary.crossSystemValidation.glTaxBalance)}
-                      </p>
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-1">
-                        <p className="text-gray-500 dark:text-gray-400">Drift</p>
-                        <InfoTooltip text="From GL − From SR. Must be 0. Non-zero indicates a tax record mismatch between business and finance." />
-                      </div>
-                      <p
-                        className={`font-medium ${
-                          glSummary.crossSystemValidation.taxInSync
-                            ? "text-emerald-700 dark:text-emerald-400"
-                            : "text-rose-700 dark:text-rose-400"
-                        }`}
-                      >
-                        {fmtBDT(glSummary.crossSystemValidation.taxDrift)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                <div className="rounded-lg bg-gray-50 p-3 dark:bg-white/[0.02]">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                        AIT
-                      </span>
-                      <InfoTooltip text="Cross-check between AIT_GL wallet balance and the sum of aitAmount on PAID/COMPLETED service_requests." />
-                    </div>
-                    <HealthDot healthy={glSummary.crossSystemValidation.aitInSync ?? true} />
-                  </div>
-                  <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
-                    <div>
-                      <div className="flex items-center gap-1">
-                        <p className="text-gray-500 dark:text-gray-400">From SR</p>
-                        <InfoTooltip text="Sum of aitAmount across all PAID/COMPLETED service_requests." />
-                      </div>
-                      <p className="font-medium text-gray-800 dark:text-white/90">
-                        {fmtBDT(glSummary.crossSystemValidation.srAitTotal ?? "0")}
-                      </p>
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-1">
-                        <p className="text-gray-500 dark:text-gray-400">From GL</p>
-                        <InfoTooltip text="Current balance of the AIT_GL ledger wallet." />
-                      </div>
-                      <p className="font-medium text-gray-800 dark:text-white/90">
-                        {fmtBDT(glSummary.crossSystemValidation.glAitBalance ?? "0")}
-                      </p>
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-1">
-                        <p className="text-gray-500 dark:text-gray-400">Drift</p>
-                        <InfoTooltip text="From GL − From SR. Must be 0. Non-zero indicates an AIT record mismatch between business and finance." />
-                      </div>
-                      <p
-                        className={`font-medium ${
-                          glSummary.crossSystemValidation.aitInSync !== false
-                            ? "text-emerald-700 dark:text-emerald-400"
-                            : "text-rose-700 dark:text-rose-400"
-                        }`}
-                      >
-                        {fmtBDT(glSummary.crossSystemValidation.aitDrift ?? "0")}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <EscrowIntegrityPanel v={glSummary.escrowIntegrity} />
             </div>
 
-            {/* GL Wallet table */}
+            {/* ── Earnings integrity ──────────────────────────────────────────── */}
+            <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+              <div className="mb-3 flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <p className="text-sm font-medium text-gray-800 dark:text-white/90">
+                    Earnings integrity
+                  </p>
+                  <InfoTooltip text="Compares COMMISSION_GL / VAT_GL / AIT_GL wallet balances against the sum of the corresponding SR columns for every SR whose platform cut has been released from escrow (COMPLETED SRs, or PAID SRs whose payment did not use hold-GL). PAID hold-GL SRs are excluded — their earnings are still in SERVICE_HOLD_GL. A non-zero drift means ledger entries and business data disagree." />
+                </div>
+                <HealthDot healthy={glSummary.overallHealth.earningsInSync} />
+              </div>
+              <EarningsIntegrityPanel v={glSummary.earningsIntegrity} />
+            </div>
+
+            {/* ── GL Wallet drift table ───────────────────────────────────────── */}
             <div className="overflow-x-auto -mx-1 px-1">
               <Table className="min-w-[44rem]">
                 <TableHeader className="border-b border-gray-200 dark:border-gray-800">
@@ -281,37 +340,37 @@ export default function GlReconciliation() {
                     <TableCell isHeader className="text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400 py-3">
                       <span className="inline-flex items-center gap-1.5">
                         Wallet
-                        <InfoTooltip text="The GL (general ledger) wallet name. ONLINE_PAYMENT_GL receives online payments, COMMISSION_GL holds platform commission, VAT_GL holds tax, AIT_GL holds Advance Income Tax withheld from providers, PAYOUT_GL tracks provider withdrawals, HOPE_GL is the platform control wallet." />
+                        <InfoTooltip text="GL wallet name. ONLINE_PAYMENT_GL is a pass-through (balance always 0). SERVICE_HOLD_GL holds escrow funds until service completes. COMMISSION_GL, VAT_GL, AIT_GL hold released platform cuts. PAYOUT_GL tracks provider withdrawals. HOPE_GL is the platform control wallet. REFUND_GL stages patient refunds. CANCELLATION_FEE_GL holds cancellation fee revenue." />
                       </span>
                     </TableCell>
                     <TableCell isHeader className="text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400 py-3">
                       <span className="inline-flex items-center gap-1.5">
                         Balance
-                        <InfoTooltip text="Current balance read directly from the wallets table." />
+                        <InfoTooltip text="Current balance from the wallets table." />
                       </span>
                     </TableCell>
                     <TableCell isHeader className="text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400 py-3">
                       <span className="inline-flex items-center gap-1.5">
                         Credits
-                        <InfoTooltip text="Sum of all ledger entries that credited this wallet (money that flowed in)." />
+                        <InfoTooltip text="Sum of all ledger entries that credited this wallet (money in)." />
                       </span>
                     </TableCell>
                     <TableCell isHeader className="text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400 py-3">
                       <span className="inline-flex items-center gap-1.5">
                         Debits
-                        <InfoTooltip text="Sum of all ledger entries that debited this wallet (money that flowed out)." />
+                        <InfoTooltip text="Sum of all ledger entries that debited this wallet (money out)." />
                       </span>
                     </TableCell>
                     <TableCell isHeader className="text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400 py-3">
                       <span className="inline-flex items-center gap-1.5">
                         Net change
-                        <InfoTooltip text="Credits − Debits. Must always equal Balance." />
+                        <InfoTooltip text="Credits − Debits. Must equal Balance." />
                       </span>
                     </TableCell>
                     <TableCell isHeader className="text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400 py-3">
                       <span className="inline-flex items-center gap-1.5">
                         Drift
-                        <InfoTooltip text="Balance − Net change. Must always be 0. A non-zero drift means a wallet balance was modified without a matching ledger entry." />
+                        <InfoTooltip text="Balance − Net change. Must be 0. Non-zero = wallet balance modified without a matching ledger entry (write corruption)." />
                       </span>
                     </TableCell>
                     <TableCell isHeader className="text-center text-xs font-medium uppercase text-gray-500 dark:text-gray-400 py-3">
