@@ -328,13 +328,29 @@ export interface TestPushRequest {
 
 // ============== Financial ==============
 
-/** GET /financial/wallet/me — per api_business_flow §11. */
+/** Lifetime / monthly stats on GET /financial/wallet/me (providers only). */
+export interface WalletOverviewDto {
+  totalEarnedLifetime: string;
+  totalServiceHoursLifetime: number;
+  completedJobsCount: number;
+  avgEarningsPerCompletedJob: string | null;
+  currentMonthEarnings: string;
+  previousMonthEarnings: string;
+  monthOverMonthPercent: number | null;
+}
+
+/** GET /financial/wallet/me — per hope-backend api_business_flow §11. */
 export interface WalletResponse {
-  totalBalance: string;
+  /** USER wallet — cash earnings + withdrawn online earnings. */
+  walletBalance: string;
+  /** CLAIMABLE wallet — online earnings available to withdraw (hero amount on mobile). */
   claimableBalance: string;
-  nonClaimableBalance: string;
-  cashCommissionDue: string;
+  totalBalance: string;
   pendingWithdrawal: string;
+  /** claimableBalance − pendingWithdrawal. */
+  availableToWithdraw: string;
+  currency: string;
+  overview?: WalletOverviewDto;
 }
 
 export interface ClaimableBalanceResponse {
@@ -1722,12 +1738,16 @@ export interface ProviderFullDetailsDto {
   /** Total wallet balance (new wallet API §11). */
   totalBalance?: string | null;
   claimableBalance: string;
+  /** USER wallet (cash + withdrawn online) — maps to mobile `walletBalance`. */
+  walletBalance?: string | null;
   /** Non-claimable (cash) balance. */
   nonClaimableBalance?: string | null;
   /** Commission owed by provider for cash payments. */
   cashCommissionDue?: string | null;
   /** Pending withdrawal amount. */
   pendingWithdrawal?: string | null;
+  /** Same aggregates as GET /financial/wallet/me `overview`. */
+  walletOverview?: WalletOverviewDto | null;
   walletHistory: WalletHistoryEntryDto[];
 }
 
@@ -2245,7 +2265,10 @@ export const notificationsApi = {
 // ============== Financial API ==============
 
 export const financialApi = {
-  /** GET /financial/wallet/me */
+  /**
+   * GET /financial/wallet/me — balances + provider `overview` stats.
+   * Mobile: hero = `claimableBalance`; grid = `overview`; see `src/utils/providerWallet.ts`.
+   */
   getWallet: async () => {
     return httpService.get<WalletResponse>("/financial/wallet/me");
   },

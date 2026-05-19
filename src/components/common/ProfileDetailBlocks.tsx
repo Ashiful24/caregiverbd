@@ -1,6 +1,11 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { formatAccountActiveLabel, formatDate, formatStatusLabel } from "../../utils/format";
+import {
+  formatMonthOverMonthPercent,
+  formatProviderWalletBdt,
+  formatServiceHours,
+} from "../../utils/providerWallet";
 import { getAssetUrl } from "../../utils/assetUrl";
 import { viewDocument, downloadDocument, printDocument } from "../../utils/documentActions";
 import Badge from "../ui/badge/Badge";
@@ -670,9 +675,11 @@ export function ProviderFullDetailsView({
     wallet,
     totalBalance,
     claimableBalance,
+    walletBalance,
     nonClaimableBalance,
     cashCommissionDue,
     pendingWithdrawal,
+    walletOverview,
     walletHistory,
   } = data;
   const profileChecklistItems = useMemo<ProviderProfileChecklistItemDto[]>(() => {
@@ -2072,11 +2079,60 @@ export function ProviderFullDetailsView({
             value={totalBalance != null && totalBalance !== "" ? totalBalance : wallet ? `${wallet.balance} ${wallet.currency}` : t("common.noValue")}
           />
           <DetailBlockRow label={t("providers.claimableBalance")} value={claimableBalance ?? t("common.noValue")} />
-          <DetailBlockRow label={t("providers.nonClaimableBalance")} value={nonClaimableBalance ?? t("common.noValue")} />
+          <DetailBlockRow
+            label={t("providers.nonClaimableBalance")}
+            value={nonClaimableBalance ?? walletBalance ?? t("common.noValue")}
+          />
           <DetailBlockRow label={t("providers.cashCommissionDue")} value={cashCommissionDue ?? t("common.noValue")} />
           <DetailBlockRow label={t("providers.pendingWithdrawal")} value={pendingWithdrawal ?? t("common.noValue")} />
           {wallet && (
             <DetailBlockRow label={t("users.created")} value={formatDate(wallet.createdAt)} />
+          )}
+        </DetailBlock>
+
+        <DetailBlock title={t("providers.walletOverview")}>
+          <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
+            {t("providers.walletOverviewHelp")}
+          </p>
+          {!walletOverview ? (
+            <p className="text-gray-500 dark:text-gray-400">{t("providers.walletOverviewUnavailable")}</p>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-lg border border-gray-200 p-3 dark:border-gray-700">
+                <p className="text-xs text-gray-500 dark:text-gray-400">{t("providers.totalEarnedLifetime")}</p>
+                <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
+                  {formatProviderWalletBdt(walletOverview.totalEarnedLifetime)}
+                </p>
+              </div>
+              <div className="rounded-lg border border-gray-200 p-3 dark:border-gray-700">
+                <p className="text-xs text-gray-500 dark:text-gray-400">{t("providers.totalServiceHours")}</p>
+                <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
+                  {formatServiceHours(walletOverview.totalServiceHoursLifetime)}
+                </p>
+              </div>
+              <div className="rounded-lg border border-gray-200 p-3 dark:border-gray-700">
+                <p className="text-xs text-gray-500 dark:text-gray-400">{t("providers.currentMonthEarnings")}</p>
+                <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
+                  {formatProviderWalletBdt(walletOverview.currentMonthEarnings)}
+                </p>
+                {formatMonthOverMonthPercent(walletOverview.monthOverMonthPercent) && (
+                  <p className="mt-0.5 text-xs text-emerald-600 dark:text-emerald-400">
+                    {t("providers.monthOverMonth", {
+                      percent: formatMonthOverMonthPercent(walletOverview.monthOverMonthPercent),
+                    })}
+                  </p>
+                )}
+              </div>
+              <div className="rounded-lg border border-gray-200 p-3 dark:border-gray-700">
+                <p className="text-xs text-gray-500 dark:text-gray-400">{t("providers.avgPerCompletedJob")}</p>
+                <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
+                  {walletOverview.completedJobsCount === 0 ||
+                  walletOverview.avgEarningsPerCompletedJob == null
+                    ? "—"
+                    : formatProviderWalletBdt(walletOverview.avgEarningsPerCompletedJob)}
+                </p>
+              </div>
+            </div>
           )}
         </DetailBlock>
 
