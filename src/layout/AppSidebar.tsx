@@ -139,6 +139,11 @@ const navSections: NavSection[] = [
             path: "/gl-reconciliation",
             allowedRoles: ["ADMIN"],
           },
+          {
+            nameKey: "navigation.adminSupervisorReporting",
+            path: "/admin-supervisor-reporting",
+            allowedRoles: ["ADMIN", "SUPERVISOR"],
+          },
         ],
       },
     ],
@@ -289,7 +294,14 @@ const AppSidebar: React.FC = () => {
               }}
             >
               <ul className="mt-2 space-y-1 ml-9">
-                {nav.subItems.map((subItem) => (
+                {nav.subItems
+                  .filter((subItem) => {
+                    if (!subItem.allowedRoles?.length) return true;
+                    return subItem.allowedRoles
+                      .map((r) => r.toUpperCase())
+                      .includes(currentRole);
+                  })
+                  .map((subItem) => (
                   <li key={subItem.nameKey}>
                     <Link
                       to={subItem.path}

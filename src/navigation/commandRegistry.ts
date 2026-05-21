@@ -165,6 +165,14 @@ export const NAV_COMMANDS: NavCommand[] = [
     keywords: ["gl", "ledger", "reconcile"],
   },
   {
+    id: "admin-supervisor-reporting",
+    path: "/admin-supervisor-reporting",
+    titleKey: "navigation.adminSupervisorReporting",
+    group: "reports",
+    allowedRoles: ["ADMIN", "SUPERVISOR"],
+    keywords: ["admin", "supervisor", "reporting", "kpi", "dashboard"],
+  },
+  {
     id: "notifications",
     path: "/notifications",
     titleKey: "navigation.notifications",
