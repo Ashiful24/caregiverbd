@@ -1632,6 +1632,8 @@ export interface AdminServiceRequestListDto {
   amount: string;
   scheduledAt?: string | null;
   createdAt: string;
+  /** Present when this SR belongs to a long-term opportunity (used by GET /service-event-logs/timeline). */
+  longTermOpportunityId?: number | null;
 }
 
 /** Response for GET /v1/admin/service-requests. */
@@ -1642,9 +1644,18 @@ export interface AdminServiceRequestListResponse {
   limit: number;
 }
 
-/** GET /v1/service-requests/:id/event-logs — audit / lifecycle entries (shape may vary by backend). */
+/**
+ * GET /v1/service-event-logs/timeline — single lifecycle entry.
+ * Fields with `?:` are tolerated for backwards compatibility with the
+ * old `/service-requests/:id/event-logs` payload shape.
+ */
 export interface ServiceRequestEventLogDto {
   id?: number;
+  /** Canonical step code from the new timeline endpoint (e.g. REQUEST_CREATED). */
+  step?: string | null;
+  /** True when this lifecycle step has already happened. New endpoint only. */
+  isDone?: boolean | null;
+  /** Legacy fields kept for fallback rendering. */
   eventType?: string | null;
   title?: string | null;
   message?: string | null;
@@ -1658,12 +1669,50 @@ export interface ServiceRequestEventLogDto {
   occurredAt?: string | null;
   timestamp?: string | null;
   actorName?: string | null;
+  actorRole?: string | null;
+  actorUserId?: number | null;
   performedBy?: string | null;
   [key: string]: unknown;
 }
 
-/** Normalize GET event-logs body whether the API returns an array or a wrapped object. */
+/** Full response of GET /v1/service-event-logs/timeline. */
+export interface ServiceRequestTimelineResponseDto {
+  serviceType: string;
+  isTerminal: boolean;
+  timeline: ServiceRequestEventLogDto[];
+}
+
+/** Normalize the new timeline response, tolerating common wrapper shapes. */
+export function normalizeServiceRequestTimeline(
+  raw: unknown
+): ServiceRequestTimelineResponseDto {
+  const empty: ServiceRequestTimelineResponseDto = {
+    serviceType: "",
+    isTerminal: false,
+    timeline: [],
+  };
+  if (!raw || typeof raw !== "object") return empty;
+  const root = raw as Record<string, unknown>;
+  const body =
+    root.timeline !== undefined
+      ? root
+      : root.data && typeof root.data === "object"
+      ? (root.data as Record<string, unknown>)
+      : root;
+  const timelineRaw = Array.isArray(body.timeline) ? body.timeline : [];
+  return {
+    serviceType: typeof body.serviceType === "string" ? body.serviceType : "",
+    isTerminal: Boolean(body.isTerminal),
+    timeline: timelineRaw.filter(
+      (x): x is ServiceRequestEventLogDto => !!x && typeof x === "object"
+    ),
+  };
+}
+
+/** Legacy: extract just the array (still used by old callers). */
 export function normalizeServiceRequestEventLogs(raw: unknown): ServiceRequestEventLogDto[] {
+  const parsed = normalizeServiceRequestTimeline(raw);
+  if (parsed.timeline.length > 0) return parsed.timeline;
   if (Array.isArray(raw)) {
     return raw.filter((x) => x && typeof x === "object") as ServiceRequestEventLogDto[];
   }
@@ -1685,7 +1734,7 @@ export function normalizeServiceRequestEventLogs(raw: unknown): ServiceRequestEv
 }
 
 function eventLogSortTime(log: ServiceRequestEventLogDto): number {
-  const s = log.createdAt ?? log.occurredAt ?? log.timestamp ?? "";
+  const s = log.occurredAt ?? log.createdAt ?? log.timestamp ?? "";
   const t = Date.parse(String(s));
   return Number.isFinite(t) ? t : 0;
 }
@@ -2525,13 +2574,22 @@ export const adminServiceRequestsApi = {
   },
 
   /**
-   * GET /v1/service-requests/:requestId/event-logs — timeline / lifecycle events for a service request.
+   * GET /v1/service-event-logs/timeline — timeline / lifecycle events for a service request
+   * and/or its parent long-term opportunity. At least one id should be supplied; both
+   * are passed when available so the backend can merge both timelines.
    */
-  getEventLogs: async (requestId: number, config?: { signal?: AbortSignal }) => {
-    return httpService.get<unknown>(
-      `/service-requests/${encodeURIComponent(String(requestId))}/event-logs`,
-      { signal: config?.signal }
-    );
+  getEventLogs: async (
+    params: { serviceRequestId?: number | null; longTermOpportunityId?: number | null },
+    config?: { signal?: AbortSignal }
+  ) => {
+    const query: Record<string, number> = {};
+    if (params.serviceRequestId != null) query.serviceRequestId = Number(params.serviceRequestId);
+    if (params.longTermOpportunityId != null)
+      query.longTermOpportunityId = Number(params.longTermOpportunityId);
+    return httpService.get<unknown>("/service-event-logs/timeline", {
+      params: query,
+      signal: config?.signal,
+    });
   },
 };
 

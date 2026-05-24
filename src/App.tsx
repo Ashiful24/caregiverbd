@@ -25,6 +25,7 @@ import ProviderCancelRequests from "./pages/ProviderCancelRequests";
 import ProviderCancelRequestDetail from "./pages/ProviderCancelRequestDetail";
 import MasterFinancialReport from "./pages/MasterFinancialReport";
 import GlReconciliation from "./pages/GlReconciliation";
+import AdminSupervisorReporting from "./pages/AdminSupervisorReporting";
 import NurseScheduleList from "./pages/NurseScheduleList";
 import NurseScheduleCalendarPage from "./pages/NurseScheduleCalendarPage";
 import SupervisorList from "./pages/SupervisorList";
@@ -154,6 +155,14 @@ export default function App() {
             element={
               <ProtectedRoute allowedRoles={["ADMIN"]}>
                 <GlReconciliation />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin-supervisor-reporting"
+            element={
+              <ProtectedRoute allowedRoles={["ADMIN", "SUPERVISOR"]}>
+                <AdminSupervisorReporting />
               </ProtectedRoute>
             }
           />
