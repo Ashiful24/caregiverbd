@@ -22,7 +22,12 @@ export const Dropdown: React.FC<DropdownProps> = ({
   anchorRef,
 }) => {
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const [portalPosition, setPortalPosition] = useState<{ top: number; right: number } | null>(null);
+  const [portalPosition, setPortalPosition] = useState<{
+    top: number;
+    right: number;
+    placement: "top" | "bottom";
+    maxHeight: number;
+  } | null>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -50,9 +55,19 @@ export const Dropdown: React.FC<DropdownProps> = ({
     const el = anchorRef.current;
     const update = () => {
       const r = el.getBoundingClientRect();
+      const gap = 8;
+      const dropdownHeight = dropdownRef.current?.offsetHeight ?? 220;
+      const spaceBelow = window.innerHeight - r.bottom;
+      const spaceAbove = r.top;
+      const placement =
+        spaceBelow < dropdownHeight + gap && spaceAbove > spaceBelow ? "top" : "bottom";
+      const availableSpace = placement === "top" ? spaceAbove : spaceBelow;
+
       setPortalPosition({
-        top: r.bottom + 8,
+        top: placement === "top" ? r.top - gap : r.bottom + gap,
         right: window.innerWidth - r.right,
+        placement,
+        maxHeight: Math.max(120, availableSpace - gap * 2),
       });
     };
     const id = window.setTimeout(update, 0);
@@ -78,8 +93,12 @@ export const Dropdown: React.FC<DropdownProps> = ({
               top: portalPosition.top,
               right: portalPosition.right,
               left: "auto",
+              transform:
+                portalPosition.placement === "top" ? "translateY(-100%)" : undefined,
               zIndex: DROPDOWN_PORTAL_Z_INDEX,
               minWidth: "160px",
+              maxHeight: portalPosition.maxHeight,
+              overflowY: "auto",
             }
           : { zIndex: 9999 }
       }

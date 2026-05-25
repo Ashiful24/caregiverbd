@@ -1,22 +1,23 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { format } from "date-fns";
 import {
-  ArrowDown,
-  ArrowUp,
   BarChart3,
   Calendar,
+  CheckCircle2,
   ClipboardList,
-  Clock,
+  Coins,
   Download,
   FileSpreadsheet,
+  HandCoins,
+  Hourglass,
+  Percent,
+  PiggyBank,
   RefreshCw,
-  Star,
-  Stethoscope,
+  Repeat,
   Timer,
   TrendingUp,
-  UserCheck,
-  Users,
+  Undo2,
   Wallet,
 } from "lucide-react";
 import PageBreadcrumb from "../components/common/PageBreadCrumb";
@@ -34,287 +35,262 @@ import {
   TableRow,
 } from "../components/ui/table";
 import { cn } from "../lib/utils";
+import { useAuth } from "../context/AuthContext";
+import { toBangladeshISODate } from "../utils/format";
+import {
+  reportingApi,
+  type ReportingDailyBreakdownResponse,
+  type ReportingDailyBreakdownRow,
+  type ReportingSummaryDto,
+} from "../services/api";
 
-// ── Hardcoded mock data (API integration later) ───────────────────────────────
-
-type TrendDirection = "up" | "down";
+// ── KPI cards driven by GET /v1/reporting/summary ─────────────────────────────
 
 type MetricCardConfig = {
   labelKey: string;
   descKey?: string;
   value: string;
-  trend: string;
-  trendDirection: TrendDirection;
-  /** Green trend = good for this metric; red = bad */
-  trendPositive: boolean;
   icon: React.ReactNode;
   bgClass: string;
   iconBgClass: string;
 };
 
-const ROW1_METRICS: MetricCardConfig[] = [
-  {
-    labelKey: "adminSupervisorReporting.kpi.totalBookings",
-    value: "1,254",
-    trend: "7.1%",
-    trendDirection: "up",
-    trendPositive: true,
-    icon: <ClipboardList className="size-5" />,
-    bgClass: "bg-emerald-50/80 dark:bg-emerald-500/10",
-    iconBgClass: "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400",
-  },
-  {
-    labelKey: "adminSupervisorReporting.kpi.fulfillmentRate",
-    descKey: "adminSupervisorReporting.kpi.fulfillmentRateDesc",
-    value: "86.7%",
-    trend: "4.3%",
-    trendDirection: "up",
-    trendPositive: true,
-    icon: <TrendingUp className="size-5" />,
-    bgClass: "bg-amber-50/80 dark:bg-amber-500/10",
-    iconBgClass: "bg-amber-100 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400",
-  },
-  {
-    labelKey: "adminSupervisorReporting.kpi.activeCaregivers",
-    value: "782",
-    trend: "8.7%",
-    trendDirection: "up",
-    trendPositive: true,
-    icon: <Users className="size-5" />,
-    bgClass: "bg-sky-50/80 dark:bg-sky-500/10",
-    iconBgClass: "bg-sky-100 text-sky-600 dark:bg-sky-500/20 dark:text-sky-400",
-  },
-  {
-    labelKey: "adminSupervisorReporting.kpi.activeDoctors",
-    value: "146",
-    trend: "6.2%",
-    trendDirection: "up",
-    trendPositive: true,
-    icon: <Stethoscope className="size-5" />,
-    bgClass: "bg-violet-50/80 dark:bg-violet-500/10",
-    iconBgClass: "bg-violet-100 text-violet-600 dark:bg-violet-500/20 dark:text-violet-400",
-  },
-];
+function formatCount(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(Number(value))) return "—";
+  return Number(value).toLocaleString("en-US");
+}
 
-const ROW2_METRICS: MetricCardConfig[] = [
-  {
-    labelKey: "adminSupervisorReporting.kpi.assignToConfirmRate",
-    descKey: "adminSupervisorReporting.kpi.assignToConfirmRateDesc",
-    value: "71.2%",
-    trend: "5.1%",
-    trendDirection: "up",
-    trendPositive: true,
-    icon: <UserCheck className="size-5" />,
-    bgClass: "bg-indigo-50/80 dark:bg-indigo-500/10",
-    iconBgClass: "bg-indigo-100 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400",
-  },
-  {
-    labelKey: "adminSupervisorReporting.kpi.confirmationExpiryRate",
-    descKey: "adminSupervisorReporting.kpi.confirmationExpiryRateDesc",
-    value: "8.4%",
-    trend: "2.3%",
-    trendDirection: "down",
-    trendPositive: true,
-    icon: <Timer className="size-5" />,
-    bgClass: "bg-rose-50/80 dark:bg-rose-500/10",
-    iconBgClass: "bg-rose-100 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400",
-  },
-  {
-    labelKey: "adminSupervisorReporting.kpi.reassignmentRate",
-    descKey: "adminSupervisorReporting.kpi.reassignmentRateDesc",
-    value: "12.6%",
-    trend: "1.7%",
-    trendDirection: "up",
-    trendPositive: false,
-    icon: <RefreshCw className="size-5" />,
-    bgClass: "bg-orange-50/80 dark:bg-orange-500/10",
-    iconBgClass: "bg-orange-100 text-orange-600 dark:bg-orange-500/20 dark:text-orange-400",
-  },
-  {
-    labelKey: "adminSupervisorReporting.kpi.avgTimeToAssignment",
-    descKey: "adminSupervisorReporting.kpi.avgTimeToAssignmentDesc",
-    value: "28m",
-    trend: "8m",
-    trendDirection: "down",
-    trendPositive: true,
-    icon: <Clock className="size-5" />,
-    bgClass: "bg-teal-50/80 dark:bg-teal-500/10",
-    iconBgClass: "bg-teal-100 text-teal-600 dark:bg-teal-500/20 dark:text-teal-400",
-  },
-];
+function formatPercent(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(Number(value))) return "—";
+  const n = Number(value);
+  return `${n.toLocaleString("en-US", {
+    minimumFractionDigits: n % 1 === 0 ? 0 : 1,
+    maximumFractionDigits: 2,
+  })}%`;
+}
 
-const ROW3_METRICS: MetricCardConfig[] = [
-  {
-    labelKey: "adminSupervisorReporting.kpi.totalRevenue",
-    value: "BDT 1,245,800",
-    trend: "15.6%",
-    trendDirection: "up",
-    trendPositive: true,
-    icon: <Wallet className="size-5" />,
-    bgClass: "bg-emerald-50/80 dark:bg-emerald-500/10",
-    iconBgClass: "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400",
-  },
-  {
-    labelKey: "adminSupervisorReporting.kpi.averageFulfillmentTime",
-    value: "3.2 Hrs",
-    trend: "15%",
-    trendDirection: "down",
-    trendPositive: true,
-    icon: <Clock className="size-5" />,
-    bgClass: "bg-blue-50/80 dark:bg-blue-500/10",
-    iconBgClass: "bg-blue-100 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400",
-  },
-  {
-    labelKey: "adminSupervisorReporting.kpi.caregiverEngagementScore",
-    value: "82%",
-    trend: "2.1%",
-    trendDirection: "up",
-    trendPositive: true,
-    icon: <BarChart3 className="size-5" />,
-    bgClass: "bg-cyan-50/80 dark:bg-cyan-500/10",
-    iconBgClass: "bg-cyan-100 text-cyan-600 dark:bg-cyan-500/20 dark:text-cyan-400",
-  },
-  {
-    labelKey: "adminSupervisorReporting.kpi.serviceRating",
-    value: "4.5 Stars",
-    trend: "0.2",
-    trendDirection: "up",
-    trendPositive: true,
-    icon: <Star className="size-5" />,
-    bgClass: "bg-yellow-50/80 dark:bg-yellow-500/10",
-    iconBgClass: "bg-yellow-100 text-yellow-600 dark:bg-yellow-500/20 dark:text-yellow-400",
-  },
-];
+function formatBdtCompact(value: string | number | null | undefined): string {
+  if (value == null || value === "") return "—";
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n)) return String(value);
+  return `BDT ${n.toLocaleString("en-US", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  })}`;
+}
 
-type TableRowData = {
+function buildMetrics(
+  summary: ReportingSummaryDto | null,
+): { row1: MetricCardConfig[]; row2: MetricCardConfig[]; row3: MetricCardConfig[] } {
+  const s = summary;
+
+  const row1: MetricCardConfig[] = [
+    {
+      labelKey: "adminSupervisorReporting.kpi.totalRequests",
+      descKey: "adminSupervisorReporting.kpi.totalRequestsDesc",
+      value: formatCount(s?.totalRequests),
+      icon: <ClipboardList className="size-5" />,
+      bgClass: "bg-emerald-50/80 dark:bg-emerald-500/10",
+      iconBgClass:
+        "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400",
+    },
+    {
+      labelKey: "adminSupervisorReporting.kpi.confirmedBookings",
+      descKey: "adminSupervisorReporting.kpi.confirmedBookingsDesc",
+      value: formatCount(s?.confirmedBookings),
+      icon: <CheckCircle2 className="size-5" />,
+      bgClass: "bg-sky-50/80 dark:bg-sky-500/10",
+      iconBgClass: "bg-sky-100 text-sky-600 dark:bg-sky-500/20 dark:text-sky-400",
+    },
+    {
+      labelKey: "adminSupervisorReporting.kpi.completedServices",
+      descKey: "adminSupervisorReporting.kpi.completedServicesDesc",
+      value: formatCount(s?.completedServices),
+      icon: <TrendingUp className="size-5" />,
+      bgClass: "bg-violet-50/80 dark:bg-violet-500/10",
+      iconBgClass:
+        "bg-violet-100 text-violet-600 dark:bg-violet-500/20 dark:text-violet-400",
+    },
+    {
+      labelKey: "adminSupervisorReporting.kpi.fulfillmentRate",
+      descKey: "adminSupervisorReporting.kpi.fulfillmentRateDesc",
+      value: formatPercent(s?.fulfillmentRate),
+      icon: <Percent className="size-5" />,
+      bgClass: "bg-amber-50/80 dark:bg-amber-500/10",
+      iconBgClass:
+        "bg-amber-100 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400",
+    },
+  ];
+
+  const row2: MetricCardConfig[] = [
+    {
+      labelKey: "adminSupervisorReporting.kpi.acceptanceRate",
+      descKey: "adminSupervisorReporting.kpi.acceptanceRateDesc",
+      value: formatPercent(s?.acceptanceRate),
+      icon: <Hourglass className="size-5" />,
+      bgClass: "bg-indigo-50/80 dark:bg-indigo-500/10",
+      iconBgClass:
+        "bg-indigo-100 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400",
+    },
+    {
+      labelKey: "adminSupervisorReporting.kpi.paymentExpiryRate",
+      descKey: "adminSupervisorReporting.kpi.paymentExpiryRateDesc",
+      value: formatPercent(s?.paymentExpiryRate),
+      icon: <Timer className="size-5" />,
+      bgClass: "bg-rose-50/80 dark:bg-rose-500/10",
+      iconBgClass: "bg-rose-100 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400",
+    },
+    {
+      labelKey: "adminSupervisorReporting.kpi.cancellationRate",
+      descKey: "adminSupervisorReporting.kpi.cancellationRateDesc",
+      value: formatPercent(s?.cancellationRate),
+      icon: <Repeat className="size-5" />,
+      bgClass: "bg-orange-50/80 dark:bg-orange-500/10",
+      iconBgClass:
+        "bg-orange-100 text-orange-600 dark:bg-orange-500/20 dark:text-orange-400",
+    },
+    {
+      labelKey: "adminSupervisorReporting.kpi.refundAmount",
+      descKey: "adminSupervisorReporting.kpi.refundAmountDesc",
+      value: formatBdtCompact(s?.refundAmount),
+      icon: <Undo2 className="size-5" />,
+      bgClass: "bg-pink-50/80 dark:bg-pink-500/10",
+      iconBgClass: "bg-pink-100 text-pink-600 dark:bg-pink-500/20 dark:text-pink-400",
+    },
+  ];
+
+  const row3: MetricCardConfig[] = [
+    {
+      labelKey: "adminSupervisorReporting.kpi.grossRevenue",
+      descKey: "adminSupervisorReporting.kpi.grossRevenueDesc",
+      value: formatBdtCompact(s?.grossRevenue),
+      icon: <Wallet className="size-5" />,
+      bgClass: "bg-emerald-50/80 dark:bg-emerald-500/10",
+      iconBgClass:
+        "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400",
+    },
+    {
+      labelKey: "adminSupervisorReporting.kpi.ontorCommission",
+      descKey: "adminSupervisorReporting.kpi.ontorCommissionDesc",
+      value: formatBdtCompact(s?.ontorCommission),
+      icon: <Coins className="size-5" />,
+      bgClass: "bg-yellow-50/80 dark:bg-yellow-500/10",
+      iconBgClass:
+        "bg-yellow-100 text-yellow-600 dark:bg-yellow-500/20 dark:text-yellow-400",
+    },
+    {
+      labelKey: "adminSupervisorReporting.kpi.providerPayout",
+      descKey: "adminSupervisorReporting.kpi.providerPayoutDesc",
+      value: formatBdtCompact(s?.providerPayout),
+      icon: <HandCoins className="size-5" />,
+      bgClass: "bg-cyan-50/80 dark:bg-cyan-500/10",
+      iconBgClass: "bg-cyan-100 text-cyan-600 dark:bg-cyan-500/20 dark:text-cyan-400",
+    },
+    {
+      labelKey: "adminSupervisorReporting.kpi.pendingPayout",
+      descKey: "adminSupervisorReporting.kpi.pendingPayoutDesc",
+      value: formatBdtCompact(s?.pendingPayout),
+      icon: <PiggyBank className="size-5" />,
+      bgClass: "bg-blue-50/80 dark:bg-blue-500/10",
+      iconBgClass: "bg-blue-100 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400",
+    },
+  ];
+
+  return { row1, row2, row3 };
+}
+
+// ── Data table — driven by GET /v1/reporting/daily-breakdown ──────────────────
+
+/** Normalized row shape consumed by the table UI. */
+type BreakdownTableRow = {
   date: string;
-  serviceType: string;
-  providerType: string;
-  area: string;
-  totalBookings: number;
-  fulfilledBookings: number;
-  fulfillmentRate: string;
-  activeCaregivers: number;
-  revenue: string;
-  assignToConfirmRate: string;
-  expiryRate: string;
-  reassignmentRate: string;
-  avgTimeToAssignment: string;
+  rawDate: string;
+  totalRequests: number | null;
+  confirmedBookings: number | null;
+  completedServices: number | null;
+  fulfillmentRate: number | null;
+  acceptanceRate: number | null;
+  grossRevenue: number | null;
 };
 
-const TABLE_DATA: TableRowData[] = [
-  {
-    date: "06 May 2025",
-    serviceType: "Lab Test",
-    providerType: "Doctor",
-    area: "Mirpur",
-    totalBookings: 45,
-    fulfilledBookings: 40,
-    fulfillmentRate: "88.9%",
-    activeCaregivers: 12,
-    revenue: "BDT 45,000",
-    assignToConfirmRate: "82%",
-    expiryRate: "5.6%",
-    reassignmentRate: "8.1%",
-    avgTimeToAssignment: "15m",
-  },
-  {
-    date: "07 May 2025",
-    serviceType: "Physiotherapy",
-    providerType: "Caregiver",
-    area: "Uttara",
-    totalBookings: 82,
-    fulfilledBookings: 75,
-    fulfillmentRate: "91.5%",
-    activeCaregivers: 28,
-    revenue: "BDT 120,000",
-    assignToConfirmRate: "88%",
-    expiryRate: "3.4%",
-    reassignmentRate: "6.2%",
-    avgTimeToAssignment: "18m",
-  },
-  {
-    date: "08 May 2025",
-    serviceType: "Physiotherapy",
-    providerType: "Caregiver",
-    area: "Mirpur",
-    totalBookings: 62,
-    fulfilledBookings: 55,
-    fulfillmentRate: "88.7%",
-    activeCaregivers: 22,
-    revenue: "BDT 95,000",
-    assignToConfirmRate: "85%",
-    expiryRate: "4.2%",
-    reassignmentRate: "7.5%",
-    avgTimeToAssignment: "22m",
-  },
-  {
-    date: "09 May 2025",
-    serviceType: "Physiotherapy",
-    providerType: "Caregiver",
-    area: "Uttara",
-    totalBookings: 92,
-    fulfilledBookings: 82,
-    fulfillmentRate: "89.1%",
-    activeCaregivers: 31,
-    revenue: "BDT 150,000",
-    assignToConfirmRate: "86%",
-    expiryRate: "3.8%",
-    reassignmentRate: "5.9%",
-    avgTimeToAssignment: "20m",
-  },
-  {
-    date: "10 May 2025",
-    serviceType: "Lab Test",
-    providerType: "Doctor",
-    area: "Gulshan",
-    totalBookings: 38,
-    fulfilledBookings: 35,
-    fulfillmentRate: "92.1%",
-    activeCaregivers: 15,
-    revenue: "BDT 38,000",
-    assignToConfirmRate: "90%",
-    expiryRate: "2.5%",
-    reassignmentRate: "4.3%",
-    avgTimeToAssignment: "12m",
-  },
-];
-
-const TABLE_TOTALS = {
-  totalBookings: 319,
-  fulfilledBookings: 287,
-  fulfillmentRate: "90.0%",
-  revenue: "BDT 448,000",
-  assignToConfirmRate: "86.2%",
-  expiryRate: "3.9%",
-  reassignmentRate: "6.4%",
-  avgTimeToAssignment: "17.4m",
-};
-
-const TOTAL_ENTRIES = 25;
 const LIMIT_OPTIONS = [5, 10, 20];
+/**
+ * Rows requested per server page. Server pagination is cursor-based; we follow
+ * `nextCursor` until exhausted (or the safety cap below) and then paginate on
+ * the client over the merged set.
+ */
+const API_PAGE_SIZE = 100;
+/** Max cursor follow-ups to prevent infinite loops on misbehaving cursors. */
+const MAX_CURSOR_PAGES = 20;
 
-const DEFAULT_RANGE: DateRangePickerValue = {
-  startDate: new Date(2025, 4, 6),
-  endDate: new Date(2025, 4, 12),
-};
+function toNumberOrNull(v: number | string | null | undefined): number | null {
+  if (v == null || v === "") return null;
+  const n = typeof v === "number" ? v : Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** Format an ISO date (or YYYY-MM-DD) as e.g. "06 May 2025". Returns input on parse failure. */
+function formatRowDate(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return String(iso);
+  return format(d, "dd MMM yyyy");
+}
+
+function normalizeBreakdownRow(r: ReportingDailyBreakdownRow): BreakdownTableRow {
+  return {
+    date: formatRowDate(r.date),
+    rawDate: r.date,
+    totalRequests: toNumberOrNull(r.totalRequests),
+    confirmedBookings: toNumberOrNull(r.confirmedBookings),
+    completedServices: toNumberOrNull(r.completedServices),
+    fulfillmentRate: toNumberOrNull(r.fulfillmentRate),
+    acceptanceRate: toNumberOrNull(r.acceptanceRate),
+    grossRevenue: toNumberOrNull(r.grossRevenue),
+  };
+}
+
+function sumOrNull(values: Array<number | null>): number | null {
+  const nums = values.filter((v): v is number => v != null);
+  if (nums.length === 0) return null;
+  return nums.reduce((acc, v) => acc + v, 0);
+}
+
+function avgOrNull(values: Array<number | null>): number | null {
+  const nums = values.filter((v): v is number => v != null);
+  if (nums.length === 0) return null;
+  return nums.reduce((acc, v) => acc + v, 0) / nums.length;
+}
+
+function computeTableTotals(rows: BreakdownTableRow[]) {
+  return {
+    totalRequests: sumOrNull(rows.map((r) => r.totalRequests)),
+    confirmedBookings: sumOrNull(rows.map((r) => r.confirmedBookings)),
+    completedServices: sumOrNull(rows.map((r) => r.completedServices)),
+    fulfillmentRate: avgOrNull(rows.map((r) => r.fulfillmentRate)),
+    acceptanceRate: avgOrNull(rows.map((r) => r.acceptanceRate)),
+    grossRevenue: sumOrNull(rows.map((r) => r.grossRevenue)),
+  };
+}
+
+/** Default range: last 30 days (Bangladesh calendar). */
+function getDefaultRange(): DateRangePickerValue {
+  const today = new Date();
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(today.getDate() - 29);
+  return { startDate: thirtyDaysAgo, endDate: today };
+}
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function MetricCard({
   config,
-  vsLastWeekLabel,
+  loading,
 }: {
   config: MetricCardConfig;
-  vsLastWeekLabel: string;
+  loading: boolean;
 }) {
   const { t } = useTranslation();
-  const isGood =
-    (config.trendDirection === "up" && config.trendPositive) ||
-    (config.trendDirection === "down" && config.trendPositive);
-
-  const TrendIcon = config.trendDirection === "up" ? ArrowUp : ArrowDown;
-
   return (
     <div
       className={cn(
@@ -340,38 +316,31 @@ function MetricCard({
           {t(config.descKey)}
         </p>
       ) : null}
-      <p className="mt-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white/95 sm:text-[1.65rem]">
-        {config.value}
-      </p>
-      <div className="mt-2 flex flex-wrap items-center gap-1 text-xs">
-        <span
-          className={cn(
-            "inline-flex items-center gap-0.5 font-semibold",
-            isGood
-              ? "text-emerald-600 dark:text-emerald-400"
-              : "text-rose-600 dark:text-rose-400",
-          )}
-        >
-          <TrendIcon className="size-3.5 shrink-0" aria-hidden />
-          {config.trend}
-        </span>
-        <span className="text-gray-500 dark:text-gray-400">{vsLastWeekLabel}</span>
-      </div>
+      {loading ? (
+        <div
+          className="mt-3 h-7 w-20 animate-pulse rounded-md bg-gray-200/80 dark:bg-gray-700/60"
+          aria-label="Loading"
+        />
+      ) : (
+        <p className="mt-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white/95 sm:text-[1.65rem]">
+          {config.value}
+        </p>
+      )}
     </div>
   );
 }
 
 function MetricsGrid({
   metrics,
-  vsLastWeekLabel,
+  loading,
 }: {
   metrics: MetricCardConfig[];
-  vsLastWeekLabel: string;
+  loading: boolean;
 }) {
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
       {metrics.map((m) => (
-        <MetricCard key={m.labelKey} config={m} vsLastWeekLabel={vsLastWeekLabel} />
+        <MetricCard key={m.labelKey} config={m} loading={loading} />
       ))}
     </div>
   );
@@ -381,31 +350,161 @@ function MetricsGrid({
 
 export default function AdminSupervisorReporting() {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const R = "adminSupervisorReporting";
 
-  const [dateRange, setDateRange] = useState<DateRangePickerValue>(DEFAULT_RANGE);
-  const [appliedRange, setAppliedRange] = useState<DateRangePickerValue>(DEFAULT_RANGE);
+  const currentRole = String(user?.role ?? "").toUpperCase();
+  const supervisorId =
+    currentRole === "SUPERVISOR" &&
+    Number.isFinite(Number(user?.id)) &&
+    Number(user?.id) > 0
+      ? Number(user?.id)
+      : undefined;
+
+  const defaultRange = useMemo(getDefaultRange, []);
+  const [dateRange, setDateRange] = useState<DateRangePickerValue>(defaultRange);
+  const [appliedRange, setAppliedRange] = useState<DateRangePickerValue>(defaultRange);
   const [lastUpdated, setLastUpdated] = useState(() => format(new Date(), "h:mm a"));
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(5);
 
-  const totalPages = Math.ceil(TOTAL_ENTRIES / limit) || 1;
-  const from = (page - 1) * limit + 1;
-  const to = Math.min(page * limit, TOTAL_ENTRIES);
+  const [summary, setSummary] = useState<ReportingSummaryDto | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState("");
+  const fetchSeq = useRef(0);
+
+  const [breakdownRows, setBreakdownRows] = useState<BreakdownTableRow[]>([]);
+  const [breakdownLoading, setBreakdownLoading] = useState(false);
+  const [breakdownError, setBreakdownError] = useState("");
+  const breakdownFetchSeq = useRef(0);
+
+  const totalEntries = breakdownRows.length;
+  const totalPages = Math.max(1, Math.ceil(totalEntries / limit));
+  const from = totalEntries === 0 ? 0 : (page - 1) * limit + 1;
+  const to = Math.min(page * limit, totalEntries);
 
   const paginatedRows = useMemo(() => {
     const start = (page - 1) * limit;
-    return TABLE_DATA.slice(start, start + limit);
-  }, [page, limit]);
+    return breakdownRows.slice(start, start + limit);
+  }, [page, limit, breakdownRows]);
+
+  const totals = useMemo(() => computeTableTotals(breakdownRows), [breakdownRows]);
+
+  const { row1, row2, row3 } = useMemo(() => buildMetrics(summary), [summary]);
+
+  const fetchSummary = useCallback(
+    async (range: DateRangePickerValue, signal?: AbortSignal) => {
+      const seq = ++fetchSeq.current;
+      setSummaryLoading(true);
+      setSummaryError("");
+      try {
+        const params: Parameters<typeof reportingApi.getSummary>[0] = {};
+        if (range.startDate) params.startDate = toBangladeshISODate(range.startDate);
+        if (range.endDate) params.endDate = toBangladeshISODate(range.endDate);
+        if (supervisorId != null) params.supervisorId = supervisorId;
+
+        const res = await reportingApi.getSummary(params, { signal });
+        if (seq !== fetchSeq.current) return;
+        const data = (res?.data ?? res) as ReportingSummaryDto;
+        setSummary(data ?? null);
+        setLastUpdated(format(new Date(), "h:mm a"));
+      } catch (err: unknown) {
+        if (err instanceof Error && err.name === "AbortError") return;
+        if (seq !== fetchSeq.current) return;
+        const message =
+          err && typeof err === "object" && "message" in err
+            ? String((err as { message: string }).message)
+            : t(`${R}.loadError`);
+        setSummaryError(message);
+        setSummary(null);
+      } finally {
+        if (seq === fetchSeq.current) setSummaryLoading(false);
+      }
+    },
+    [supervisorId, t],
+  );
+
+  const fetchBreakdown = useCallback(
+    async (range: DateRangePickerValue, signal?: AbortSignal) => {
+      const seq = ++breakdownFetchSeq.current;
+      setBreakdownLoading(true);
+      setBreakdownError("");
+      try {
+        const baseParams: Parameters<typeof reportingApi.getDailyBreakdown>[0] = {
+          limit: API_PAGE_SIZE,
+        };
+        if (range.startDate) baseParams.startDate = toBangladeshISODate(range.startDate);
+        if (range.endDate) baseParams.endDate = toBangladeshISODate(range.endDate);
+        if (supervisorId != null) baseParams.supervisorId = supervisorId;
+
+        const collected: BreakdownTableRow[] = [];
+        let cursor: string | undefined;
+        let pagesFetched = 0;
+        while (pagesFetched < MAX_CURSOR_PAGES) {
+          const params = cursor ? { ...baseParams, cursor } : baseParams;
+          const res = await reportingApi.getDailyBreakdown(params, { signal });
+          if (seq !== breakdownFetchSeq.current) return;
+          const payload = (res?.data ?? res) as
+            | ReportingDailyBreakdownResponse
+            | { data?: ReportingDailyBreakdownResponse };
+
+          const envelope = (
+            payload && typeof payload === "object" && "data" in payload && Array.isArray(
+              (payload as ReportingDailyBreakdownResponse).data,
+            )
+              ? (payload as ReportingDailyBreakdownResponse)
+              : (payload as { data?: ReportingDailyBreakdownResponse })?.data
+          ) as ReportingDailyBreakdownResponse | undefined;
+
+          const rows: ReportingDailyBreakdownRow[] = Array.isArray(envelope?.data)
+            ? envelope!.data
+            : [];
+          for (const r of rows) collected.push(normalizeBreakdownRow(r));
+
+          pagesFetched += 1;
+          const next = envelope?.nextCursor;
+          if (!envelope?.hasMore || !next || rows.length === 0) break;
+          cursor = next;
+        }
+
+        setBreakdownRows(collected);
+        setPage(1);
+      } catch (err: unknown) {
+        if (err instanceof Error && err.name === "AbortError") return;
+        if (seq !== breakdownFetchSeq.current) return;
+        const message =
+          err && typeof err === "object" && "message" in err
+            ? String((err as { message: string }).message)
+            : t(`${R}.loadError`);
+        setBreakdownError(message);
+        setBreakdownRows([]);
+      } finally {
+        if (seq === breakdownFetchSeq.current) setBreakdownLoading(false);
+      }
+    },
+    [supervisorId, t],
+  );
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetchSummary(appliedRange, controller.signal);
+    return () => controller.abort();
+  }, [appliedRange, fetchSummary]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetchBreakdown(appliedRange, controller.signal);
+    return () => controller.abort();
+  }, [appliedRange, fetchBreakdown]);
 
   const handleApply = () => {
     setAppliedRange(dateRange);
     setPage(1);
-    setLastUpdated(format(new Date(), "h:mm a"));
   };
 
   const handleRefresh = () => {
-    setLastUpdated(format(new Date(), "h:mm a"));
+    void fetchSummary(appliedRange);
+    void fetchBreakdown(appliedRange);
   };
 
   const rangeLabel =
@@ -478,19 +577,26 @@ export default function AdminSupervisorReporting() {
           ) : null}
         </section>
 
-        {/* KPI rows — 4 cards per row on xl */}
-        <MetricsGrid
-          metrics={ROW1_METRICS}
-          vsLastWeekLabel={t(`${R}.vsLastWeek`)}
-        />
-        <MetricsGrid
-          metrics={ROW2_METRICS}
-          vsLastWeekLabel={t(`${R}.vsLastWeek`)}
-        />
-        <MetricsGrid
-          metrics={ROW3_METRICS}
-          vsLastWeekLabel={t(`${R}.vsLastWeek`)}
-        />
+        {/* KPI rows — 4 cards per row on xl, sourced from GET /v1/reporting/summary */}
+        {summaryError ? (
+          <div
+            role="alert"
+            className="flex flex-col gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800 dark:border-rose-800/60 dark:bg-rose-500/10 dark:text-rose-200 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <span>{summaryError}</span>
+            <button
+              type="button"
+              onClick={handleRefresh}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-rose-300 bg-white px-3 py-1.5 text-xs font-medium text-rose-700 transition hover:bg-rose-50 dark:border-rose-700 dark:bg-rose-900/30 dark:text-rose-200 dark:hover:bg-rose-900/50"
+            >
+              <RefreshCw className="size-3.5" aria-hidden />
+              {t(`${R}.retry`)}
+            </button>
+          </div>
+        ) : null}
+        <MetricsGrid metrics={row1} loading={summaryLoading} />
+        <MetricsGrid metrics={row2} loading={summaryLoading} />
+        <MetricsGrid metrics={row3} loading={summaryLoading} />
 
         {/* Supervisor note */}
         <div
@@ -530,12 +636,12 @@ export default function AdminSupervisorReporting() {
                 <TableRow>
                   {[
                     "colDate",
-                    "colServiceType",
-                    "colProviderType",
-                    "colArea",
-                    "colTotalBookings",
-                    "colFulfilledBookings",
-                    "colRevenue",
+                    "colTotalRequests",
+                    "colConfirmedBookings",
+                    "colCompletedServices",
+                    "colFulfillmentRate",
+                    "colAcceptanceRate",
+                    "colGrossRevenue",
                   ].map((key) => (
                     <TableCell
                       key={key}
@@ -548,51 +654,99 @@ export default function AdminSupervisorReporting() {
                 </TableRow>
               </TableHeader>
               <TableBody className="divide-y divide-gray-100 dark:divide-gray-800">
-                {paginatedRows.map((row) => (
-                  <TableRow
-                    key={row.date}
-                    className="hover:bg-gray-50 dark:hover:bg-white/[0.02]"
-                  >
-                    <TableCell className="whitespace-nowrap py-3 text-theme-sm text-gray-700 dark:text-gray-300">
-                      {row.date}
-                    </TableCell>
-                    <TableCell className="py-3 text-theme-sm text-gray-700 dark:text-gray-300">
-                      {row.serviceType}
-                    </TableCell>
-                    <TableCell className="py-3 text-theme-sm text-gray-700 dark:text-gray-300">
-                      {row.providerType}
-                    </TableCell>
-                    <TableCell className="py-3 text-theme-sm text-gray-700 dark:text-gray-300">
-                      {row.area}
-                    </TableCell>
-                    <TableCell className="py-3 text-theme-sm font-medium text-gray-800 dark:text-white/90">
-                      {row.totalBookings}
-                    </TableCell>
-                    <TableCell className="py-3 text-theme-sm text-gray-700 dark:text-gray-300">
-                      {row.fulfilledBookings}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap py-3 text-theme-sm text-gray-700 dark:text-gray-300">
-                      {row.revenue}
+                {breakdownLoading && breakdownRows.length === 0 ? (
+                  Array.from({ length: limit }).map((_, i) => (
+                    <TableRow key={`sk-${i}`}>
+                      {Array.from({ length: 7 }).map((__, j) => (
+                        <TableCell key={j} className="py-3">
+                          <div className="h-4 w-24 animate-pulse rounded bg-gray-200/80 dark:bg-gray-700/60" />
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))
+                ) : breakdownError ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={7}
+                      className="py-8 text-center text-sm text-rose-600 dark:text-rose-400"
+                    >
+                      <div className="inline-flex flex-col items-center gap-2">
+                        <span>{breakdownError}</span>
+                        <button
+                          type="button"
+                          onClick={handleRefresh}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-rose-300 bg-white px-3 py-1.5 text-xs font-medium text-rose-700 transition hover:bg-rose-50 dark:border-rose-700 dark:bg-rose-900/30 dark:text-rose-200 dark:hover:bg-rose-900/50"
+                        >
+                          <RefreshCw className="size-3.5" aria-hidden />
+                          {t(`${R}.retry`)}
+                        </button>
+                      </div>
                     </TableCell>
                   </TableRow>
-                ))}
-                <TableRow className="bg-gray-50/90 font-semibold dark:bg-white/[0.04]">
-                  <TableCell className="py-3 text-theme-sm text-gray-800 dark:text-white/90">
-                    {t(`${R}.table.totalAvg`)}
-                  </TableCell>
-                  <TableCell className="py-3 text-theme-sm text-gray-500">—</TableCell>
-                  <TableCell className="py-3 text-theme-sm text-gray-500">—</TableCell>
-                  <TableCell className="py-3 text-theme-sm text-gray-500">—</TableCell>
-                  <TableCell className="py-3 text-theme-sm text-gray-800 dark:text-white/90">
-                    {TABLE_TOTALS.totalBookings}
-                  </TableCell>
-                  <TableCell className="py-3 text-theme-sm text-gray-800 dark:text-white/90">
-                    {TABLE_TOTALS.fulfilledBookings}
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap py-3 text-theme-sm text-gray-800 dark:text-white/90">
-                    {TABLE_TOTALS.revenue}
-                  </TableCell>
-                </TableRow>
+                ) : breakdownRows.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={7}
+                      className="py-8 text-center text-sm text-gray-500 dark:text-gray-400"
+                    >
+                      {t(`${R}.table.empty`)}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  <>
+                    {paginatedRows.map((row, i) => (
+                      <TableRow
+                        key={`${row.rawDate ?? row.date}-${i}`}
+                        className="hover:bg-gray-50 dark:hover:bg-white/[0.02]"
+                      >
+                        <TableCell className="whitespace-nowrap py-3 text-theme-sm text-gray-700 dark:text-gray-300">
+                          {row.date}
+                        </TableCell>
+                        <TableCell className="py-3 text-theme-sm font-medium text-gray-800 dark:text-white/90">
+                          {formatCount(row.totalRequests)}
+                        </TableCell>
+                        <TableCell className="py-3 text-theme-sm text-gray-700 dark:text-gray-300">
+                          {formatCount(row.confirmedBookings)}
+                        </TableCell>
+                        <TableCell className="py-3 text-theme-sm text-gray-700 dark:text-gray-300">
+                          {formatCount(row.completedServices)}
+                        </TableCell>
+                        <TableCell className="py-3 text-theme-sm text-gray-700 dark:text-gray-300">
+                          {formatPercent(row.fulfillmentRate)}
+                        </TableCell>
+                        <TableCell className="py-3 text-theme-sm text-gray-700 dark:text-gray-300">
+                          {formatPercent(row.acceptanceRate)}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap py-3 text-theme-sm text-gray-700 dark:text-gray-300">
+                          {formatBdtCompact(row.grossRevenue)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    <TableRow className="bg-gray-50/90 font-semibold dark:bg-white/[0.04]">
+                      <TableCell className="py-3 text-theme-sm text-gray-800 dark:text-white/90">
+                        {t(`${R}.table.totalAvg`)}
+                      </TableCell>
+                      <TableCell className="py-3 text-theme-sm text-gray-800 dark:text-white/90">
+                        {formatCount(totals.totalRequests)}
+                      </TableCell>
+                      <TableCell className="py-3 text-theme-sm text-gray-800 dark:text-white/90">
+                        {formatCount(totals.confirmedBookings)}
+                      </TableCell>
+                      <TableCell className="py-3 text-theme-sm text-gray-800 dark:text-white/90">
+                        {formatCount(totals.completedServices)}
+                      </TableCell>
+                      <TableCell className="py-3 text-theme-sm text-gray-800 dark:text-white/90">
+                        {formatPercent(totals.fulfillmentRate)}
+                      </TableCell>
+                      <TableCell className="py-3 text-theme-sm text-gray-800 dark:text-white/90">
+                        {formatPercent(totals.acceptanceRate)}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap py-3 text-theme-sm text-gray-800 dark:text-white/90">
+                        {formatBdtCompact(totals.grossRevenue)}
+                      </TableCell>
+                    </TableRow>
+                  </>
+                )}
               </TableBody>
             </Table>
           </div>
@@ -617,7 +771,7 @@ export default function AdminSupervisorReporting() {
                 </ThemedSelect>
               </label>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                {t(`${R}.table.showingRangeOf`, { from, to, total: TOTAL_ENTRIES })}
+                {t(`${R}.table.showingRangeOf`, { from, to, total: totalEntries })}
               </p>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-end">
