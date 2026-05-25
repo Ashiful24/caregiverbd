@@ -1320,6 +1320,8 @@ const en = {
     refresh: "Refresh",
     dateRange: "Date Range",
     apply: "Apply",
+    clear: "Clear",
+    allTime: "All time (no date filter)",
     supervisorNote:
       "Note: If you are Supervisor, all cards and charts show data only for Caregivers under you and your own performance.",
     vsLastWeek: "vs last week",

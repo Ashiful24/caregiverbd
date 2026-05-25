@@ -273,13 +273,8 @@ function computeTableTotals(rows: BreakdownTableRow[]) {
   };
 }
 
-/** Default range: last 30 days (Bangladesh calendar). */
-function getDefaultRange(): DateRangePickerValue {
-  const today = new Date();
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(today.getDate() - 29);
-  return { startDate: thirtyDaysAgo, endDate: today };
-}
+/** Empty range — no date filter applied. APIs are called without startDate/endDate. */
+const EMPTY_RANGE: DateRangePickerValue = { startDate: null, endDate: null };
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
@@ -361,9 +356,8 @@ export default function AdminSupervisorReporting() {
       ? Number(user?.id)
       : undefined;
 
-  const defaultRange = useMemo(getDefaultRange, []);
-  const [dateRange, setDateRange] = useState<DateRangePickerValue>(defaultRange);
-  const [appliedRange, setAppliedRange] = useState<DateRangePickerValue>(defaultRange);
+  const [dateRange, setDateRange] = useState<DateRangePickerValue>(EMPTY_RANGE);
+  const [appliedRange, setAppliedRange] = useState<DateRangePickerValue>(EMPTY_RANGE);
   const [lastUpdated, setLastUpdated] = useState(() => format(new Date(), "h:mm a"));
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(5);
@@ -498,7 +492,18 @@ export default function AdminSupervisorReporting() {
   }, [appliedRange, fetchBreakdown]);
 
   const handleApply = () => {
-    setAppliedRange(dateRange);
+    // Only apply when both ends are set — partial ranges are treated as "no filter".
+    if (dateRange.startDate && dateRange.endDate) {
+      setAppliedRange(dateRange);
+    } else {
+      setAppliedRange(EMPTY_RANGE);
+    }
+    setPage(1);
+  };
+
+  const handleClearFilter = () => {
+    setDateRange(EMPTY_RANGE);
+    setAppliedRange(EMPTY_RANGE);
     setPage(1);
   };
 
@@ -507,10 +512,10 @@ export default function AdminSupervisorReporting() {
     void fetchBreakdown(appliedRange);
   };
 
-  const rangeLabel =
-    appliedRange.startDate && appliedRange.endDate
-      ? `${format(appliedRange.startDate, "dd MMM yyyy")} - ${format(appliedRange.endDate, "dd MMM yyyy")}`
-      : "";
+  const isFilterApplied = Boolean(appliedRange.startDate && appliedRange.endDate);
+  const rangeLabel = isFilterApplied
+    ? `${format(appliedRange.startDate as Date, "dd MMM yyyy")} - ${format(appliedRange.endDate as Date, "dd MMM yyyy")}`
+    : t(`${R}.allTime`);
 
   return (
     <>
@@ -566,6 +571,15 @@ export default function AdminSupervisorReporting() {
               >
                 {t(`${R}.apply`)}
               </button>
+              {isFilterApplied || dateRange.startDate || dateRange.endDate ? (
+                <button
+                  type="button"
+                  onClick={handleClearFilter}
+                  className="inline-flex min-h-[42px] shrink-0 items-center justify-center rounded-lg border border-gray-300 bg-white px-5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-brand-500/40 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                >
+                  {t(`${R}.clear`)}
+                </button>
+              ) : null}
             </div>
           </div>
 
