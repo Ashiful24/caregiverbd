@@ -54,6 +54,15 @@ export default function SignUpForm() {
       </div>
       <div className="flex flex-col justify-center flex-1 w-full max-w-md mx-auto">
         <div>
+          <Link to="/" aria-label="Ontor Care home" className="mb-6 inline-block sm:mb-8">
+            <img
+              src="/images/logo/ontor-logo-horizontal.png"
+              alt="Ontor Care"
+              width={160}
+              height={48}
+              className="h-10 w-auto sm:h-12"
+            />
+          </Link>
           <div className="mb-5 sm:mb-8">
             <h1 className="mb-2 font-semibold text-gray-800 text-title-sm dark:text-white/90 sm:text-title-md">
               {t("auth.signUp.title")}

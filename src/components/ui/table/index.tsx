@@ -31,6 +31,7 @@ interface TableCellProps {
   isHeader?: boolean; // If true, renders as <th>, otherwise <td>
   className?: string; // Optional className for styling
   title?: string; // Optional title (e.g. for tooltip / truncation)
+  colSpan?: number; // Optional colSpan for spanning multiple columns (e.g. empty/error rows)
 }
 
 // Table Component - w-full + table-fixed so columns use full width and don't bunch left
@@ -63,9 +64,18 @@ const TableCell: React.FC<TableCellProps> = ({
   isHeader = false,
   className,
   title,
+  colSpan,
 }) => {
   const CellTag = isHeader ? "th" : "td";
-  return <CellTag className={`pl-6 pr-5 ${className ?? ""}`} title={title}>{children}</CellTag>;
+  return (
+    <CellTag
+      className={`pl-6 pr-5 ${className ?? ""}`}
+      title={title}
+      colSpan={colSpan}
+    >
+      {children}
+    </CellTag>
+  );
 };
 
 export { Table, TableHeader, TableBody, TableRow, TableCell };

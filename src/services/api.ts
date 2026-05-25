@@ -113,16 +113,21 @@ export interface PasswordResetRequestRequest {
 }
 
 export interface PasswordResetVerifyOtpRequest {
-  mobileNumber: string;
+  /** Email or phone — same value supplied to /password-reset/request. */
+  identifier: string;
+  /** 6-digit one-time code delivered to the identifier. */
   otpCode: string;
 }
 
 export interface PasswordResetVerifyOtpResponse {
+  /** UUID token to pass to /password-reset/reset. */
   verificationToken: string;
 }
 
 export interface PasswordResetRequest {
-  mobileNumber: string;
+  /** Email or phone (Bangladeshi format) — same value the user supplied to request the reset. */
+  identifier: string;
+  /** UUID token delivered in the reset link / from verify-otp. */
   verificationToken: string;
   newPassword: string;
 }
@@ -3775,5 +3780,120 @@ export const userApi = {
   },
   deleteUser: async (userId: string) => {
     return httpService.delete(`/users/${userId}`);
+  },
+};
+
+// ============== Admin / Supervisor Reporting ==============
+
+/** Service request flavor used as a reporting filter. */
+export type ReportingServiceType = "SHORT_TERM" | "LONG_TERM";
+
+/** Provider category used as a reporting filter. */
+export type ReportingProviderCategory = "DOCTOR" | "CAREGIVER" | "NURSE";
+
+/** Query params for GET /v1/reporting/summary. All fields optional. */
+export interface ReportingSummaryParams {
+  /** Start date — `YYYY-MM-DD` (inclusive). */
+  startDate?: string;
+  /** End date — `YYYY-MM-DD` (inclusive). */
+  endDate?: string;
+  serviceType?: ReportingServiceType;
+  providerCategory?: ReportingProviderCategory;
+  providerId?: number;
+  supervisorId?: number;
+  /** Server-side row cap for ancillary breakdowns. Defaults vary by backend. */
+  limit?: number;
+}
+
+/**
+ * Response of GET /v1/reporting/summary.
+ * Money fields are decimal strings (e.g. "147500.00"); rates are 0–100 numbers.
+ */
+export interface ReportingSummaryDto {
+  fulfillmentRate: number | null;
+  acceptanceRate: number | null;
+  paymentExpiryRate: number | null;
+  cancellationRate: number | null;
+  totalRequests: number | null;
+  confirmedBookings: number | null;
+  completedServices: number | null;
+  grossRevenue: string | null;
+  ontorCommission: string | null;
+  providerPayout: string | null;
+  pendingPayout: string | null;
+  refundAmount: string | null;
+}
+
+/**
+ * Single row in GET /v1/reporting/daily-breakdown.
+ * Money fields are decimal strings; counts and rates are numeric.
+ */
+export interface ReportingDailyBreakdownRow {
+  /** Day in `YYYY-MM-DD` (Bangladesh calendar). */
+  date: string;
+  fulfillmentRate?: number | null;
+  acceptanceRate?: number | null;
+  paymentExpiryRate?: number | null;
+  cancellationRate?: number | null;
+  totalRequests?: number | null;
+  confirmedBookings?: number | null;
+  completedServices?: number | null;
+  grossRevenue?: string | number | null;
+  ontorCommission?: string | number | null;
+  providerPayout?: string | number | null;
+  pendingPayout?: string | number | null;
+  refundAmount?: string | number | null;
+}
+
+/** Cursor-paginated response of GET /v1/reporting/daily-breakdown. */
+export interface ReportingDailyBreakdownResponse {
+  data: ReportingDailyBreakdownRow[];
+  nextCursor?: string | null;
+  hasMore?: boolean;
+  limit?: number;
+}
+
+/** Extends summary params with a forward-only `cursor` for paginated breakdown calls. */
+export interface ReportingDailyBreakdownParams extends ReportingSummaryParams {
+  cursor?: string;
+}
+
+export const reportingApi = {
+  /** GET /v1/reporting/summary — KPI summary for admin/supervisor reporting dashboard. */
+  getSummary: async (
+    params?: ReportingSummaryParams,
+    config?: { signal?: AbortSignal }
+  ) => {
+    const query: Record<string, string | number> = {};
+    if (params?.startDate) query.startDate = params.startDate;
+    if (params?.endDate) query.endDate = params.endDate;
+    if (params?.serviceType) query.serviceType = params.serviceType;
+    if (params?.providerCategory) query.providerCategory = params.providerCategory;
+    if (params?.providerId != null) query.providerId = params.providerId;
+    if (params?.supervisorId != null) query.supervisorId = params.supervisorId;
+    if (params?.limit != null) query.limit = params.limit;
+    return httpService.get<ReportingSummaryDto>("/reporting/summary", {
+      params: query,
+      signal: config?.signal,
+    });
+  },
+  /** GET /v1/reporting/daily-breakdown — cursor-paginated per-day breakdown. */
+  getDailyBreakdown: async (
+    params?: ReportingDailyBreakdownParams,
+    config?: { signal?: AbortSignal }
+  ) => {
+    const query: Record<string, string | number> = {};
+    if (params?.startDate) query.startDate = params.startDate;
+    if (params?.endDate) query.endDate = params.endDate;
+    if (params?.serviceType) query.serviceType = params.serviceType;
+    if (params?.providerCategory) query.providerCategory = params.providerCategory;
+    if (params?.providerId != null) query.providerId = params.providerId;
+    if (params?.supervisorId != null) query.supervisorId = params.supervisorId;
+    if (params?.limit != null) query.limit = params.limit;
+    if (params?.cursor) query.cursor = params.cursor;
+    return httpService.get<ReportingDailyBreakdownResponse>(
+      "/reporting/daily-breakdown",
+      { params: query, signal: config?.signal }
+    );
   },
 };

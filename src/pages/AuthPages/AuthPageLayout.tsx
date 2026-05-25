@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import LanguageSwitcher from "../../components/common/LanguageSwitcher";
 import ThemeTogglerTwo from "../../components/common/ThemeTogglerTwo";
 
 const CAROUSEL_SLIDES: { src: string; alt: string }[] = [
@@ -119,6 +120,9 @@ export default function AuthLayout({
         {children}
         <div className="hidden h-full w-full bg-brand-950 dark:bg-white/5 lg:block lg:w-1/2">
           <AuthCarousel />
+        </div>
+        <div className="fixed top-6 right-6 z-50">
+          <LanguageSwitcher />
         </div>
         <div className="fixed bottom-6 right-6 z-50 hidden sm:block">
           <ThemeTogglerTwo />
