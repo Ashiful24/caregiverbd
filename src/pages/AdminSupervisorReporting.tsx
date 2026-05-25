@@ -250,27 +250,137 @@ function normalizeBreakdownRow(r: ReportingDailyBreakdownRow): BreakdownTableRow
   };
 }
 
-function sumOrNull(values: Array<number | null>): number | null {
-  const nums = values.filter((v): v is number => v != null);
-  if (nums.length === 0) return null;
-  return nums.reduce((acc, v) => acc + v, 0);
+/**
+ * Column definition shared by the table renderer and the CSV/Excel exporters.
+ * `hideClass` controls responsive visibility — empty string = always visible.
+ */
+type BreakdownColumn = {
+  key: string;
+  labelKey: string;
+  /** Tailwind class to hide on small screens, e.g. "hidden md:table-cell". */
+  hideClass: string;
+  /** Renderer for the on-screen cell. */
+  render: (row: BreakdownTableRow) => string;
+  /** Raw value used in exports (kept as a plain string/number for CSV cells). */
+  exportValue: (row: BreakdownTableRow) => string | number;
+};
+
+const BREAKDOWN_COLUMNS: BreakdownColumn[] = [
+  {
+    key: "colDate",
+    labelKey: "colDate",
+    hideClass: "",
+    render: (r) => r.date,
+    exportValue: (r) => r.rawDate ?? r.date,
+  },
+  {
+    key: "colTotalRequests",
+    labelKey: "colTotalRequests",
+    hideClass: "",
+    render: (r) => formatCount(r.totalRequests),
+    exportValue: (r) => r.totalRequests ?? "",
+  },
+  {
+    key: "colConfirmedBookings",
+    labelKey: "colConfirmedBookings",
+    hideClass: "hidden md:table-cell",
+    render: (r) => formatCount(r.confirmedBookings),
+    exportValue: (r) => r.confirmedBookings ?? "",
+  },
+  {
+    key: "colCompletedServices",
+    labelKey: "colCompletedServices",
+    hideClass: "hidden sm:table-cell",
+    render: (r) => formatCount(r.completedServices),
+    exportValue: (r) => r.completedServices ?? "",
+  },
+  {
+    key: "colFulfillmentRate",
+    labelKey: "colFulfillmentRate",
+    hideClass: "hidden lg:table-cell",
+    render: (r) => formatPercent(r.fulfillmentRate),
+    exportValue: (r) => r.fulfillmentRate ?? "",
+  },
+  {
+    key: "colAcceptanceRate",
+    labelKey: "colAcceptanceRate",
+    hideClass: "hidden xl:table-cell",
+    render: (r) => formatPercent(r.acceptanceRate),
+    exportValue: (r) => r.acceptanceRate ?? "",
+  },
+  {
+    key: "colGrossRevenue",
+    labelKey: "colGrossRevenue",
+    hideClass: "hidden xsm:table-cell",
+    render: (r) => formatBdtCompact(r.grossRevenue),
+    exportValue: (r) => r.grossRevenue ?? "",
+  },
+];
+
+/** Escape a value for a single CSV cell (RFC 4180-ish). */
+function csvCell(value: string | number | null | undefined): string {
+  if (value == null) return "";
+  const s = String(value);
+  if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
 }
 
-function avgOrNull(values: Array<number | null>): number | null {
-  const nums = values.filter((v): v is number => v != null);
-  if (nums.length === 0) return null;
-  return nums.reduce((acc, v) => acc + v, 0) / nums.length;
+/** Trigger a browser download for the given Blob. */
+function downloadBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-function computeTableTotals(rows: BreakdownTableRow[]) {
-  return {
-    totalRequests: sumOrNull(rows.map((r) => r.totalRequests)),
-    confirmedBookings: sumOrNull(rows.map((r) => r.confirmedBookings)),
-    completedServices: sumOrNull(rows.map((r) => r.completedServices)),
-    fulfillmentRate: avgOrNull(rows.map((r) => r.fulfillmentRate)),
-    acceptanceRate: avgOrNull(rows.map((r) => r.acceptanceRate)),
-    grossRevenue: sumOrNull(rows.map((r) => r.grossRevenue)),
-  };
+function buildCsv(rows: BreakdownTableRow[], headers: string[]): Blob {
+  const headerLine = headers.map(csvCell).join(",");
+  const bodyLines = rows.map((r) =>
+    BREAKDOWN_COLUMNS.map((c) => csvCell(c.exportValue(r))).join(","),
+  );
+  // UTF-8 BOM so Excel opens non-ASCII (e.g. Bangla) correctly.
+  const content = "\uFEFF" + [headerLine, ...bodyLines].join("\r\n");
+  return new Blob([content], { type: "text/csv;charset=utf-8;" });
+}
+
+/**
+ * Excel-compatible export. Emits an HTML <table> with `.xls` extension —
+ * Excel reliably opens this without a third-party library.
+ */
+function buildXls(rows: BreakdownTableRow[], headers: string[]): Blob {
+  const escapeHtml = (s: string) =>
+    s
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+
+  const thead = `<thead><tr>${headers
+    .map((h) => `<th>${escapeHtml(h)}</th>`)
+    .join("")}</tr></thead>`;
+  const tbody = `<tbody>${rows
+    .map(
+      (r) =>
+        `<tr>${BREAKDOWN_COLUMNS.map(
+          (c) => `<td>${escapeHtml(String(c.exportValue(r) ?? ""))}</td>`,
+        ).join("")}</tr>`,
+    )
+    .join("")}</tbody>`;
+
+  const html =
+    `<html xmlns:o="urn:schemas-microsoft-com:office:office" ` +
+    `xmlns:x="urn:schemas-microsoft-com:office:excel" ` +
+    `xmlns="http://www.w3.org/TR/REC-html40">` +
+    `<head><meta charset="utf-8" /></head>` +
+    `<body><table border="1">${thead}${tbody}</table></body></html>`;
+
+  return new Blob(["\uFEFF" + html], {
+    type: "application/vnd.ms-excel;charset=utf-8;",
+  });
 }
 
 /** Empty range — no date filter applied. APIs are called without startDate/endDate. */
@@ -382,9 +492,26 @@ export default function AdminSupervisorReporting() {
     return breakdownRows.slice(start, start + limit);
   }, [page, limit, breakdownRows]);
 
-  const totals = useMemo(() => computeTableTotals(breakdownRows), [breakdownRows]);
-
   const { row1, row2, row3 } = useMemo(() => buildMetrics(summary), [summary]);
+
+  const handleExport = useCallback(
+    (kind: "csv" | "xls") => {
+      if (breakdownRows.length === 0) return;
+      const headers = BREAKDOWN_COLUMNS.map((c) => t(`${R}.table.${c.labelKey}`));
+      const today = format(new Date(), "yyyy-MM-dd");
+      const rangePart =
+        appliedRange.startDate && appliedRange.endDate
+          ? `${toBangladeshISODate(appliedRange.startDate)}_${toBangladeshISODate(appliedRange.endDate)}`
+          : "all-time";
+      const base = `reporting-daily-breakdown_${rangePart}_${today}`;
+      if (kind === "csv") {
+        downloadBlob(buildCsv(breakdownRows, headers), `${base}.csv`);
+      } else {
+        downloadBlob(buildXls(breakdownRows, headers), `${base}.xls`);
+      }
+    },
+    [breakdownRows, appliedRange, t],
+  );
 
   const fetchSummary = useCallback(
     async (range: DateRangePickerValue, signal?: AbortSignal) => {
@@ -629,14 +756,18 @@ export default function AdminSupervisorReporting() {
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                className="inline-flex min-h-[36px] items-center gap-1.5 rounded-lg border border-white/30 bg-white/10 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-white/20"
+                onClick={() => handleExport("csv")}
+                disabled={breakdownRows.length === 0 || breakdownLoading}
+                className="inline-flex min-h-[36px] items-center gap-1.5 rounded-lg border border-white/30 bg-white/10 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Download className="size-3.5" aria-hidden />
                 {t(`${R}.table.exportCsv`)}
               </button>
               <button
                 type="button"
-                className="inline-flex min-h-[36px] items-center gap-1.5 rounded-lg border border-white/30 bg-white/10 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-white/20"
+                onClick={() => handleExport("xls")}
+                disabled={breakdownRows.length === 0 || breakdownLoading}
+                className="inline-flex min-h-[36px] items-center gap-1.5 rounded-lg border border-white/30 bg-white/10 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <FileSpreadsheet className="size-3.5" aria-hidden />
                 {t(`${R}.table.exportExcel`)}
@@ -645,24 +776,19 @@ export default function AdminSupervisorReporting() {
           </div>
 
           <div className="overflow-x-auto px-0" style={{ WebkitOverflowScrolling: "touch" }}>
-            <Table className="min-w-[44rem] table-auto">
+            <Table className="w-full table-auto">
               <TableHeader className="border-b border-gray-200 bg-gray-50/80 dark:border-gray-800 dark:bg-white/[0.02]">
                 <TableRow>
-                  {[
-                    "colDate",
-                    "colTotalRequests",
-                    "colConfirmedBookings",
-                    "colCompletedServices",
-                    "colFulfillmentRate",
-                    "colAcceptanceRate",
-                    "colGrossRevenue",
-                  ].map((key) => (
+                  {BREAKDOWN_COLUMNS.map((col) => (
                     <TableCell
-                      key={key}
+                      key={col.key}
                       isHeader
-                      className="whitespace-nowrap py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
+                      className={cn(
+                        "whitespace-nowrap py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400",
+                        col.hideClass,
+                      )}
                     >
-                      {t(`${R}.table.${key}`)}
+                      {t(`${R}.table.${col.labelKey}`)}
                     </TableCell>
                   ))}
                 </TableRow>
@@ -671,8 +797,11 @@ export default function AdminSupervisorReporting() {
                 {breakdownLoading && breakdownRows.length === 0 ? (
                   Array.from({ length: limit }).map((_, i) => (
                     <TableRow key={`sk-${i}`}>
-                      {Array.from({ length: 7 }).map((__, j) => (
-                        <TableCell key={j} className="py-3">
+                      {BREAKDOWN_COLUMNS.map((col) => (
+                        <TableCell
+                          key={col.key}
+                          className={cn("py-3", col.hideClass)}
+                        >
                           <div className="h-4 w-24 animate-pulse rounded bg-gray-200/80 dark:bg-gray-700/60" />
                         </TableCell>
                       ))}
@@ -681,7 +810,7 @@ export default function AdminSupervisorReporting() {
                 ) : breakdownError ? (
                   <TableRow>
                     <TableCell
-                      colSpan={7}
+                      colSpan={BREAKDOWN_COLUMNS.length}
                       className="py-8 text-center text-sm text-rose-600 dark:text-rose-400"
                     >
                       <div className="inline-flex flex-col items-center gap-2">
@@ -700,66 +829,34 @@ export default function AdminSupervisorReporting() {
                 ) : breakdownRows.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={7}
+                      colSpan={BREAKDOWN_COLUMNS.length}
                       className="py-8 text-center text-sm text-gray-500 dark:text-gray-400"
                     >
                       {t(`${R}.table.empty`)}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  <>
-                    {paginatedRows.map((row, i) => (
-                      <TableRow
-                        key={`${row.rawDate ?? row.date}-${i}`}
-                        className="hover:bg-gray-50 dark:hover:bg-white/[0.02]"
-                      >
-                        <TableCell className="whitespace-nowrap py-3 text-theme-sm text-gray-700 dark:text-gray-300">
-                          {row.date}
+                  paginatedRows.map((row, i) => (
+                    <TableRow
+                      key={`${row.rawDate ?? row.date}-${i}`}
+                      className="hover:bg-gray-50 dark:hover:bg-white/[0.02]"
+                    >
+                      {BREAKDOWN_COLUMNS.map((col, colIdx) => (
+                        <TableCell
+                          key={col.key}
+                          className={cn(
+                            "whitespace-nowrap py-3 text-theme-sm",
+                            colIdx === 1
+                              ? "font-medium text-gray-800 dark:text-white/90"
+                              : "text-gray-700 dark:text-gray-300",
+                            col.hideClass,
+                          )}
+                        >
+                          {col.render(row)}
                         </TableCell>
-                        <TableCell className="py-3 text-theme-sm font-medium text-gray-800 dark:text-white/90">
-                          {formatCount(row.totalRequests)}
-                        </TableCell>
-                        <TableCell className="py-3 text-theme-sm text-gray-700 dark:text-gray-300">
-                          {formatCount(row.confirmedBookings)}
-                        </TableCell>
-                        <TableCell className="py-3 text-theme-sm text-gray-700 dark:text-gray-300">
-                          {formatCount(row.completedServices)}
-                        </TableCell>
-                        <TableCell className="py-3 text-theme-sm text-gray-700 dark:text-gray-300">
-                          {formatPercent(row.fulfillmentRate)}
-                        </TableCell>
-                        <TableCell className="py-3 text-theme-sm text-gray-700 dark:text-gray-300">
-                          {formatPercent(row.acceptanceRate)}
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap py-3 text-theme-sm text-gray-700 dark:text-gray-300">
-                          {formatBdtCompact(row.grossRevenue)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    <TableRow className="bg-gray-50/90 font-semibold dark:bg-white/[0.04]">
-                      <TableCell className="py-3 text-theme-sm text-gray-800 dark:text-white/90">
-                        {t(`${R}.table.totalAvg`)}
-                      </TableCell>
-                      <TableCell className="py-3 text-theme-sm text-gray-800 dark:text-white/90">
-                        {formatCount(totals.totalRequests)}
-                      </TableCell>
-                      <TableCell className="py-3 text-theme-sm text-gray-800 dark:text-white/90">
-                        {formatCount(totals.confirmedBookings)}
-                      </TableCell>
-                      <TableCell className="py-3 text-theme-sm text-gray-800 dark:text-white/90">
-                        {formatCount(totals.completedServices)}
-                      </TableCell>
-                      <TableCell className="py-3 text-theme-sm text-gray-800 dark:text-white/90">
-                        {formatPercent(totals.fulfillmentRate)}
-                      </TableCell>
-                      <TableCell className="py-3 text-theme-sm text-gray-800 dark:text-white/90">
-                        {formatPercent(totals.acceptanceRate)}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap py-3 text-theme-sm text-gray-800 dark:text-white/90">
-                        {formatBdtCompact(totals.grossRevenue)}
-                      </TableCell>
+                      ))}
                     </TableRow>
-                  </>
+                  ))
                 )}
               </TableBody>
             </Table>
