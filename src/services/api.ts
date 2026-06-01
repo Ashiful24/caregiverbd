@@ -658,6 +658,7 @@ export const consultationTypesApi = {
     data: {
       name: string;
       description?: string | null;
+      type?: ServiceCategoryChecklistType;
       isActive?: boolean;
       displayOrder?: number;
     }
@@ -674,6 +675,7 @@ export const consultationTypesApi = {
     data: {
       name?: string;
       description?: string | null;
+      type?: ServiceCategoryChecklistType;
       isActive?: boolean;
       displayOrder?: number;
     }
@@ -728,10 +730,14 @@ export const consultationTypesApi = {
 };
 
 /** Service category checklist row (admin; per consultation type). */
+export type ServiceCategoryChecklistType = "CHECKLIST" | "VITALS";
+
 export interface ServiceCategoryChecklistItem {
   id: number;
+  consultationTypeId?: number;
   name: string;
   description?: string | null;
+  type?: ServiceCategoryChecklistType;
   isActive: boolean;
   displayOrder: number;
 }
