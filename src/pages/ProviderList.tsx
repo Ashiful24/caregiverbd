@@ -27,6 +27,7 @@ import { formatDate, formatStatusLabel } from "../utils/format";
 import { useAuth } from "../context/AuthContext";
 
 const LIMIT_OPTIONS = [10, 20, 50];
+const SEARCH_DEBOUNCE_MS = 300;
 
 /** Status tabs: All | Pending | Rejected | Active | Deactivated | Archived (matches backend enum) */
 const STATUS_TABS: { value: ProviderListStatusFilter }[] = [
@@ -93,6 +94,8 @@ export default function ProviderList() {
   const [limit, setLimit] = useState(10);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
+  const [searchInput, setSearchInput] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [consultationTypes, setConsultationTypes] = useState<ConsultationType[]>([]);
   const [consultationTypeFilterId, setConsultationTypeFilterId] = useState<number | "">("");
   const [documentTypes, setDocumentTypes] = useState<VerificationDocumentTypeItem[]>([]);
@@ -102,6 +105,15 @@ export default function ProviderList() {
   const [detailProviderId, setDetailProviderId] = useState<number | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailData, setDetailData] = useState<ProviderFullDetailsDto | null>(null);
+
+  // Debounce search: update searchQuery (and reset to page 1) after user stops typing
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchQuery(searchInput.trim());
+      setPage(1);
+    }, SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   /** Dropdown options from GET /consultation-types. Backend GET /admin/providers accepts consultationTypeId (single ID) and includes type + descendants. */
   const fetchConsultationTypes = useCallback(async () => {
@@ -152,6 +164,7 @@ export default function ProviderList() {
         {
           page,
           limit,
+          search: searchQuery || undefined,
           consultationTypeId:
             consultationTypeFilterId === "" || consultationTypeFilterId == null
               ? undefined
@@ -202,6 +215,7 @@ export default function ProviderList() {
   }, [
     page,
     limit,
+    searchQuery,
     consultationTypeFilterId,
     documentTypeFilterCode,
     statusTab,
@@ -261,6 +275,20 @@ export default function ProviderList() {
             </p>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-3 sm:ml-auto">
+            <div className="relative">
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </span>
+              <input
+                type="search"
+                placeholder={t("providers.searchProviders")}
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                className="w-full min-w-[200px] rounded-lg border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:placeholder:text-gray-500 sm:w-56"
+              />
+            </div>
             <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
               <span className="shrink-0">{t("providers.consultationType")}</span>
               <ThemedSelect

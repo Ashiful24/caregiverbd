@@ -130,6 +130,8 @@ function statusBadge(status: SupervisorFullDetails["status"], label: string) {
 export default function SupervisorList() {
   const { t } = useTranslation();
   const [supervisors, setSupervisors] = useState<SupervisorFullDetails[]>([]);
+  const [searchInput, setSearchInput] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
@@ -141,28 +143,45 @@ export default function SupervisorList() {
   const [assignOpen, setAssignOpen] = useState(false);
   const [assignTarget, setAssignTarget] = useState<SupervisorFullDetails | null>(null);
 
-  const fetchSupervisors = useCallback(async () => {
-    setLoading(true);
-    setLoadError(null);
-    try {
-      const res = await adminSupervisorsApi.getAll();
-      const rows = normalizeAdminSupervisorsResponse(res.data);
-      setSupervisors(rows.map(mapAdminSupervisorDtoToFull));
-    } catch (err: unknown) {
-      const message =
-        err && typeof err === "object" && "message" in err
-          ? String((err as { message: string }).message)
-          : t("supervisor.failedToLoad");
-      setLoadError(message);
-      setSupervisors([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [t]);
+  const fetchSupervisors = useCallback(
+    async (signal?: AbortSignal) => {
+      setLoading(true);
+      setLoadError(null);
+      try {
+        const res = await adminSupervisorsApi.getAll(
+          { search: searchQuery || undefined },
+          { signal }
+        );
+        const rows = normalizeAdminSupervisorsResponse(res.data);
+        setSupervisors(rows.map(mapAdminSupervisorDtoToFull));
+      } catch (err: unknown) {
+        if (err instanceof Error && err.name === "AbortError") return;
+        const message =
+          err && typeof err === "object" && "message" in err
+            ? String((err as { message: string }).message)
+            : t("supervisor.failedToLoad");
+        setLoadError(message);
+        setSupervisors([]);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [t, searchQuery]
+  );
 
   useEffect(() => {
-    void fetchSupervisors();
+    const controller = new AbortController();
+    void fetchSupervisors(controller.signal);
+    return () => controller.abort();
   }, [fetchSupervisors]);
+
+  // Debounce search input into the query that triggers a refetch
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchQuery(searchInput.trim());
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   const openCreate = () => {
     setFormMode("create");
@@ -218,6 +237,8 @@ export default function SupervisorList() {
     setAssignTarget(null);
   };
 
+  const hasActiveSearch = searchQuery.trim().length > 0;
+
   return (
     <>
       <PageMeta title={t("supervisor.metaTitle")} description={t("supervisor.metaDescription")} />
@@ -235,14 +256,30 @@ export default function SupervisorList() {
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={openCreate}
-            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 dark:bg-brand-600 dark:hover:bg-brand-500"
-          >
-            <PlusIcon className="size-4" />
-            {t("supervisor.createSupervisor")}
-          </button>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="relative">
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </span>
+              <input
+                type="search"
+                placeholder={t("supervisor.searchPlaceholder")}
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                className="w-full min-w-[200px] rounded-lg border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:placeholder:text-gray-500 sm:w-56"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={openCreate}
+              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 dark:bg-brand-600 dark:hover:bg-brand-500"
+            >
+              <PlusIcon className="size-4" />
+              {t("supervisor.createSupervisor")}
+            </button>
+          </div>
         </div>
 
         <div className="px-4 py-4 sm:px-6 lg:py-6">
@@ -256,7 +293,9 @@ export default function SupervisorList() {
           ) : null}
           {!loading && supervisors.length === 0 && !loadError ? (
             <div className="py-12 text-center text-sm text-gray-500 dark:text-gray-400">
-              {t("supervisor.noSupervisorsFound")}
+              {hasActiveSearch
+                ? t("supervisor.noSupervisorsMatchSearch")
+                : t("supervisor.noSupervisorsFound")}
             </div>
           ) : null}
           {!loading && supervisors.length > 0 ? (
