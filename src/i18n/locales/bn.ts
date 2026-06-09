@@ -302,6 +302,8 @@ const bn = {
     supervisorLabel: "সুপারভাইজার",
     loadingProviders: "প্রোভাইডার লোড হচ্ছে...",
     noNursesToShow: "দেখানোর মতো কোনো নার্স নেই।",
+    searchNursesPlaceholder: "নার্স খুঁজুন...",
+    noNursesMatchSearch: "আপনার সার্চের সাথে কোনো নার্স মেলেনি।",
     experience: "অভিজ্ঞতা",
     selectedCount_one: "নির্বাচিত: {{count}} জন নার্স",
     selectedCount_other: "নির্বাচিত: {{count}} জন নার্স",

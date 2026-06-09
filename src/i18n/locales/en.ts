@@ -302,6 +302,8 @@ const en = {
     supervisorLabel: "Supervisor",
     loadingProviders: "Loading providers...",
     noNursesToShow: "No nurses to show.",
+    searchNursesPlaceholder: "Search nurses...",
+    noNursesMatchSearch: "No nurses match your search.",
     experience: "Experience",
     selectedCount_one: "Selected: {{count}} nurse",
     selectedCount_other: "Selected: {{count}} nurses",

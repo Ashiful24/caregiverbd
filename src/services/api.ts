@@ -1940,7 +1940,7 @@ export const providersApi = {
    * Query: page, limit. Backend requires consultationTypeCode when isSupervised is sent.
    */
   getAllPublic: async (
-    params?: { page?: number; limit?: number; consultationTypeCode?: string },
+    params?: { page?: number; limit?: number; consultationTypeCode?: string; search?: string },
     config?: { signal?: AbortSignal }
   ) => {
     const query: Record<string, string | number | boolean> = {
@@ -1949,6 +1949,8 @@ export const providersApi = {
       isSupervised: false,
       consultationTypeCode: params?.consultationTypeCode ?? "NURSING_CARE",
     };
+    const search = params?.search?.trim();
+    if (search) query.search = search;
     return httpService.get<unknown>("/providers/all", {
       params: query,
       signal: config?.signal,
