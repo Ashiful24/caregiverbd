@@ -1009,7 +1009,7 @@ export const adminProviderCancelApi = {
       { signal: config?.signal }
     );
   },
-  approve: async (id: number, body?: { adminNotes?: string }) => {
+  approve: async (id: number, body?: { adminNotes?: string; refundAmount?: number }) => {
     return httpService.post(`/admin/provider-cancel-requests/${id}/approve`, body ?? {});
   },
   reject: async (id: number, body: { adminNotes: string }) => {
@@ -1018,6 +1018,43 @@ export const adminProviderCancelApi = {
   reassign: async (id: number, body: { newProviderId: number; adminNotes?: string }) => {
     return httpService.post<ProviderCancelReviewReassignResult>(
       `/admin/provider-cancel-requests/${id}/reassign`,
+      body
+    );
+  },
+  // Batch endpoints (multi-shift LTO provider cancel)
+  getBatch: async (batchId: string, config?: { signal?: AbortSignal }) => {
+    return httpService.get<{
+      batchId: string;
+      opportunityId: number | null;
+      shifts: Array<{
+        cancellationId: number;
+        shiftId: number;
+        scheduledDate: string | null;
+        scheduledTime: string | null;
+        fee: string;
+        reasonCategory: string | null;
+        reviewStatus: string;
+        srStatus: string | null;
+        previousSrStatus: string | null;
+        refundPreview: { feeAmount: string; refundAmount: string };
+      }>;
+    }>(`/admin/provider-cancel-requests/batch/${batchId}`, { signal: config?.signal });
+  },
+  processBatch: async (
+    batchId: string,
+    body: {
+      adminNotes?: string;
+      actions: Array<{
+        cancellationId: number;
+        decision: 'approve' | 'reject' | 'reassign';
+        refundAmount?: number;
+        newProviderId?: number;
+        shiftNotes?: string;
+      }>;
+    }
+  ) => {
+    return httpService.post<{ batchId: string; processed: number; results: unknown[] }>(
+      `/admin/provider-cancel-requests/batch/${batchId}/process`,
       body
     );
   },
@@ -3297,6 +3334,9 @@ export interface GlMoneySummaryDto {
   stagedRefunds: string;
   /** CANCELLATION_FEE_GL — cancellation fee revenue collected */
   cancellationFees: string;
+  /** Total supervisor commission released to assigned supervisors' CLAIMABLE wallets on completion.
+   *  When no supervisor is assigned the amount goes to COMMISSION_GL and is already in commissionEarned. */
+  supervisorCommissionReleased: string;
 }
 
 export interface GlEscrowIntegrityDto {

@@ -24,6 +24,7 @@ import WithdrawalRequests from "./pages/WithdrawalRequests";
 import CancellationRefunds from "./pages/CancellationRefunds";
 import ProviderCancelRequests from "./pages/ProviderCancelRequests";
 import ProviderCancelRequestDetail from "./pages/ProviderCancelRequestDetail";
+import ProviderCancelBatchDetail from "./pages/ProviderCancelBatchDetail";
 import MasterFinancialReport from "./pages/MasterFinancialReport";
 import GlReconciliation from "./pages/GlReconciliation";
 import AdminSupervisorReporting from "./pages/AdminSupervisorReporting";
@@ -188,6 +189,14 @@ export default function App() {
             element={
               <ProtectedRoute allowedRoles={["ADMIN"]}>
                 <ProviderCancelRequestDetail />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/provider-cancel-requests/batch/:batchId"
+            element={
+              <ProtectedRoute allowedRoles={["ADMIN"]}>
+                <ProviderCancelBatchDetail />
               </ProtectedRoute>
             }
           />
