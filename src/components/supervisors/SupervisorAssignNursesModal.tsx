@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Modal } from "../ui/modal";
 import Button from "../ui/button/Button";
@@ -92,105 +92,149 @@ export function SupervisorAssignNursesModal({ isOpen, onClose, supervisor, onAss
   const [error, setError] = useState<string | null>(null);
   /** Nurses already assigned to this supervisor (prepended to the list; excluded from pool total math). */
   const [assignedPrefixCount, setAssignedPrefixCount] = useState(0);
+  const [searchInput, setSearchInput] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  /** Search term reflected in the currently loaded list; guards against duplicate loads. */
+  const lastLoadedSearchRef = useRef<string | null>(null);
 
-  const loadInitial = useCallback(async () => {
-    if (!supervisor) return;
-    const supervisorId = Number(supervisor.id);
-    if (!Number.isFinite(supervisorId) || supervisorId <= 0) return;
+  /**
+   * Load the assigned nurses plus the first page of the unsupervised pool.
+   * When `searchTerm` is set, the assigned prefix is omitted and only matching
+   * pool results (from GET /providers/all?search=...) are shown.
+   */
+  const loadProviders = useCallback(
+    async (searchTerm: string, opts: { resetSelection: boolean }) => {
+      if (!supervisor) return;
+      const supervisorId = Number(supervisor.id);
+      if (!Number.isFinite(supervisorId) || supervisorId <= 0) return;
+      const trimmed = searchTerm.trim();
+      lastLoadedSearchRef.current = trimmed;
+      const showAssignedPrefix = trimmed === "";
 
-    setListLoading(true);
-    setError(null);
-    setAssignedPrefixCount(0);
-    try {
-      let assignedList: ProviderListItem[] = [];
-      let selectedIds: number[] = [];
-      try {
-        const assignedRes = await adminSupervisorsApi.getAssignedProviders(supervisorId);
-        assignedList = normalizeAssignedProvidersToListItems(assignedRes.data);
-        selectedIds = normalizeAssignedProviderIdsResponse(assignedRes.data);
-      } catch {
-        // Modal still works with pool-only if this fails.
-      }
-
-      const assignedIdSet = new Set(
-        assignedList.map((p) => p.id).filter((id) => Number.isFinite(id) && id > 0)
-      );
-      setAssignedPrefixCount(assignedList.length);
-
-      let norm: ReturnType<typeof normalizeProvidersAllResponse>;
-      try {
-        const poolRes = await providersApi.getAllPublic({ page: 1, limit: PAGE_SIZE });
-        norm = normalizeProvidersAllResponse(poolRes.data);
-      } catch (poolErr: unknown) {
-        if (assignedList.length > 0) {
-          const message =
-            poolErr && typeof poolErr === "object" && "message" in poolErr
-              ? String((poolErr as { message: string }).message)
-              : "Failed to load available nurses.";
-          setError(message);
-          setTotal(0);
-          setPage(1);
-          setLastBatchSize(0);
-          setSelected(new Set(selectedIds));
-          setProviders(assignedList);
-          return;
-        }
-        throw poolErr;
-      }
-
-      const poolDeduped = norm.providers.filter((p) => !assignedIdSet.has(p.id));
-
-      setTotal(norm.total);
-      setPage(1);
-      setLastBatchSize(norm.providers.length);
-      setSelected(new Set(selectedIds));
-      setProviders([...assignedList, ...poolDeduped]);
-    } catch (err: unknown) {
-      const message =
-        err && typeof err === "object" && "message" in err
-          ? String((err as { message: string }).message)
-          : t("supervisor.assignmentFailed");
-      setError(message);
-      setProviders([]);
-      setTotal(0);
-      setLastBatchSize(0);
+      setListLoading(true);
+      setError(null);
       setAssignedPrefixCount(0);
-    } finally {
-      setListLoading(false);
-    }
-  }, [supervisor, t]);
+      try {
+        let assignedList: ProviderListItem[] = [];
+        let selectedIds: number[] = [];
+        try {
+          const assignedRes = await adminSupervisorsApi.getAssignedProviders(supervisorId);
+          assignedList = normalizeAssignedProvidersToListItems(assignedRes.data);
+          selectedIds = normalizeAssignedProviderIdsResponse(assignedRes.data);
+        } catch {
+          // Modal still works with pool-only if this fails.
+        }
 
-  const fetchPoolPageAppend = useCallback(async (nextPage: number) => {
-    setListLoadingMore(true);
-    setError(null);
-    try {
-      const res = await providersApi.getAllPublic({ page: nextPage, limit: PAGE_SIZE });
-      const norm = normalizeProvidersAllResponse(res.data);
-      setTotal(norm.total);
-      setPage(nextPage);
-      setLastBatchSize(norm.providers.length);
-      setProviders((prev) => {
-        const existing = new Set(prev.map((p) => p.id));
-        const extra = norm.providers.filter((p) => !existing.has(p.id));
-        return [...prev, ...extra];
-      });
-    } catch (err: unknown) {
-      const message =
-        err && typeof err === "object" && "message" in err
-          ? String((err as { message: string }).message)
-          : t("supervisor.assignmentFailed");
-      setError(message);
-    } finally {
-      setListLoadingMore(false);
-    }
-  }, [t]);
+        const assignedIdSet = new Set(
+          assignedList.map((p) => p.id).filter((id) => Number.isFinite(id) && id > 0)
+        );
+        setAssignedPrefixCount(showAssignedPrefix ? assignedList.length : 0);
 
+        let norm: ReturnType<typeof normalizeProvidersAllResponse>;
+        try {
+          const poolRes = await providersApi.getAllPublic({
+            page: 1,
+            limit: PAGE_SIZE,
+            search: trimmed || undefined,
+          });
+          norm = normalizeProvidersAllResponse(poolRes.data);
+        } catch (poolErr: unknown) {
+          if (assignedList.length > 0 && showAssignedPrefix) {
+            const message =
+              poolErr && typeof poolErr === "object" && "message" in poolErr
+                ? String((poolErr as { message: string }).message)
+                : "Failed to load available nurses.";
+            setError(message);
+            setTotal(0);
+            setPage(1);
+            setLastBatchSize(0);
+            if (opts.resetSelection) setSelected(new Set(selectedIds));
+            setProviders(assignedList);
+            return;
+          }
+          throw poolErr;
+        }
+
+        const poolDeduped = norm.providers.filter((p) => !assignedIdSet.has(p.id));
+
+        setTotal(norm.total);
+        setPage(1);
+        setLastBatchSize(norm.providers.length);
+        if (opts.resetSelection) setSelected(new Set(selectedIds));
+        setProviders(showAssignedPrefix ? [...assignedList, ...poolDeduped] : poolDeduped);
+      } catch (err: unknown) {
+        const message =
+          err && typeof err === "object" && "message" in err
+            ? String((err as { message: string }).message)
+            : t("supervisor.assignmentFailed");
+        setError(message);
+        setProviders([]);
+        setTotal(0);
+        setLastBatchSize(0);
+        setAssignedPrefixCount(0);
+      } finally {
+        setListLoading(false);
+      }
+    },
+    [supervisor, t]
+  );
+
+  const fetchPoolPageAppend = useCallback(
+    async (nextPage: number) => {
+      setListLoadingMore(true);
+      setError(null);
+      try {
+        const res = await providersApi.getAllPublic({
+          page: nextPage,
+          limit: PAGE_SIZE,
+          search: searchQuery.trim() || undefined,
+        });
+        const norm = normalizeProvidersAllResponse(res.data);
+        setTotal(norm.total);
+        setPage(nextPage);
+        setLastBatchSize(norm.providers.length);
+        setProviders((prev) => {
+          const existing = new Set(prev.map((p) => p.id));
+          const extra = norm.providers.filter((p) => !existing.has(p.id));
+          return [...prev, ...extra];
+        });
+      } catch (err: unknown) {
+        const message =
+          err && typeof err === "object" && "message" in err
+            ? String((err as { message: string }).message)
+            : t("supervisor.assignmentFailed");
+        setError(message);
+      } finally {
+        setListLoadingMore(false);
+      }
+    },
+    [t, searchQuery]
+  );
+
+  // Open (or supervisor change): reset search/selection and load the initial list.
   useEffect(() => {
     if (!isOpen || !supervisor) return;
+    setSearchInput("");
+    setSearchQuery("");
     setSelected(new Set());
     setError(null);
-    void loadInitial();
-  }, [isOpen, supervisor?.id, loadInitial]);
+    void loadProviders("", { resetSelection: true });
+  }, [isOpen, supervisor?.id, loadProviders]);
+
+  // Debounce the search box into the query that triggers a reload.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchQuery(searchInput.trim());
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
+  // Reload the pool when the (debounced) search query changes, preserving selections.
+  useEffect(() => {
+    if (!isOpen || !supervisor) return;
+    if (lastLoadedSearchRef.current === searchQuery.trim()) return;
+    void loadProviders(searchQuery, { resetSelection: false });
+  }, [isOpen, supervisor?.id, searchQuery, loadProviders]);
 
   const toggle = (providerId: number) => {
     setSelected((prev) => {
@@ -225,6 +269,9 @@ export function SupervisorAssignNursesModal({ isOpen, onClose, supervisor, onAss
     setSelected(new Set());
     setError(null);
     setSubmitting(false);
+    setSearchInput("");
+    setSearchQuery("");
+    lastLoadedSearchRef.current = null;
     onClose();
   };
 
@@ -268,13 +315,31 @@ export function SupervisorAssignNursesModal({ isOpen, onClose, supervisor, onAss
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
             {t("supervisor.supervisorLabel")}: <span className="font-medium text-gray-800 dark:text-gray-200">{supervisor.name}</span>
           </p>
+          <div className="relative mt-3">
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </span>
+            <input
+              type="search"
+              placeholder={t("supervisor.searchNursesPlaceholder")}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:placeholder:text-gray-500"
+            />
+          </div>
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
           {listLoading ? (
             <p className="text-sm text-gray-500 dark:text-gray-400">{t("supervisor.loadingProviders")}</p>
           ) : providers.length === 0 ? (
-            <p className="text-sm text-gray-500 dark:text-gray-400">{t("supervisor.noNursesToShow")}</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              {searchQuery.trim()
+                ? t("supervisor.noNursesMatchSearch")
+                : t("supervisor.noNursesToShow")}
+            </p>
           ) : (
             <ul className="space-y-2">
               {providers.map((p) => {
