@@ -1927,6 +1927,7 @@ export const providersApi = {
     params?: {
       page?: number;
       limit?: number;
+      search?: string;
       consultationTypeId?: number;
       status?: ProviderListStatusFilter;
       documentType?: string;
@@ -1942,6 +1943,8 @@ export const providersApi = {
       page: params?.page ?? 1,
       limit: params?.limit ?? 10,
     };
+    const search = params?.search?.trim();
+    if (search) query.search = search;
     if (params?.consultationTypeId != null) {
       query.consultationTypeId = params.consultationTypeId;
     }
@@ -1974,7 +1977,7 @@ export const providersApi = {
    * Query: page, limit. Backend requires consultationTypeCode when isSupervised is sent.
    */
   getAllPublic: async (
-    params?: { page?: number; limit?: number; consultationTypeCode?: string },
+    params?: { page?: number; limit?: number; consultationTypeCode?: string; search?: string },
     config?: { signal?: AbortSignal }
   ) => {
     const query: Record<string, string | number | boolean> = {
@@ -1983,6 +1986,8 @@ export const providersApi = {
       isSupervised: false,
       consultationTypeCode: params?.consultationTypeCode ?? "NURSING_CARE",
     };
+    const search = params?.search?.trim();
+    if (search) query.search = search;
     return httpService.get<unknown>("/providers/all", {
       params: query,
       signal: config?.signal,
@@ -2860,13 +2865,14 @@ export function normalizeLongTermOpportunitiesListResponse(data: unknown): {
 export const adminLongTermOpportunitiesApi = {
   /**
    * GET /v1/admin/long-term-opportunities — Paginated long-term service requests.
-   * Query: page, limit; optional status (omit for all).
+   * Query: page, limit; optional status (omit for all), search (free-text).
    */
   getList: async (
     params?: {
       page?: number;
       limit?: number;
       status?: LongTermOpportunityStatusFilter;
+      search?: string;
     },
     config?: { signal?: AbortSignal }
   ) => {
@@ -2875,6 +2881,8 @@ export const adminLongTermOpportunitiesApi = {
       limit: params?.limit ?? 10,
     };
     if (params?.status) query.status = params.status;
+    const search = params?.search?.trim();
+    if (search) query.search = search;
     return httpService.get<unknown>("/admin/long-term-opportunities", {
       params: query,
       signal: config?.signal,
@@ -3127,9 +3135,17 @@ export function normalizeAssignedProvidersToListItems(data: unknown): ProviderLi
 }
 
 export const adminSupervisorsApi = {
-  /** GET /v1/admin/supervisors — list supervisors (admin). */
-  getAll: async (config?: { signal?: AbortSignal }) => {
-    return httpService.get<unknown>("/admin/supervisors", { signal: config?.signal });
+  /** GET /v1/admin/supervisors — list supervisors (admin). Optional free-text search. */
+  getAll: async (
+    params?: { search?: string },
+    config?: { signal?: AbortSignal }
+  ) => {
+    const search = params?.search?.trim();
+    const query = search ? { search } : undefined;
+    return httpService.get<unknown>("/admin/supervisors", {
+      params: query,
+      signal: config?.signal,
+    });
   },
 
   /** GET /v1/admin/:supervisorId/providers — already assigned providers under a supervisor. */
