@@ -4,15 +4,14 @@ import { Modal } from "../ui/modal";
 import Badge from "../ui/badge/Badge";
 import {
   adminServiceRequestsApi,
-  normalizeServiceRequestEventLogs,
-  sortServiceRequestEventLogsAsc,
+  normalizeServiceRequestTimeline,
   type AdminServiceRequestListDto,
   type ServiceRequestEventLogDto,
 } from "../../services/api";
 import { formatDate, formatDateTime, formatStatusLabel } from "../../utils/format";
 import { ServiceRequestLifecycleStepper } from "./ServiceRequestLifecycleStepper";
 import {
-  lifecycleActiveIndexForEventLogCount,
+  lifecycleActiveIndexForTimeline,
   mapEventLogToLifecycleStep,
 } from "./mapEventLogToLifecycleStep";
 
@@ -57,6 +56,7 @@ export function ServiceRequestDetailModal({
 }: ServiceRequestDetailModalProps) {
   const { t } = useTranslation();
   const [eventLogs, setEventLogs] = useState<ServiceRequestEventLogDto[]>([]);
+  const [eventLogsIsTerminal, setEventLogsIsTerminal] = useState(false);
   const [eventLogsLoading, setEventLogsLoading] = useState(false);
   const [eventLogsError, setEventLogsError] = useState<string | null>(null);
   const [eventLogsFetched, setEventLogsFetched] = useState(false);
@@ -64,24 +64,32 @@ export function ServiceRequestDetailModal({
   useEffect(() => {
     if (!item || !isOpen) {
       setEventLogs([]);
+      setEventLogsIsTerminal(false);
       setEventLogsError(null);
       setEventLogsLoading(false);
       setEventLogsFetched(false);
       return;
     }
 
-    const requestId = item.id;
     const controller = new AbortController();
     setEventLogs([]);
+    setEventLogsIsTerminal(false);
     setEventLogsError(null);
     setEventLogsFetched(false);
     setEventLogsLoading(true);
 
     adminServiceRequestsApi
-      .getEventLogs(requestId, { signal: controller.signal })
+      .getEventLogs(
+        {
+          serviceRequestId: item.id,
+          longTermOpportunityId: item.longTermOpportunityId ?? undefined,
+        },
+        { signal: controller.signal }
+      )
       .then((res) => {
-        const list = sortServiceRequestEventLogsAsc(normalizeServiceRequestEventLogs(res.data));
-        setEventLogs(list);
+        const parsed = normalizeServiceRequestTimeline(res.data);
+        setEventLogs(parsed.timeline);
+        setEventLogsIsTerminal(parsed.isTerminal);
         setEventLogsFetched(true);
       })
       .catch((err: unknown) => {
@@ -106,9 +114,9 @@ export function ServiceRequestDetailModal({
     if (eventLogsError) return { kind: "error", message: eventLogsError };
     if (eventLogs.length === 0) return { kind: "empty" };
     const steps = eventLogs.map((log) => mapEventLogToLifecycleStep(log, t));
-    const activeIndex = lifecycleActiveIndexForEventLogCount(item.status, steps.length);
+    const activeIndex = lifecycleActiveIndexForTimeline(eventLogs, eventLogsIsTerminal);
     return { kind: "api", steps, activeIndex };
-  }, [item, eventLogs, eventLogsFetched, eventLogsError, t]);
+  }, [item, eventLogs, eventLogsIsTerminal, eventLogsFetched, eventLogsError, t]);
 
   const showLifecycleSection = eventLogsLoading || eventLogsFetched;
 

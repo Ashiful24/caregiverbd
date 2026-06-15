@@ -1,6 +1,7 @@
 import { Routes, Route } from "react-router";
 import SignIn from "./pages/AuthPages/SignIn";
 import SignUp from "./pages/AuthPages/SignUp";
+import ForgotPassword from "./pages/AuthPages/ForgotPassword";
 import NotFound from "./pages/OtherPage/NotFound";
 import UserProfiles from "./pages/UserProfiles";
 import AppLayout from "./layout/AppLayout";
@@ -23,8 +24,10 @@ import WithdrawalRequests from "./pages/WithdrawalRequests";
 import CancellationRefunds from "./pages/CancellationRefunds";
 import ProviderCancelRequests from "./pages/ProviderCancelRequests";
 import ProviderCancelRequestDetail from "./pages/ProviderCancelRequestDetail";
+import ProviderCancelBatchDetail from "./pages/ProviderCancelBatchDetail";
 import MasterFinancialReport from "./pages/MasterFinancialReport";
 import GlReconciliation from "./pages/GlReconciliation";
+import AdminSupervisorReporting from "./pages/AdminSupervisorReporting";
 import NurseScheduleList from "./pages/NurseScheduleList";
 import NurseScheduleCalendarPage from "./pages/NurseScheduleCalendarPage";
 import SupervisorList from "./pages/SupervisorList";
@@ -158,6 +161,14 @@ export default function App() {
             }
           />
           <Route
+            path="/admin-supervisor-reporting"
+            element={
+              <ProtectedRoute allowedRoles={["ADMIN", "SUPERVISOR"]}>
+                <AdminSupervisorReporting />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/withdrawal-requests"
             element={
               <ProtectedRoute allowedRoles={["ADMIN"]}>
@@ -178,6 +189,14 @@ export default function App() {
             element={
               <ProtectedRoute allowedRoles={["ADMIN"]}>
                 <ProviderCancelRequestDetail />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/provider-cancel-requests/batch/:batchId"
+            element={
+              <ProtectedRoute allowedRoles={["ADMIN"]}>
+                <ProviderCancelBatchDetail />
               </ProtectedRoute>
             }
           />
@@ -253,6 +272,14 @@ export default function App() {
           element={
             <PublicRoute>
               <SignUp />
+            </PublicRoute>
+          }
+        />
+        <Route
+          path="/forgot-password"
+          element={
+            <PublicRoute>
+              <ForgotPassword />
             </PublicRoute>
           }
         />

@@ -248,7 +248,8 @@ export default function GlReconciliation() {
           <div className="space-y-5">
 
             {/* ── Money summary KPIs ──────────────────────────────────────────── */}
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+              {/* 9 cards: 8 original + supervisor commission */}
               <KpiCard
                 label="In escrow"
                 value={fmtBDT(glSummary.moneySummary.inEscrow)}
@@ -301,6 +302,13 @@ export default function GlReconciliation() {
                 tone="neutral"
                 hint="Revenue from cancellations"
                 tooltip="CANCELLATION_FEE_GL balance — cancellation fee revenue retained by the platform."
+              />
+              <KpiCard
+                label="Supervisor commission"
+                value={fmtBDT(glSummary.moneySummary.supervisorCommissionReleased)}
+                tone="neutral"
+                hint="Credited to supervisor wallets"
+                tooltip="Total supervisor commission credited to assigned supervisors' CLAIMABLE wallets on service completion. Still inside the platform — supervisors can withdraw this when they request a payout. When no supervisor is assigned, that amount goes to Ontor's COMMISSION_GL and is already included in 'Commission earned'."
               />
             </div>
 

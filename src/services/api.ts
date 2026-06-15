@@ -113,16 +113,21 @@ export interface PasswordResetRequestRequest {
 }
 
 export interface PasswordResetVerifyOtpRequest {
-  mobileNumber: string;
+  /** Email or phone — same value supplied to /password-reset/request. */
+  identifier: string;
+  /** 6-digit one-time code delivered to the identifier. */
   otpCode: string;
 }
 
 export interface PasswordResetVerifyOtpResponse {
+  /** UUID token to pass to /password-reset/reset. */
   verificationToken: string;
 }
 
 export interface PasswordResetRequest {
-  mobileNumber: string;
+  /** Email or phone (Bangladeshi format) — same value the user supplied to request the reset. */
+  identifier: string;
+  /** UUID token delivered in the reset link / from verify-otp. */
   verificationToken: string;
   newPassword: string;
 }
@@ -328,13 +333,29 @@ export interface TestPushRequest {
 
 // ============== Financial ==============
 
-/** GET /financial/wallet/me — per api_business_flow §11. */
+/** Lifetime / monthly stats on GET /financial/wallet/me (providers only). */
+export interface WalletOverviewDto {
+  totalEarnedLifetime: string;
+  totalServiceHoursLifetime: number;
+  completedJobsCount: number;
+  avgEarningsPerCompletedJob: string | null;
+  currentMonthEarnings: string;
+  previousMonthEarnings: string;
+  monthOverMonthPercent: number | null;
+}
+
+/** GET /financial/wallet/me — per hope-backend api_business_flow §11. */
 export interface WalletResponse {
-  totalBalance: string;
+  /** USER wallet — cash earnings + withdrawn online earnings. */
+  walletBalance: string;
+  /** CLAIMABLE wallet — online earnings available to withdraw (hero amount on mobile). */
   claimableBalance: string;
-  nonClaimableBalance: string;
-  cashCommissionDue: string;
+  totalBalance: string;
   pendingWithdrawal: string;
+  /** claimableBalance − pendingWithdrawal. */
+  availableToWithdraw: string;
+  currency: string;
+  overview?: WalletOverviewDto;
 }
 
 export interface ClaimableBalanceResponse {
@@ -637,6 +658,7 @@ export const consultationTypesApi = {
     data: {
       name: string;
       description?: string | null;
+      type?: ServiceCategoryChecklistType;
       isActive?: boolean;
       displayOrder?: number;
     }
@@ -653,6 +675,7 @@ export const consultationTypesApi = {
     data: {
       name?: string;
       description?: string | null;
+      type?: ServiceCategoryChecklistType;
       isActive?: boolean;
       displayOrder?: number;
     }
@@ -707,10 +730,14 @@ export const consultationTypesApi = {
 };
 
 /** Service category checklist row (admin; per consultation type). */
+export type ServiceCategoryChecklistType = "CHECKLIST" | "VITALS";
+
 export interface ServiceCategoryChecklistItem {
   id: number;
+  consultationTypeId?: number;
   name: string;
   description?: string | null;
+  type?: ServiceCategoryChecklistType;
   isActive: boolean;
   displayOrder: number;
 }
@@ -982,7 +1009,7 @@ export const adminProviderCancelApi = {
       { signal: config?.signal }
     );
   },
-  approve: async (id: number, body?: { adminNotes?: string }) => {
+  approve: async (id: number, body?: { adminNotes?: string; refundAmount?: number }) => {
     return httpService.post(`/admin/provider-cancel-requests/${id}/approve`, body ?? {});
   },
   reject: async (id: number, body: { adminNotes: string }) => {
@@ -991,6 +1018,43 @@ export const adminProviderCancelApi = {
   reassign: async (id: number, body: { newProviderId: number; adminNotes?: string }) => {
     return httpService.post<ProviderCancelReviewReassignResult>(
       `/admin/provider-cancel-requests/${id}/reassign`,
+      body
+    );
+  },
+  // Batch endpoints (multi-shift LTO provider cancel)
+  getBatch: async (batchId: string, config?: { signal?: AbortSignal }) => {
+    return httpService.get<{
+      batchId: string;
+      opportunityId: number | null;
+      shifts: Array<{
+        cancellationId: number;
+        shiftId: number;
+        scheduledDate: string | null;
+        scheduledTime: string | null;
+        fee: string;
+        reasonCategory: string | null;
+        reviewStatus: string;
+        srStatus: string | null;
+        previousSrStatus: string | null;
+        refundPreview: { feeAmount: string; refundAmount: string };
+      }>;
+    }>(`/admin/provider-cancel-requests/batch/${batchId}`, { signal: config?.signal });
+  },
+  processBatch: async (
+    batchId: string,
+    body: {
+      adminNotes?: string;
+      actions: Array<{
+        cancellationId: number;
+        decision: 'approve' | 'reject' | 'reassign';
+        refundAmount?: number;
+        newProviderId?: number;
+        shiftNotes?: string;
+      }>;
+    }
+  ) => {
+    return httpService.post<{ batchId: string; processed: number; results: unknown[] }>(
+      `/admin/provider-cancel-requests/batch/${batchId}/process`,
       body
     );
   },
@@ -1616,6 +1680,8 @@ export interface AdminServiceRequestListDto {
   amount: string;
   scheduledAt?: string | null;
   createdAt: string;
+  /** Present when this SR belongs to a long-term opportunity (used by GET /service-event-logs/timeline). */
+  longTermOpportunityId?: number | null;
 }
 
 /** Response for GET /v1/admin/service-requests. */
@@ -1626,9 +1692,18 @@ export interface AdminServiceRequestListResponse {
   limit: number;
 }
 
-/** GET /v1/service-requests/:id/event-logs — audit / lifecycle entries (shape may vary by backend). */
+/**
+ * GET /v1/service-event-logs/timeline — single lifecycle entry.
+ * Fields with `?:` are tolerated for backwards compatibility with the
+ * old `/service-requests/:id/event-logs` payload shape.
+ */
 export interface ServiceRequestEventLogDto {
   id?: number;
+  /** Canonical step code from the new timeline endpoint (e.g. REQUEST_CREATED). */
+  step?: string | null;
+  /** True when this lifecycle step has already happened. New endpoint only. */
+  isDone?: boolean | null;
+  /** Legacy fields kept for fallback rendering. */
   eventType?: string | null;
   title?: string | null;
   message?: string | null;
@@ -1642,12 +1717,50 @@ export interface ServiceRequestEventLogDto {
   occurredAt?: string | null;
   timestamp?: string | null;
   actorName?: string | null;
+  actorRole?: string | null;
+  actorUserId?: number | null;
   performedBy?: string | null;
   [key: string]: unknown;
 }
 
-/** Normalize GET event-logs body whether the API returns an array or a wrapped object. */
+/** Full response of GET /v1/service-event-logs/timeline. */
+export interface ServiceRequestTimelineResponseDto {
+  serviceType: string;
+  isTerminal: boolean;
+  timeline: ServiceRequestEventLogDto[];
+}
+
+/** Normalize the new timeline response, tolerating common wrapper shapes. */
+export function normalizeServiceRequestTimeline(
+  raw: unknown
+): ServiceRequestTimelineResponseDto {
+  const empty: ServiceRequestTimelineResponseDto = {
+    serviceType: "",
+    isTerminal: false,
+    timeline: [],
+  };
+  if (!raw || typeof raw !== "object") return empty;
+  const root = raw as Record<string, unknown>;
+  const body =
+    root.timeline !== undefined
+      ? root
+      : root.data && typeof root.data === "object"
+      ? (root.data as Record<string, unknown>)
+      : root;
+  const timelineRaw = Array.isArray(body.timeline) ? body.timeline : [];
+  return {
+    serviceType: typeof body.serviceType === "string" ? body.serviceType : "",
+    isTerminal: Boolean(body.isTerminal),
+    timeline: timelineRaw.filter(
+      (x): x is ServiceRequestEventLogDto => !!x && typeof x === "object"
+    ),
+  };
+}
+
+/** Legacy: extract just the array (still used by old callers). */
 export function normalizeServiceRequestEventLogs(raw: unknown): ServiceRequestEventLogDto[] {
+  const parsed = normalizeServiceRequestTimeline(raw);
+  if (parsed.timeline.length > 0) return parsed.timeline;
   if (Array.isArray(raw)) {
     return raw.filter((x) => x && typeof x === "object") as ServiceRequestEventLogDto[];
   }
@@ -1669,7 +1782,7 @@ export function normalizeServiceRequestEventLogs(raw: unknown): ServiceRequestEv
 }
 
 function eventLogSortTime(log: ServiceRequestEventLogDto): number {
-  const s = log.createdAt ?? log.occurredAt ?? log.timestamp ?? "";
+  const s = log.occurredAt ?? log.createdAt ?? log.timestamp ?? "";
   const t = Date.parse(String(s));
   return Number.isFinite(t) ? t : 0;
 }
@@ -1722,12 +1835,16 @@ export interface ProviderFullDetailsDto {
   /** Total wallet balance (new wallet API §11). */
   totalBalance?: string | null;
   claimableBalance: string;
+  /** USER wallet (cash + withdrawn online) — maps to mobile `walletBalance`. */
+  walletBalance?: string | null;
   /** Non-claimable (cash) balance. */
   nonClaimableBalance?: string | null;
   /** Commission owed by provider for cash payments. */
   cashCommissionDue?: string | null;
   /** Pending withdrawal amount. */
   pendingWithdrawal?: string | null;
+  /** Same aggregates as GET /financial/wallet/me `overview`. */
+  walletOverview?: WalletOverviewDto | null;
   walletHistory: WalletHistoryEntryDto[];
 }
 
@@ -1810,6 +1927,7 @@ export const providersApi = {
     params?: {
       page?: number;
       limit?: number;
+      search?: string;
       consultationTypeId?: number;
       status?: ProviderListStatusFilter;
       documentType?: string;
@@ -1825,6 +1943,8 @@ export const providersApi = {
       page: params?.page ?? 1,
       limit: params?.limit ?? 10,
     };
+    const search = params?.search?.trim();
+    if (search) query.search = search;
     if (params?.consultationTypeId != null) {
       query.consultationTypeId = params.consultationTypeId;
     }
@@ -1857,7 +1977,7 @@ export const providersApi = {
    * Query: page, limit. Backend requires consultationTypeCode when isSupervised is sent.
    */
   getAllPublic: async (
-    params?: { page?: number; limit?: number; consultationTypeCode?: string },
+    params?: { page?: number; limit?: number; consultationTypeCode?: string; search?: string },
     config?: { signal?: AbortSignal }
   ) => {
     const query: Record<string, string | number | boolean> = {
@@ -1866,6 +1986,8 @@ export const providersApi = {
       isSupervised: false,
       consultationTypeCode: params?.consultationTypeCode ?? "NURSING_CARE",
     };
+    const search = params?.search?.trim();
+    if (search) query.search = search;
     return httpService.get<unknown>("/providers/all", {
       params: query,
       signal: config?.signal,
@@ -2245,7 +2367,10 @@ export const notificationsApi = {
 // ============== Financial API ==============
 
 export const financialApi = {
-  /** GET /financial/wallet/me */
+  /**
+   * GET /financial/wallet/me — balances + provider `overview` stats.
+   * Mobile: hero = `claimableBalance`; grid = `overview`; see `src/utils/providerWallet.ts`.
+   */
   getWallet: async () => {
     return httpService.get<WalletResponse>("/financial/wallet/me");
   },
@@ -2502,13 +2627,22 @@ export const adminServiceRequestsApi = {
   },
 
   /**
-   * GET /v1/service-requests/:requestId/event-logs — timeline / lifecycle events for a service request.
+   * GET /v1/service-event-logs/timeline — timeline / lifecycle events for a service request
+   * and/or its parent long-term opportunity. At least one id should be supplied; both
+   * are passed when available so the backend can merge both timelines.
    */
-  getEventLogs: async (requestId: number, config?: { signal?: AbortSignal }) => {
-    return httpService.get<unknown>(
-      `/service-requests/${encodeURIComponent(String(requestId))}/event-logs`,
-      { signal: config?.signal }
-    );
+  getEventLogs: async (
+    params: { serviceRequestId?: number | null; longTermOpportunityId?: number | null },
+    config?: { signal?: AbortSignal }
+  ) => {
+    const query: Record<string, number> = {};
+    if (params.serviceRequestId != null) query.serviceRequestId = Number(params.serviceRequestId);
+    if (params.longTermOpportunityId != null)
+      query.longTermOpportunityId = Number(params.longTermOpportunityId);
+    return httpService.get<unknown>("/service-event-logs/timeline", {
+      params: query,
+      signal: config?.signal,
+    });
   },
 };
 
@@ -2731,13 +2865,14 @@ export function normalizeLongTermOpportunitiesListResponse(data: unknown): {
 export const adminLongTermOpportunitiesApi = {
   /**
    * GET /v1/admin/long-term-opportunities — Paginated long-term service requests.
-   * Query: page, limit; optional status (omit for all).
+   * Query: page, limit; optional status (omit for all), search (free-text).
    */
   getList: async (
     params?: {
       page?: number;
       limit?: number;
       status?: LongTermOpportunityStatusFilter;
+      search?: string;
     },
     config?: { signal?: AbortSignal }
   ) => {
@@ -2746,6 +2881,8 @@ export const adminLongTermOpportunitiesApi = {
       limit: params?.limit ?? 10,
     };
     if (params?.status) query.status = params.status;
+    const search = params?.search?.trim();
+    if (search) query.search = search;
     return httpService.get<unknown>("/admin/long-term-opportunities", {
       params: query,
       signal: config?.signal,
@@ -2998,9 +3135,17 @@ export function normalizeAssignedProvidersToListItems(data: unknown): ProviderLi
 }
 
 export const adminSupervisorsApi = {
-  /** GET /v1/admin/supervisors — list supervisors (admin). */
-  getAll: async (config?: { signal?: AbortSignal }) => {
-    return httpService.get<unknown>("/admin/supervisors", { signal: config?.signal });
+  /** GET /v1/admin/supervisors — list supervisors (admin). Optional free-text search. */
+  getAll: async (
+    params?: { search?: string },
+    config?: { signal?: AbortSignal }
+  ) => {
+    const search = params?.search?.trim();
+    const query = search ? { search } : undefined;
+    return httpService.get<unknown>("/admin/supervisors", {
+      params: query,
+      signal: config?.signal,
+    });
   },
 
   /** GET /v1/admin/:supervisorId/providers — already assigned providers under a supervisor. */
@@ -3205,6 +3350,9 @@ export interface GlMoneySummaryDto {
   stagedRefunds: string;
   /** CANCELLATION_FEE_GL — cancellation fee revenue collected */
   cancellationFees: string;
+  /** Total supervisor commission released to assigned supervisors' CLAIMABLE wallets on completion.
+   *  When no supervisor is assigned the amount goes to COMMISSION_GL and is already in commissionEarned. */
+  supervisorCommissionReleased: string;
 }
 
 export interface GlEscrowIntegrityDto {
@@ -3694,5 +3842,120 @@ export const userApi = {
   },
   deleteUser: async (userId: string) => {
     return httpService.delete(`/users/${userId}`);
+  },
+};
+
+// ============== Admin / Supervisor Reporting ==============
+
+/** Service request flavor used as a reporting filter. */
+export type ReportingServiceType = "SHORT_TERM" | "LONG_TERM";
+
+/** Provider category used as a reporting filter. */
+export type ReportingProviderCategory = "DOCTOR" | "CAREGIVER" | "NURSE";
+
+/** Query params for GET /v1/reporting/summary. All fields optional. */
+export interface ReportingSummaryParams {
+  /** Start date — `YYYY-MM-DD` (inclusive). */
+  startDate?: string;
+  /** End date — `YYYY-MM-DD` (inclusive). */
+  endDate?: string;
+  serviceType?: ReportingServiceType;
+  providerCategory?: ReportingProviderCategory;
+  providerId?: number;
+  supervisorId?: number;
+  /** Server-side row cap for ancillary breakdowns. Defaults vary by backend. */
+  limit?: number;
+}
+
+/**
+ * Response of GET /v1/reporting/summary.
+ * Money fields are decimal strings (e.g. "147500.00"); rates are 0–100 numbers.
+ */
+export interface ReportingSummaryDto {
+  fulfillmentRate: number | null;
+  acceptanceRate: number | null;
+  paymentExpiryRate: number | null;
+  cancellationRate: number | null;
+  totalRequests: number | null;
+  confirmedBookings: number | null;
+  completedServices: number | null;
+  grossRevenue: string | null;
+  ontorCommission: string | null;
+  providerPayout: string | null;
+  pendingPayout: string | null;
+  refundAmount: string | null;
+}
+
+/**
+ * Single row in GET /v1/reporting/daily-breakdown.
+ * Money fields are decimal strings; counts and rates are numeric.
+ */
+export interface ReportingDailyBreakdownRow {
+  /** Day in `YYYY-MM-DD` (Bangladesh calendar). */
+  date: string;
+  fulfillmentRate?: number | null;
+  acceptanceRate?: number | null;
+  paymentExpiryRate?: number | null;
+  cancellationRate?: number | null;
+  totalRequests?: number | null;
+  confirmedBookings?: number | null;
+  completedServices?: number | null;
+  grossRevenue?: string | number | null;
+  ontorCommission?: string | number | null;
+  providerPayout?: string | number | null;
+  pendingPayout?: string | number | null;
+  refundAmount?: string | number | null;
+}
+
+/** Cursor-paginated response of GET /v1/reporting/daily-breakdown. */
+export interface ReportingDailyBreakdownResponse {
+  data: ReportingDailyBreakdownRow[];
+  nextCursor?: string | null;
+  hasMore?: boolean;
+  limit?: number;
+}
+
+/** Extends summary params with a forward-only `cursor` for paginated breakdown calls. */
+export interface ReportingDailyBreakdownParams extends ReportingSummaryParams {
+  cursor?: string;
+}
+
+export const reportingApi = {
+  /** GET /v1/reporting/summary — KPI summary for admin/supervisor reporting dashboard. */
+  getSummary: async (
+    params?: ReportingSummaryParams,
+    config?: { signal?: AbortSignal }
+  ) => {
+    const query: Record<string, string | number> = {};
+    if (params?.startDate) query.startDate = params.startDate;
+    if (params?.endDate) query.endDate = params.endDate;
+    if (params?.serviceType) query.serviceType = params.serviceType;
+    if (params?.providerCategory) query.providerCategory = params.providerCategory;
+    if (params?.providerId != null) query.providerId = params.providerId;
+    if (params?.supervisorId != null) query.supervisorId = params.supervisorId;
+    if (params?.limit != null) query.limit = params.limit;
+    return httpService.get<ReportingSummaryDto>("/reporting/summary", {
+      params: query,
+      signal: config?.signal,
+    });
+  },
+  /** GET /v1/reporting/daily-breakdown — cursor-paginated per-day breakdown. */
+  getDailyBreakdown: async (
+    params?: ReportingDailyBreakdownParams,
+    config?: { signal?: AbortSignal }
+  ) => {
+    const query: Record<string, string | number> = {};
+    if (params?.startDate) query.startDate = params.startDate;
+    if (params?.endDate) query.endDate = params.endDate;
+    if (params?.serviceType) query.serviceType = params.serviceType;
+    if (params?.providerCategory) query.providerCategory = params.providerCategory;
+    if (params?.providerId != null) query.providerId = params.providerId;
+    if (params?.supervisorId != null) query.supervisorId = params.supervisorId;
+    if (params?.limit != null) query.limit = params.limit;
+    if (params?.cursor) query.cursor = params.cursor;
+    return httpService.get<ReportingDailyBreakdownResponse>(
+      "/reporting/daily-breakdown",
+      { params: query, signal: config?.signal }
+    );
   },
 };

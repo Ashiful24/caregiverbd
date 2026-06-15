@@ -26,10 +26,12 @@ export function mapEventLogToLifecycleStep(
   log: ServiceRequestEventLogDto,
   t: TFunction
 ): LifecycleStepItem {
+  const rawStep = str(log.step);
   const rawEventType = str(log.eventType);
   const rawLabel = str(log.label);
   const title =
     str(log.title) ||
+    (rawStep ? humanizeApiEventCode(rawStep) : "") ||
     (rawEventType ? humanizeApiEventCode(rawEventType) : "") ||
     (rawLabel ? humanizeApiEventCode(rawLabel) : "") ||
     (str(log.status) ? formatStatusLabel(str(log.status)) : "") ||
@@ -43,8 +45,12 @@ export function mapEventLogToLifecycleStep(
     str(log.note),
   ].filter(Boolean);
 
-  const who = str(log.actorName) || str(log.performedBy);
-  const whenRaw = log.createdAt ?? log.occurredAt ?? log.timestamp;
+  const role = str(log.actorRole);
+  const who =
+    str(log.actorName) ||
+    str(log.performedBy) ||
+    (role ? humanizeApiEventCode(role) : "");
+  const whenRaw = log.occurredAt ?? log.createdAt ?? log.timestamp;
   const when = whenRaw ? formatDateTime(String(whenRaw)) : "";
 
   let description = bodyParts.join(" — ");
@@ -55,13 +61,24 @@ export function mapEventLogToLifecycleStep(
     description = description ? `${description} · ${when}` : when;
   }
   if (!description) {
-    description = t("appointments.eventLogNoDetail");
+    // For not-yet-done steps from the timeline endpoint, surface a friendlier
+    // "pending" placeholder instead of the generic "no detail" copy.
+    description =
+      log.isDone === false
+        ? t("appointments.eventLogPending", {
+            defaultValue: "Not started yet",
+          })
+        : t("appointments.eventLogNoDetail");
   }
 
   return { title, description };
 }
 
-/** When using API-driven steps: terminal statuses show all steps completed; otherwise highlight the latest event. */
+/**
+ * When using API-driven steps from the legacy event-logs endpoint
+ * (where each entry is already a completed event): terminal statuses
+ * show all steps completed; otherwise highlight the latest event.
+ */
 export function lifecycleActiveIndexForEventLogCount(
   status: string,
   stepCount: number
@@ -71,4 +88,21 @@ export function lifecycleActiveIndexForEventLogCount(
   const terminal = ["COMPLETED", "CANCELLED", "REJECTED", "EXPIRED"].includes(s);
   if (terminal) return stepCount;
   return stepCount - 1;
+}
+
+/**
+ * Active index for the new `/service-event-logs/timeline` payload, where the
+ * server already returns the full ordered lifecycle with `isDone` flags. The
+ * active step is the first not-done entry. When `isTerminal` is true (or every
+ * step is done) we mark the whole stepper as completed.
+ */
+export function lifecycleActiveIndexForTimeline(
+  steps: { isDone?: boolean | null }[],
+  isTerminal: boolean
+): number {
+  if (steps.length === 0) return 0;
+  if (isTerminal) return steps.length;
+  const firstPending = steps.findIndex((s) => s.isDone !== true);
+  if (firstPending === -1) return steps.length;
+  return firstPending;
 }

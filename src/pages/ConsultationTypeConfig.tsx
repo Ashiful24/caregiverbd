@@ -5,11 +5,13 @@ import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import PageMeta from "../components/common/PageMeta";
 import Button from "../components/ui/button/Button";
 import Checkbox from "../components/form/input/Checkbox";
+import ThemedSelect from "../components/form/ThemedSelect";
 import { Modal } from "../components/ui/modal";
 import {
   consultationTypesApi,
   verificationDocumentTypesApi,
   type ServiceCategoryChecklistItem,
+  type ServiceCategoryChecklistType,
   type ConsultationTypeVerificationRequirementItem,
   type VerificationDocumentTypeItem,
 } from "../services/api";
@@ -39,6 +41,7 @@ export default function ConsultationTypeConfig() {
   >(null);
   const [serviceName, setServiceName] = useState("");
   const [serviceDescription, setServiceDescription] = useState("");
+  const [serviceType, setServiceType] = useState<ServiceCategoryChecklistType>("CHECKLIST");
   const [serviceIsActive, setServiceIsActive] = useState(true);
   const [serviceDisplayOrder, setServiceDisplayOrder] = useState(0);
   const [documentTypes, setDocumentTypes] = useState<VerificationDocumentTypeItem[]>([]);
@@ -101,12 +104,14 @@ export default function ConsultationTypeConfig() {
       await consultationTypesApi.createService(typeId, {
         name: serviceName.trim(),
         description: serviceDescription.trim() || null,
+        type: serviceType,
         isActive: serviceIsActive,
         displayOrder: serviceDisplayOrder,
       });
       setServiceModal(null);
       setServiceName("");
       setServiceDescription("");
+      setServiceType("CHECKLIST");
       setServiceIsActive(true);
       setServiceDisplayOrder(0);
       await fetchData();
@@ -122,6 +127,7 @@ export default function ConsultationTypeConfig() {
       await consultationTypesApi.updateService(typeId, serviceModal.item.id, {
         name: serviceName.trim(),
         description: serviceDescription.trim() || null,
+        type: serviceType,
         isActive: serviceIsActive,
         displayOrder: serviceDisplayOrder,
       });
@@ -254,6 +260,11 @@ export default function ConsultationTypeConfig() {
                           <span className="font-medium text-gray-800 dark:text-white/90">
                             {s.name}
                           </span>
+                          {s.type === "VITALS" && (
+                            <span className="rounded bg-blue-100 px-1.5 text-xs font-medium text-blue-700 dark:bg-blue-900/40 dark:text-blue-200">
+                              {t("consultationConfig.serviceTypeVitals")}
+                            </span>
+                          )}
                           {!s.isActive && (
                             <span className="rounded bg-gray-200 px-1.5 text-xs text-gray-700 dark:bg-gray-600 dark:text-gray-200">
                               {t("common.status.inactive")}
@@ -273,6 +284,7 @@ export default function ConsultationTypeConfig() {
                             setServiceModal({ mode: "edit", item: s });
                             setServiceName(s.name);
                             setServiceDescription(s.description ?? "");
+                            setServiceType(s.type ?? "CHECKLIST");
                             setServiceIsActive(s.isActive);
                             setServiceDisplayOrder(s.displayOrder);
                           }}
@@ -300,6 +312,7 @@ export default function ConsultationTypeConfig() {
                   setServiceModal({ mode: "add" });
                   setServiceName("");
                   setServiceDescription("");
+                  setServiceType("CHECKLIST");
                   setServiceIsActive(true);
                   setServiceDisplayOrder(services.length);
                 }}
@@ -399,6 +412,20 @@ export default function ConsultationTypeConfig() {
                 className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
                 placeholder={t("consultationConfig.serviceItemNamePlaceholder")}
               />
+            </label>
+            <label className="block">
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("consultationConfig.serviceItemType")}</span>
+              <ThemedSelect
+                value={serviceType}
+                onChange={(e) => setServiceType(e.target.value as ServiceCategoryChecklistType)}
+                className="mt-1"
+              >
+                <option value="CHECKLIST">{t("consultationConfig.serviceTypeChecklist")}</option>
+                <option value="VITALS">{t("consultationConfig.serviceTypeVitals")}</option>
+              </ThemedSelect>
+              <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
+                {t("consultationConfig.serviceItemTypeHelp")}
+              </span>
             </label>
             <label className="block">
               <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("consultationConfig.serviceItemDescription")}</span>
