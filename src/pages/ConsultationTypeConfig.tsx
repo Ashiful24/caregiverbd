@@ -414,16 +414,6 @@ export default function ConsultationTypeConfig() {
               />
             </label>
             <label className="block">
-              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("consultationConfig.serviceItemDescription")}</span>
-              <textarea
-                value={serviceDescription}
-                onChange={(e) => setServiceDescription(e.target.value)}
-                rows={3}
-                className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
-                placeholder={t("consultationConfig.serviceItemDescriptionPlaceholder")}
-              />
-            </label>
-            <div className="block">
               <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("consultationConfig.serviceItemType")}</span>
               <ThemedSelect
                 value={serviceType}
@@ -436,7 +426,17 @@ export default function ConsultationTypeConfig() {
               <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
                 {t("consultationConfig.serviceItemTypeHelp")}
               </span>
-            </div>
+            </label>
+            <label className="block">
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("consultationConfig.serviceItemDescription")}</span>
+              <textarea
+                value={serviceDescription}
+                onChange={(e) => setServiceDescription(e.target.value)}
+                rows={3}
+                className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                placeholder={t("consultationConfig.serviceItemDescriptionPlaceholder")}
+              />
+            </label>
             <label className="flex items-center gap-2">
               <Checkbox
                 checked={serviceIsActive}
