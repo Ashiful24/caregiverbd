@@ -17,6 +17,7 @@ import {
   adminProviderCancelApi,
   patientsApi,
   providersApi,
+  isProviderCancelBatchItem,
   type PatientListItem,
   type ProviderCancelReviewListItem,
   type ProviderCancelReviewListResponse,
@@ -75,10 +76,10 @@ export default function ProviderCancelRequests() {
     null
   );
   const [hasNext, setHasNext] = useState(false);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [hasPrev, setHasPrev] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
   const [total, setTotal] = useState<number | undefined>(undefined);
   const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
 
   const [statusTab, setStatusTab] = useState<ProviderCancelReviewStatus>("PENDING");
@@ -122,30 +123,34 @@ export default function ProviderCancelRequests() {
 
   const baseQuery = useMemo(
     () => ({
-      status: statusTab,
+      status: statusTab === "ALL" ? undefined : statusTab,
       providerId: providerIdParsed,
       patientId: patientIdParsed,
-      limit,
       includeSummary,
       includeTotal,
     }),
-    [includeSummary, includeTotal, limit, patientIdParsed, providerIdParsed, statusTab]
+    [includeSummary, includeTotal, patientIdParsed, providerIdParsed, statusTab]
   );
 
-  const fetchFirstPage = useCallback(
-    async (signal?: AbortSignal) => {
+  // Reset to page 1 when any filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [statusTab, providerIdParsed, patientIdParsed, limit, includeSummary, includeTotal]);
+
+  const fetchPage = useCallback(
+    async (page: number, signal?: AbortSignal) => {
       setLoading(true);
       setError("");
       try {
         const res = await adminProviderCancelApi.list(
-          { ...baseQuery, page: 1 },
+          { ...baseQuery, page, limit },
           { signal }
         );
         const body = unwrapListPayload(res);
         setRows(Array.isArray(body.data) ? body.data : []);
         setSummary(body.summary ?? null);
         setHasNext(!!body.hasNext);
-        setNextCursor(body.nextCursor ?? null);
+        setHasPrev(page > 1);
         setTotal(body.total);
       } catch (err: unknown) {
         if (err instanceof Error && err.name === "AbortError") return;
@@ -157,46 +162,20 @@ export default function ProviderCancelRequests() {
         setRows([]);
         setSummary(null);
         setHasNext(false);
-        setNextCursor(null);
+        setHasPrev(false);
         setTotal(undefined);
       } finally {
         setLoading(false);
       }
     },
-    [baseQuery, t]
+    [baseQuery, limit, t]
   );
 
   useEffect(() => {
     const controller = new AbortController();
-    fetchFirstPage(controller.signal);
+    fetchPage(currentPage, controller.signal);
     return () => controller.abort();
-  }, [fetchFirstPage]);
-
-  const loadMore = async () => {
-    if (!nextCursor || loadingMore) return;
-    setLoadingMore(true);
-    setError("");
-    try {
-      const res = await adminProviderCancelApi.list({
-        ...baseQuery,
-        cursor: nextCursor,
-      });
-      const body = unwrapListPayload(res);
-      setRows((prev) => [...prev, ...(Array.isArray(body.data) ? body.data : [])]);
-      if (body.summary) setSummary(body.summary);
-      setHasNext(!!body.hasNext);
-      setNextCursor(body.nextCursor ?? null);
-      if (body.total !== undefined) setTotal(body.total);
-    } catch (err: unknown) {
-      const message =
-        err && typeof err === "object" && "message" in err
-          ? String((err as { message: string }).message)
-          : t("providerCancelRequests.failedToLoad");
-      setError(message);
-    } finally {
-      setLoadingMore(false);
-    }
-  };
+  }, [fetchPage, currentPage]);
 
   const providerLabel = (p: ProviderListItem) =>
     [p.firstName, p.lastName].filter(Boolean).join(" ") ||
@@ -220,7 +199,7 @@ export default function ProviderCancelRequests() {
           title={t("providerCancelRequests.heading")}
           subheading={t("providerCancelRequests.subheading")}
           pendingCount={includeSummary ? summary?.pending : undefined}
-          onRefresh={() => fetchFirstPage()}
+          onRefresh={() => fetchPage(currentPage)}
           loading={loading}
           refreshLabel={
             loading ? t("providerCancelRequests.refreshing") : t("providerCancelRequests.refresh")
@@ -274,23 +253,9 @@ export default function ProviderCancelRequests() {
                 }))}
               />
             }
-            limitSelect={
-              <ThemedSelect
-                value={limit}
-                onChange={(e) => setLimit(Number(e.target.value))}
-                className="w-full min-h-[42px]"
-              >
-                {LIMIT_OPTIONS.map((n) => (
-                  <option key={n} value={n}>
-                    {n}
-                  </option>
-                ))}
-              </ThemedSelect>
-            }
             labels={{
               provider: t("providerCancelRequests.providerFilter"),
               patient: t("providerCancelRequests.patientFilter"),
-              pageSize: t("providerCancelRequests.pageSize"),
             }}
           />
 
@@ -334,12 +299,6 @@ export default function ProviderCancelRequests() {
           </div>
         ) : null}
 
-        {total != null ? (
-          <p className="mb-2 text-xs text-gray-600 dark:text-gray-400">
-            {t("providerCancelRequests.exactTotal", { total })}
-          </p>
-        ) : null}
-
         {error ? (
           <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-300">
             {error}
@@ -357,23 +316,52 @@ export default function ProviderCancelRequests() {
         ) : rows.length > 0 ? (
           <>
             <RequestsTable rows={rows} t={t} />
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                {t("providerCancelRequests.loadedRows", { count: rows.length })}
-                {hasNext ? ` · ${t("providerCancelRequests.moreAvailable")}` : ""}
-              </p>
-              {hasNext ? (
+            {/* Pagination bar */}
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+              {/* Left: page size + row count */}
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5">
+                  <label className="text-xs text-gray-500 dark:text-gray-400">
+                    {t("providerCancelRequests.pageSize")}:
+                  </label>
+                  <ThemedSelect
+                    value={limit}
+                    onChange={(e) => setLimit(Number(e.target.value))}
+                    className="min-h-[32px] py-1 text-xs"
+                  >
+                    {LIMIT_OPTIONS.map((n) => (
+                      <option key={n} value={n}>{n}</option>
+                    ))}
+                  </ThemedSelect>
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {total != null
+                    ? t("providerCancelRequests.exactTotal", { total })
+                    : `${rows.length} rows`}
+                </p>
+              </div>
+              {/* Right: prev / page indicator / next */}
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={loadMore}
-                  disabled={loadingMore}
-                  className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
+                  disabled={!hasPrev || loading}
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
                 >
-                  {loadingMore
-                    ? t("providerCancelRequests.loadingMore")
-                    : t("providerCancelRequests.loadMore")}
+                  ← Prev
                 </button>
-              ) : null}
+                <span className="min-w-[60px] text-center text-xs text-gray-600 dark:text-gray-400">
+                  Page {currentPage}
+                </span>
+                <button
+                  type="button"
+                  disabled={!hasNext || loading}
+                  onClick={() => setCurrentPage((p) => p + 1)}
+                  className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                >
+                  Next →
+                </button>
+              </div>
             </div>
           </>
         ) : null}
@@ -426,8 +414,7 @@ function PageHeader(props: {
 function FilterGrid(props: {
   providerFilter: React.ReactNode;
   patientFilter: React.ReactNode;
-  limitSelect: React.ReactNode;
-  labels: { provider: string; patient: string; pageSize: string };
+  labels: { provider: string; patient: string };
 }) {
   return (
     <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-12 lg:items-end">
@@ -442,12 +429,6 @@ function FilterGrid(props: {
           {props.labels.patient}
         </label>
         {props.patientFilter}
-      </div>
-      <div className="min-w-0 sm:col-span-2 lg:col-span-2">
-        <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
-          {props.labels.pageSize}
-        </label>
-        {props.limitSelect}
       </div>
     </div>
   );
@@ -496,7 +477,16 @@ function RequestsTable({
         </TableHeader>
         <TableBody className="divide-y divide-gray-100 dark:divide-gray-800">
           {rows.map((row, index) => (
-            <ProviderCancelRow key={row.id} row={row} rowNumber={index + 1} t={t} />
+            <ProviderCancelRow
+              key={
+                isProviderCancelBatchItem(row)
+                  ? `batch-${row.batchId}`
+                  : `cancel-${row.id}`
+              }
+              row={row}
+              rowNumber={index + 1}
+              t={t}
+            />
           ))}
         </TableBody>
       </Table>
@@ -513,16 +503,37 @@ function ProviderCancelRow({
   rowNumber: number;
   t: (key: string, opts?: Record<string, unknown>) => string;
 }) {
-  const sr = row.serviceRequest;
   const isPending = row.reviewStatus === "PENDING";
-  const scheduleLabel = [sr.scheduledDate, sr.scheduledTime].filter(Boolean).join(" · ");
-  const visitMeta = [
-    scheduleLabel,
-    sr.status ? formatStatusLabel(sr.status) : null,
-    sr.serviceCategory ? formatStatusLabel(sr.serviceCategory) : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  const isBatch = isProviderCancelBatchItem(row);
+
+  const visitMeta = isBatch
+    ? [
+        t("providerCancelRequests.longTermBatch"),
+        t("providerCancelRequests.shiftCount", { count: row.shiftCount }),
+        row.earliestDate && row.latestDate && row.earliestDate !== row.latestDate
+          ? t("providerCancelRequests.dateRange", {
+              from: row.earliestDate,
+              to: row.latestDate,
+            })
+          : row.earliestDate ?? row.latestDate,
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : (() => {
+        const sr = row.serviceRequest;
+        const scheduleLabel = [sr.scheduledDate, sr.scheduledTime].filter(Boolean).join(" · ");
+        return [
+          scheduleLabel,
+          sr.status ? formatStatusLabel(sr.status) : null,
+          sr.serviceCategory ? formatStatusLabel(sr.serviceCategory) : null,
+        ]
+          .filter(Boolean)
+          .join(" · ");
+      })();
+
+  const detailHref = isBatch
+    ? `/provider-cancel-requests/batch/${row.batchId}`
+    : `/provider-cancel-requests/${row.id}`;
 
   return (
     <TableRow
@@ -545,16 +556,34 @@ function ProviderCancelRow({
       </TableCell>
 
       <TableCell className={tdClass}>
+        {/* Service type badge */}
+        <span className={`mb-1 inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold ${
+          isBatch
+            ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300"
+            : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
+        }`}>
+          {isBatch ? "Long Term Batch" : "Short Term"}
+        </span>
         {visitMeta ? (
           <p className="mb-0.5 text-xs text-gray-600 dark:text-gray-400">{visitMeta}</p>
         ) : null}
-        <Link
-          className="text-sm font-medium text-brand-600 hover:underline dark:text-brand-400"
-          to={`/schedule/${sr.id}`}
-          title={t("providerCancelRequests.openVisitTitle", { id: sr.id })}
-        >
-          {t("providerCancelRequests.openVisit")}
-        </Link>
+        {isBatch ? (
+          <Link
+            className="text-sm font-medium text-brand-600 hover:underline dark:text-brand-400"
+            to={detailHref}
+            title={t("providerCancelRequests.openBatchTitle", { count: row.shiftCount })}
+          >
+            {t("providerCancelRequests.openBatch")}
+          </Link>
+        ) : (
+          <Link
+            className="text-sm font-medium text-brand-600 hover:underline dark:text-brand-400"
+            to={`/schedule/${row.serviceRequest.id}`}
+            title={t("providerCancelRequests.openVisitTitle", { id: row.serviceRequest.id })}
+          >
+            {t("providerCancelRequests.openVisit")}
+          </Link>
+        )}
       </TableCell>
 
       <TableCell className={tdClass}>
@@ -583,12 +612,12 @@ function ProviderCancelRow({
       </TableCell>
 
       <TableCell className={`${tdClass} whitespace-nowrap text-right font-medium text-gray-800 dark:text-white/90`}>
-        {fmtBDT(sr.fee)}
+        {isBatch ? "—" : fmtBDT(row.serviceRequest.fee)}
       </TableCell>
 
       <TableCell className={`${tdClass} text-right`}>
         <Link
-          to={`/provider-cancel-requests/${row.id}`}
+          to={detailHref}
           className="inline-flex rounded border border-brand-500 bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-700 hover:bg-brand-100 dark:bg-brand-900/30 dark:text-brand-300 dark:hover:bg-brand-900/50"
         >
           {isPending ? t("providerCancelRequests.review") : t("common.actions.view")}
