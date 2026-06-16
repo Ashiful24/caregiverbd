@@ -903,26 +903,55 @@ export type ProviderCancelReviewStatus =
   | "REASSIGNED"
   | "ALL";
 
-export interface ProviderCancelReviewListItem {
+export interface ProviderCancelReviewListItemBase {
   id: number;
+  scope?: "SINGLE" | "LONG_TERM";
   reviewStatus: string | null;
   createdAt: string | null;
   reasonCategory: string | null;
   reasonNote: string | null;
+  provider: { id: number; userId?: number | null; name: string } | null;
+  patient: { id: number; userId?: number; name: string };
+}
+
+/** Single service-request cancellation (non-batch). */
+export interface ProviderCancelReviewSingleItem extends ProviderCancelReviewListItemBase {
+  scope: "SINGLE";
+  batchId: null;
   serviceRequest: {
     id: number;
     status: string | null;
     statusAtRequest: string;
     scheduledDate: string | null;
     scheduledTime: string | null;
-    scope: string;
     consultationTypeId: number;
     consultationTypeName: string;
     serviceCategory: string;
     fee: string | null;
   };
-  provider: { id: number; userId: number | null; name: string } | null;
-  patient: { id: number; userId: number; name: string };
+}
+
+/** Long-term multi-shift batch cancellation. */
+export interface ProviderCancelReviewBatchItem extends ProviderCancelReviewListItemBase {
+  scope: "LONG_TERM";
+  batchId: string;
+  opportunityId: number | null;
+  shiftCount: number;
+  earliestDate: string | null;
+  latestDate: string | null;
+}
+
+export type ProviderCancelReviewListItem =
+  | ProviderCancelReviewSingleItem
+  | ProviderCancelReviewBatchItem;
+
+export function isProviderCancelBatchItem(
+  row: ProviderCancelReviewListItem
+): row is ProviderCancelReviewBatchItem {
+  if (row.scope === "LONG_TERM") return true;
+  if (row.scope === "SINGLE") return false;
+  const maybeBatch = row as ProviderCancelReviewBatchItem;
+  return typeof maybeBatch.batchId === "string" && maybeBatch.batchId.length > 0;
 }
 
 export interface ProviderCancelReviewListResponse {
@@ -973,7 +1002,7 @@ export interface ProviderCancelReviewReassignResult {
   reassignTransactionId: number | null;
 }
 
-export interface ProviderCancelReviewDetail extends ProviderCancelReviewListItem {
+export interface ProviderCancelReviewDetail extends ProviderCancelReviewSingleItem {
   refundPreview: {
     feeAmount: string;
     refundAmount: string;
@@ -1026,6 +1055,16 @@ export const adminProviderCancelApi = {
     return httpService.get<{
       batchId: string;
       opportunityId: number | null;
+      reviewStatus: string;
+      shiftCount: number;
+      resolvedCount: number;
+      earliestDate: string | null;
+      latestDate: string | null;
+      reasonCategory: string | null;
+      reasonNote: string | null;
+      createdAt: string | null;
+      provider: { id: number; name: string | null } | null;
+      patient: { id: number; name: string | null } | null;
       shifts: Array<{
         cancellationId: number;
         shiftId: number;
@@ -1033,6 +1072,7 @@ export const adminProviderCancelApi = {
         scheduledTime: string | null;
         fee: string;
         reasonCategory: string | null;
+        reasonNote: string | null;
         reviewStatus: string;
         srStatus: string | null;
         previousSrStatus: string | null;
@@ -3355,47 +3395,6 @@ export interface GlMoneySummaryDto {
   supervisorCommissionReleased: string;
 }
 
-export interface GlEscrowIntegrityDto {
-  /** Sum of sr.fee for PAID/IN_PROGRESS short-term SRs whose payment used usesHoldGl=true */
-  shortTermExpected: string;
-  /** Sum of sr.fee for PAID/IN_PROGRESS LTO SRs whose parent payment used usesHoldGl=true */
-  ltoExpected: string;
-  /** shortTermExpected + ltoExpected — total money that should be in escrow */
-  totalExpected: string;
-  /** Actual SERVICE_HOLD_GL wallet balance */
-  actualBalance: string;
-  /** actualBalance − totalExpected; must be 0. Non-zero = escrow corruption. */
-  drift: string;
-  inSync: boolean;
-}
-
-export interface GlEarningsIntegrityDto {
-  /** Sum of commissionAmount for SRs whose commission has been released to COMMISSION_GL */
-  commissionReleased: string;
-  commissionBalance: string;
-  commissionDrift: string;
-  commissionInSync: boolean;
-  /** Sum of taxAmount for SRs whose tax has been released to VAT_GL */
-  taxReleased: string;
-  taxBalance: string;
-  taxDrift: string;
-  taxInSync: boolean;
-  /** Sum of aitAmount for SRs whose AIT has been released to AIT_GL */
-  aitReleased: string;
-  aitBalance: string;
-  aitDrift: string;
-  aitInSync: boolean;
-}
-
-export interface GlOverallHealthDto {
-  healthy: boolean;
-  walletsDriftFree: boolean;
-  /** SERVICE_HOLD_GL balance matches expected hold from active SRs (both short-term and LTO) */
-  escrowInSync: boolean;
-  /** COMMISSION_GL, VAT_GL, AIT_GL balances match released SR sums */
-  earningsInSync: boolean;
-  driftedWallets: string[];
-}
 
 export interface GlReconciliationHealthDto {
   balanced: boolean;
@@ -3409,9 +3408,6 @@ export interface GlReconciliationHealthDto {
 export interface GlReconciliationSummaryResponseDto {
   wallets: GlWalletReconciliationDto[];
   moneySummary: GlMoneySummaryDto;
-  escrowIntegrity: GlEscrowIntegrityDto;
-  earningsIntegrity: GlEarningsIntegrityDto;
-  overallHealth: GlOverallHealthDto;
   reconciliationHealth: GlReconciliationHealthDto;
 }
 

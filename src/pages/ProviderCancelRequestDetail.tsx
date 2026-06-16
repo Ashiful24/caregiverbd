@@ -7,17 +7,11 @@ import { SearchableSelect } from "../components/form/SearchableSelect";
 import Badge from "../components/ui/badge/Badge";
 import { ConfirmModal } from "../components/ui/confirm-modal";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHeader,
-  TableRow,
-} from "../components/ui/table";
-import {
   adminProviderCancelApi,
   providersApi,
   type ProviderCancelReviewDetail,
   type ProviderListItem,
+  type ProviderCancelReviewListItem,
 } from "../services/api";
 import { formatDateTime, formatStatusLabel } from "../utils/format";
 import { fmtBDT } from "./financial/shared";
@@ -57,6 +51,14 @@ export default function ProviderCancelRequestDetail() {
     null
   );
   const [successMessage, setSuccessMessage] = useState("");
+  const [showHistory, setShowHistory] = useState(false);
+  const [historyItems, setHistoryItems] = useState<ProviderCancelReviewListItem[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
+  const [selectedAction, setSelectedAction] = useState<"approve" | "reject" | "reassign" | null>(null);
+  const [refundAmount, setRefundAmount] = useState("");
+  const [refundMode, setRefundMode] = useState<"amount" | "percent">("amount");
+  const [percentInput, setPercentInput] = useState("100");
   const [replacementProviders, setReplacementProviders] = useState<ProviderListItem[]>([]);
   const [loadingReplacementProviders, setLoadingReplacementProviders] = useState(false);
 
@@ -89,6 +91,39 @@ export default function ProviderCancelRequestDetail() {
   useEffect(() => {
     fetchDetail();
   }, [fetchDetail]);
+
+  useEffect(() => {
+    if (selectedAction === "approve" && detail) {
+      setRefundAmount(detail.refundPreview.refundAmount ?? "");
+      setRefundMode("amount");
+      setPercentInput("100");
+    }
+  }, [selectedAction, detail?.id]);
+
+  // ── Approve-panel derived values ─────────────────────────────────────────
+  const fullRefundValue = parseFloat(detail?.refundPreview.refundAmount ?? "0") || 0;
+  const currentRefundValue = parseFloat(refundAmount) || 0;
+  const approveRefundPct =
+    fullRefundValue > 0 ? Math.round((currentRefundValue / fullRefundValue) * 100) : 0;
+  const isPartialRefund = currentRefundValue < fullRefundValue && currentRefundValue >= 0;
+
+  const handleApproveAmountChange = (raw: string) => {
+    setRefundAmount(raw);
+    if (fullRefundValue > 0)
+      setPercentInput(
+        String(Math.min(100, Math.max(0, Math.round(((parseFloat(raw) || 0) / fullRefundValue) * 100))))
+      );
+  };
+  const handleApprovePercentChange = (raw: string) => {
+    setPercentInput(raw);
+    const p = Math.min(100, Math.max(0, parseFloat(raw) || 0));
+    setRefundAmount(((p / 100) * fullRefundValue).toFixed(2));
+  };
+  const switchApproveRefundMode = (mode: "amount" | "percent") => {
+    setRefundMode(mode);
+    if (mode === "percent") setPercentInput(String(approveRefundPct));
+  };
+  // ─────────────────────────────────────────────────────────────────────────
 
   const consultationTypeId = detail?.serviceRequest.consultationTypeId;
   const isPending = detail?.reviewStatus === "PENDING";
@@ -202,8 +237,12 @@ export default function ProviderCancelRequestDetail() {
     setError("");
     try {
       if (confirmAction === "approve") {
+        const fullAmt = parseFloat(detail?.refundPreview.refundAmount ?? "0");
+        const customAmt = parseFloat(refundAmount);
         await adminProviderCancelApi.approve(requestId, {
           adminNotes: adminNotes.trim() || undefined,
+          refundAmount:
+            Number.isFinite(customAmt) && customAmt < fullAmt ? customAmt : undefined,
         });
         setSuccessMessage(t("providerCancelRequests.approveSuccess"));
       } else if (confirmAction === "reject") {
@@ -413,130 +452,306 @@ export default function ProviderCancelRequestDetail() {
           </div>
         </section>
 
-        {detail.cancelHistory.length > 0 ? (
-          <section className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] lg:p-6">
-            <h3 className="mb-3 text-lg font-semibold text-gray-800 dark:text-white/90">
-              {t("providerCancelRequests.providerHistory")}
-            </h3>
-            <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-800">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableCell isHeader className="px-3 py-2 text-xs">
-                      {t("providerCancelRequests.colSubmitted")}
-                    </TableCell>
-                    <TableCell isHeader className="px-3 py-2 text-xs">
-                      {t("providerCancelRequests.colReviewStatus")}
-                    </TableCell>
-                    <TableCell isHeader className="px-3 py-2 text-xs">
-                      {t("providerCancelRequests.colReason")}
-                    </TableCell>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {detail.cancelHistory.map((h) => (
-                    <TableRow key={h.id}>
-                      <TableCell className="px-3 py-2 text-xs">
-                        {formatDateTime(h.createdAt ?? "")}
-                      </TableCell>
-                      <TableCell className="px-3 py-2 text-xs">
-                        {formatStatusLabel(h.reviewStatus ?? "")}
-                      </TableCell>
-                      <TableCell className="px-3 py-2 text-xs">
-                        {h.reasonCategory ? formatStatusLabel(h.reasonCategory) : "—"}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </section>
-        ) : null}
+        <div>
+          <button
+            type="button"
+            onClick={async () => {
+              if (!showHistory && !historyLoaded) {
+                setHistoryLoading(true);
+                try {
+                  const res = await adminProviderCancelApi.list(
+                    { providerId: detail.provider?.id, limit: 30 }
+                  );
+                  const body = (res as unknown as { data?: { data?: ProviderCancelReviewListItem[] } }).data ?? res;
+                  const items = (body as { data?: ProviderCancelReviewListItem[] }).data ?? [];
+                  setHistoryItems(Array.isArray(items) ? items : []);
+                  setHistoryLoaded(true);
+                } catch {
+                  setHistoryItems([]);
+                  setHistoryLoaded(true);
+                } finally {
+                  setHistoryLoading(false);
+                }
+              }
+              setShowHistory((v) => !v);
+            }}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400 dark:hover:bg-gray-800"
+          >
+            {historyLoading
+              ? "Loading…"
+              : showHistory
+              ? "Hide provider cancel history (90 days)"
+              : "Show provider cancel history (90 days)"}
+          </button>
+          {showHistory && !historyLoading ? (
+            <section className="mt-3 rounded-2xl border border-gray-100 bg-white dark:border-gray-800/60 dark:bg-white/[0.03]">
+              <div className="border-b border-gray-100 px-5 py-3 dark:border-gray-800/60">
+                <h3 className="text-sm font-semibold text-gray-800 dark:text-white/90">
+                  {t("providerCancelRequests.providerHistory")}
+                </h3>
+              </div>
+              {historyItems.length === 0 ? (
+                <p className="px-5 py-4 text-sm text-gray-400">No previous cancel requests.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-100 bg-gray-50/60 dark:border-gray-800/60 dark:bg-gray-900/20">
+                        <th className="px-5 py-2.5 text-left text-xs font-medium text-gray-500">{t("providerCancelRequests.colSubmitted")}</th>
+                        <th className="px-5 py-2.5 text-left text-xs font-medium text-gray-500">{t("providerCancelRequests.colReviewStatus")}</th>
+                        <th className="px-5 py-2.5 text-left text-xs font-medium text-gray-500">{t("providerCancelRequests.colReason")}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {historyItems.map((h) => (
+                        <tr key={h.id} className="border-b border-gray-100/70 last:border-0 dark:border-gray-800/40">
+                          <td className="px-5 py-2.5 text-xs text-gray-600 dark:text-gray-400">{formatDateTime(h.createdAt ?? "")}</td>
+                          <td className="px-5 py-2.5 text-xs">{formatStatusLabel(h.reviewStatus ?? "")}</td>
+                          <td className="px-5 py-2.5 text-xs text-gray-600 dark:text-gray-400">{h.reasonCategory ? formatStatusLabel(h.reasonCategory) : "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+          ) : null}
+        </div>
 
         {isPending ? (
           <section className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] lg:p-6">
-            <h3 className="mb-3 text-lg font-semibold text-gray-800 dark:text-white/90">
+            <h3 className="mb-4 text-lg font-semibold text-gray-800 dark:text-white/90">
               {t("providerCancelRequests.adminActions")}
             </h3>
 
-            <div className="mb-4 rounded-xl border border-gray-100 bg-gray-50/60 p-4 dark:border-gray-800 dark:bg-gray-900/30">
-              <p className="mb-1 text-sm font-medium text-gray-800 dark:text-white/90">
-                {t("providerCancelRequests.reassignProvider")}
-              </p>
-              <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
-                {t("providerCancelRequests.reassignProviderHelp", {
-                  type: sr.consultationTypeName ?? formatStatusLabel(sr.serviceCategory),
-                })}
-              </p>
-              {loadingReplacementProviders ? (
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {t("providerCancelRequests.loadingProviders")}
-                </p>
-              ) : reassignProviderOptions.length === 0 ? (
-                <p className="text-sm text-amber-700 dark:text-amber-400">
-                  {t("providerCancelRequests.noReplacementProviders")}
-                </p>
-              ) : (
-                <>
-                  <SearchableSelect<number>
-                    value={newProviderId === "" ? null : newProviderId}
-                    onChange={(id) => setNewProviderId(id ?? "")}
-                    placeholder={t("providerCancelRequests.reassignSelectPlaceholder")}
-                    clearLabel={t("providerCancelRequests.reassignClear")}
-                    searchPlaceholder={t("providerCancelRequests.reassignSearchPlaceholder")}
-                    className="min-h-[42px]"
-                    options={reassignProviderOptions}
-                  />
-                  {selectedReassignProvider?.hint ? (
-                    <p className="mt-2 text-xs text-gray-600 dark:text-gray-400">
-                      {selectedReassignProvider.hint}
-                    </p>
+            {/* Step 1 — pick an action */}
+            {!selectedAction ? (
+              <>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <button
+                  type="button"
+                  onClick={() => { setSelectedAction("approve"); setAdminNotes(""); }}
+                  className="group rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 text-left hover:border-emerald-300 hover:bg-emerald-50 dark:border-emerald-800/50 dark:bg-emerald-950/25 dark:hover:bg-emerald-950/40"
+                >
+                  <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">
+                    {t("providerCancelRequests.approve")}
+                  </p>
+                  <p className="mt-0.5 text-xs text-emerald-600/70 dark:text-emerald-500">
+                    Refund patient · {fmtBDT(preview.refundAmount)}
+                  </p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setSelectedAction("reassign"); setAdminNotes(""); }}
+                  className="group rounded-xl border border-indigo-200 bg-indigo-50/60 p-4 text-left hover:border-indigo-300 hover:bg-indigo-50 dark:border-indigo-800/50 dark:bg-indigo-950/25 dark:hover:bg-indigo-950/40"
+                >
+                  <p className="text-sm font-semibold text-indigo-700 dark:text-indigo-400">
+                    {t("providerCancelRequests.reassign")}
+                  </p>
+                  <p className="mt-0.5 text-xs text-indigo-600/70 dark:text-indigo-500">
+                    Assign a different provider
+                  </p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setSelectedAction("reject"); setAdminNotes(""); }}
+                  className="group rounded-xl border border-rose-200 bg-rose-50/60 p-4 text-left hover:border-rose-300 hover:bg-rose-50 dark:border-rose-800/50 dark:bg-rose-950/25 dark:hover:bg-rose-950/40"
+                >
+                  <p className="text-sm font-semibold text-rose-700 dark:text-rose-400">
+                    {t("providerCancelRequests.reject")}
+                  </p>
+                  <p className="mt-0.5 text-xs text-rose-600/70 dark:text-rose-500">
+                    Restore shift to provider
+                  </p>
+                </button>
+              </div>
+              <div className="mt-4 flex justify-end">
+                <Link
+                  to="/provider-cancel-requests"
+                  className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
+                >
+                  Cancel
+                </Link>
+              </div>
+              </>
+            ) : (
+              /* Step 2 — configure the selected action */
+              <div
+                className={`rounded-xl border p-4 ${
+                  selectedAction === "approve"
+                    ? "border-emerald-200 bg-emerald-50/60 dark:border-emerald-800/50 dark:bg-emerald-950/25"
+                    : selectedAction === "reject"
+                    ? "border-rose-200 bg-rose-50/60 dark:border-rose-800/50 dark:bg-rose-950/25"
+                    : "border-indigo-200 bg-indigo-50/60 dark:border-indigo-800/50 dark:bg-indigo-950/25"
+                }`}
+              >
+                {/* Panel header */}
+                <div className="mb-4 flex items-center justify-between">
+                  <p
+                    className={`text-xs font-semibold tracking-wide ${
+                      selectedAction === "approve"
+                        ? "text-emerald-700 dark:text-emerald-400"
+                        : selectedAction === "reject"
+                        ? "text-rose-700 dark:text-rose-400"
+                        : "text-indigo-700 dark:text-indigo-400"
+                    }`}
+                  >
+                    {selectedAction === "approve"
+                      ? "Approve & Refund Patient"
+                      : selectedAction === "reject"
+                      ? "Reject — Restore Shift to Provider"
+                      : "Reassign to New Provider"}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedAction(null)}
+                    className="rounded px-2 py-0.5 text-xs text-gray-400 hover:bg-black/5 hover:text-gray-600 dark:hover:bg-white/5 dark:hover:text-gray-300"
+                  >
+                    ← Change decision
+                  </button>
+                </div>
+
+                {/* Fields row */}
+                <div className="flex flex-wrap items-end gap-5">
+                  {/* Approve — custom refund amount */}
+                  {selectedAction === "approve" ? (
+                    <div>
+                      <p className="mb-1.5 text-xs font-medium text-gray-500 dark:text-gray-400">
+                        Refund amount
+                      </p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="inline-flex overflow-hidden rounded-lg border border-gray-200 bg-white text-xs dark:border-gray-700 dark:bg-gray-900">
+                          <button type="button" onClick={() => switchApproveRefundMode("amount")}
+                            className={`px-3 py-1.5 ${refundMode === "amount" ? "bg-brand-500 text-white" : "text-gray-500 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-gray-800"}`}>
+                            BDT
+                          </button>
+                          <button type="button" onClick={() => switchApproveRefundMode("percent")}
+                            className={`px-3 py-1.5 ${refundMode === "percent" ? "bg-brand-500 text-white" : "text-gray-500 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-gray-800"}`}>
+                            %
+                          </button>
+                        </span>
+                        {refundMode === "amount" ? (
+                          <input type="number" min={0} max={fullRefundValue} step="0.01" value={refundAmount}
+                            onChange={(e) => handleApproveAmountChange(e.target.value)}
+                            className="w-32 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm shadow-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100" />
+                        ) : (
+                          <div className="flex items-center gap-1.5">
+                            <input type="number" min={0} max={100} step="1" value={percentInput}
+                              onChange={(e) => handleApprovePercentChange(e.target.value)}
+                              className="w-20 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm shadow-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100" />
+                            <span className="text-sm text-gray-400">%</span>
+                          </div>
+                        )}
+                        <div className="flex items-baseline gap-1.5 rounded-lg bg-white px-3 py-1.5 shadow-sm ring-1 ring-gray-200 dark:bg-gray-900 dark:ring-gray-700">
+                          <span className="text-sm font-bold text-gray-900 dark:text-white">{fmtBDT(refundAmount)}</span>
+                          <span className="text-xs text-gray-400">{approveRefundPct}%</span>
+                        </div>
+                        <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                          isPartialRefund
+                            ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+                            : currentRefundValue <= 0
+                            ? "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300"
+                            : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                        }`}>
+                          {isPartialRefund ? "Partial" : currentRefundValue <= 0 ? "No refund" : "Full refund"}
+                        </span>
+                      </div>
+                    </div>
                   ) : null}
-                </>
-              )}
-            </div>
 
-            <label className="mb-4 block text-sm">
-              <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
-                {t("providerCancelRequests.adminNotes")}
-              </span>
-              <textarea
-                value={adminNotes}
-                onChange={(e) => setAdminNotes(e.target.value)}
-                rows={3}
-                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
-                placeholder={t("providerCancelRequests.adminNotesPlaceholder")}
-              />
-            </label>
+                  {/* Reassign — provider select */}
+                  {selectedAction === "reassign" ? (
+                    <div className="w-60">
+                      <p className="mb-1.5 text-xs font-medium text-gray-500 dark:text-gray-400">
+                        New provider <span className="text-rose-500">*</span>
+                      </p>
+                      {loadingReplacementProviders ? (
+                        <p className="text-xs text-gray-400">{t("providerCancelRequests.loadingProviders")}</p>
+                      ) : reassignProviderOptions.length === 0 ? (
+                        <p className="text-xs text-amber-700 dark:text-amber-400">
+                          {t("providerCancelRequests.noReplacementProviders")}
+                        </p>
+                      ) : (
+                        <>
+                          <SearchableSelect<number>
+                            value={newProviderId === "" ? null : newProviderId}
+                            onChange={(id) => setNewProviderId(id ?? "")}
+                            placeholder={t("providerCancelRequests.reassignSelectPlaceholder")}
+                            clearLabel={t("providerCancelRequests.reassignClear")}
+                            searchPlaceholder={t("providerCancelRequests.reassignSearchPlaceholder")}
+                            className="min-h-[38px]"
+                            options={reassignProviderOptions}
+                          />
+                          {selectedReassignProvider?.hint ? (
+                            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                              {selectedReassignProvider.hint}
+                            </p>
+                          ) : null}
+                        </>
+                      )}
+                    </div>
+                  ) : null}
 
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                disabled={actionBusy}
-                onClick={() => setConfirmAction("approve")}
-                className="rounded-lg bg-brand-500 px-4 py-2 text-sm text-white hover:bg-brand-600 disabled:opacity-60"
-              >
-                {t("providerCancelRequests.approve")}
-              </button>
-              <button
-                type="button"
-                disabled={
-                  actionBusy || newProviderId === "" || reassignProviderOptions.length === 0
-                }
-                onClick={() => setConfirmAction("reassign")}
-                className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-800 hover:bg-gray-50 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-              >
-                {t("providerCancelRequests.reassign")}
-              </button>
-              <button
-                type="button"
-                disabled={actionBusy}
-                onClick={() => setConfirmAction("reject")}
-                className="rounded-lg border border-rose-300 bg-rose-50 px-4 py-2 text-sm text-rose-800 hover:bg-rose-100 disabled:opacity-60 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-200"
-              >
-                {t("providerCancelRequests.reject")}
-              </button>
-            </div>
+                  {/* Notes */}
+                  <div className="min-w-[180px] flex-1 max-w-sm">
+                    <p className="mb-1.5 text-xs font-medium text-gray-500 dark:text-gray-400">
+                      {t("providerCancelRequests.adminNotes")}
+                      {selectedAction === "reject" ? (
+                        <span className="ml-0.5 text-rose-500">*</span>
+                      ) : (
+                        <span className="ml-1 font-normal text-gray-400">(optional)</span>
+                      )}
+                    </p>
+                    <input
+                      type="text"
+                      value={adminNotes}
+                      onChange={(e) => setAdminNotes(e.target.value)}
+                      className="w-full rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm shadow-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+                      placeholder={
+                        selectedAction === "reject"
+                          ? "Reason for rejection (required)"
+                          : t("providerCancelRequests.adminNotesPlaceholder")
+                      }
+                    />
+                    {selectedAction === "reject" && !adminNotes.trim() ? (
+                      <p className="mt-1 text-xs text-rose-500">Required when rejecting</p>
+                    ) : null}
+                  </div>
+                </div>
+
+                {/* Submit + Cancel */}
+                <div className="mt-4 flex items-center justify-end gap-3">
+                  <Link
+                    to="/provider-cancel-requests"
+                    className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
+                  >
+                    Cancel
+                  </Link>
+                  <button
+                    type="button"
+                    disabled={
+                      actionBusy ||
+                      (selectedAction === "reject" && !adminNotes.trim()) ||
+                      (selectedAction === "reassign" && (newProviderId === "" || reassignProviderOptions.length === 0))
+                    }
+                    onClick={() => setConfirmAction(selectedAction)}
+                    className={`rounded-lg px-6 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60 ${
+                      selectedAction === "approve"
+                        ? "bg-emerald-600 hover:bg-emerald-700"
+                        : selectedAction === "reject"
+                        ? "bg-rose-600 hover:bg-rose-700"
+                        : "bg-indigo-600 hover:bg-indigo-700"
+                    }`}
+                  >
+                    {selectedAction === "approve"
+                      ? "Approve & Refund"
+                      : selectedAction === "reject"
+                      ? "Reject"
+                      : "Reassign"}
+                  </button>
+                </div>
+              </div>
+            )}
           </section>
         ) : null}
       </div>
