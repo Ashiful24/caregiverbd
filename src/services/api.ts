@@ -2724,6 +2724,7 @@ export interface LongTermOpportunityListItem {
   status: string;
   requestNo?: string | null;
   patientName?: string | null;
+  caregiverCategory?: string | null;
   location?: string | null;
   amount?: string | null;
   consultationTypeId?: number | null;
@@ -2860,11 +2861,25 @@ export function normalizeLongTermOpportunityRow(raw: unknown): LongTermOpportuni
   const consultationTypeIdNorm =
     Number.isFinite(consultationTypeId) && consultationTypeId > 0 ? consultationTypeId : null;
 
+  const consultationType =
+    o.consultationType && typeof o.consultationType === "object"
+      ? (o.consultationType as Record<string, unknown>)
+      : null;
+  const caregiverCategory =
+    strOpt(o.caregiverCategory) ??
+    strOpt(o.caregiver_category) ??
+    strOpt(consultationType?.caregiverCategory) ??
+    strOpt(consultationType?.caregiver_category) ??
+    strOpt(consultationType?.name) ??
+    strOpt(o.consultationTypeName) ??
+    strOpt(o.consultation_type_name);
+
   return {
     id: Number.isFinite(id) && id > 0 ? id : 0,
     status,
     requestNo,
     patientName,
+    caregiverCategory,
     location,
     amount: strOpt(o.fee ?? o.amount ?? o.totalFee ?? o.total_fee),
     consultationTypeId: consultationTypeIdNorm,

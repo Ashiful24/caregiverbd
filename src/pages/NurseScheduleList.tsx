@@ -69,6 +69,12 @@ function formatTimeRange(row: LongTermOpportunityListItem): string {
   return row.timeRange?.trim() || "—";
 }
 
+function formatCaregiverCategory(row: LongTermOpportunityListItem): string {
+  const raw = row.caregiverCategory?.trim();
+  if (!raw) return "—";
+  return formatStatusLabel(raw);
+}
+
 function resolveOpportunityFromScheduleDetails(data: unknown): LongTermOpportunityListItem {
   const candidates: unknown[] = [];
   if (data && typeof data === "object") {
@@ -514,6 +520,10 @@ export default function NurseScheduleList() {
                     </div>
                     <dl className="mt-3 grid grid-cols-1 gap-2 text-sm">
                       <div className="flex justify-between gap-2">
+                        <dt className="text-gray-500 dark:text-gray-400">{t("schedule.caregiverCategory")}</dt>
+                        <dd className="text-gray-800 dark:text-gray-200">{formatCaregiverCategory(request)}</dd>
+                      </div>
+                      <div className="flex justify-between gap-2">
                         <dt className="text-gray-500 dark:text-gray-400">{t("schedule.amount")}</dt>
                         <dd className="text-gray-800 dark:text-gray-200">{formatAmount(request)}</dd>
                       </div>
@@ -545,6 +555,12 @@ export default function NurseScheduleList() {
                         className="py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
                       >
                         {t("schedule.patient")}
+                      </TableCell>
+                      <TableCell
+                        isHeader
+                        className="py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
+                      >
+                        {t("schedule.caregiverCategory")}
                       </TableCell>
                       <TableCell
                         isHeader
@@ -603,6 +619,9 @@ export default function NurseScheduleList() {
                         </TableCell>
                         <TableCell className="py-3 text-theme-sm text-gray-600 dark:text-gray-400">
                           {request.patientName?.trim() || "—"}
+                        </TableCell>
+                        <TableCell className="py-3 text-theme-sm text-gray-600 dark:text-gray-400">
+                          {formatCaregiverCategory(request)}
                         </TableCell>
                         <TableCell className="py-3 text-theme-sm text-gray-600 dark:text-gray-400">
                           {request.location?.trim() || "—"}
@@ -750,6 +769,12 @@ export default function NurseScheduleList() {
                 <p className="text-xs text-gray-500 dark:text-gray-400">{t("schedule.patient")}</p>
                 <p className="mt-1 text-sm font-medium text-gray-800 dark:text-gray-200">
                   {detailsItem.patientName?.trim() || "—"}
+                </p>
+              </div>
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-800/40">
+                <p className="text-xs text-gray-500 dark:text-gray-400">{t("schedule.caregiverCategory")}</p>
+                <p className="mt-1 text-sm font-medium text-gray-800 dark:text-gray-200">
+                  {formatCaregiverCategory(detailsItem)}
                 </p>
               </div>
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-800/40">

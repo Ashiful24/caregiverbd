@@ -333,6 +333,7 @@ const en = {
     noItemsForFilter: "No service requests found for this filter.",
     requestNo: "Request no",
     patient: "Patient",
+    caregiverCategory: "Caregiver category",
     location: "Location",
     amount: "Amount",
     timeRange: "Time range",

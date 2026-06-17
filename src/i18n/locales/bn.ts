@@ -333,6 +333,7 @@ const bn = {
     noItemsForFilter: "এই ফিল্টারের জন্য কোনো সার্ভিস রিকোয়েস্ট পাওয়া যায়নি।",
     requestNo: "রিকোয়েস্ট নং",
     patient: "রোগী",
+    caregiverCategory: "কেয়ারগিভার ক্যাটাগরি",
     location: "লোকেশন",
     amount: "অ্যামাউন্ট",
     timeRange: "সময়ের পরিসর",
