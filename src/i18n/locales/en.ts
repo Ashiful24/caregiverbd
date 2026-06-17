@@ -405,6 +405,8 @@ const en = {
     nurseList: "Nurse list",
     nurseListSupervisor: "Showing nurses filtered by your supervisor account.",
     nurseListAll: "Showing all nurses.",
+    searchNursesPlaceholder: "Search nurses...",
+    noNursesMatchSearch: "No nurses match your search.",
     loadingShort: "Loading…",
     noNurses: "No nurses found.",
     nurseFallback: "Nurse",

@@ -226,6 +226,8 @@ export function ScheduleCalendar({
   const [selectedNurseId, setSelectedNurseId] = useState<number | null>(null);
   const [nurses, setNurses] = useState<ProviderListItem[]>([]);
   const [nursesLoading, setNursesLoading] = useState(false);
+  const [nurseSearchInput, setNurseSearchInput] = useState("");
+  const [nurseSearchQuery, setNurseSearchQuery] = useState("");
   const [availabilityLoadingId, setAvailabilityLoadingId] = useState<number | null>(null);
   const [availabilityByNurse, setAvailabilityByNurse] = useState<Record<number, string[]>>({});
   const [availabilityErrorByNurse, setAvailabilityErrorByNurse] = useState<Record<number, string>>(
@@ -373,7 +375,8 @@ export function ScheduleCalendar({
       .getList(
         {
           page: 1,
-          limit: 10,
+          limit: 20,
+          search: nurseSearchQuery.trim() || undefined,
           ...(supervisorId != null ? { supervisorId } : {}),
         },
         { signal: ac.signal }
@@ -392,7 +395,13 @@ export function ScheduleCalendar({
       });
 
     return () => ac.abort();
-  }, [isScheduleModalOpen, supervisorId]);
+  }, [isScheduleModalOpen, supervisorId, nurseSearchQuery]);
+
+  useEffect(() => {
+    if (!isScheduleModalOpen) return;
+    const timer = setTimeout(() => setNurseSearchQuery(nurseSearchInput.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [isScheduleModalOpen, nurseSearchInput]);
 
   useEffect(() => {
     if (!isScheduleModalOpen || !selectedNurseId) {
@@ -464,6 +473,8 @@ export function ScheduleCalendar({
     setFeeEstimateLoading(false);
     setFormError(null);
     setNurses([]);
+    setNurseSearchInput("");
+    setNurseSearchQuery("");
     setAvailabilityByNurse({});
     setAvailabilityErrorByNurse({});
     setAvailabilityLoadingId(null);
@@ -977,21 +988,48 @@ export function ScheduleCalendar({
             )}
 
             <div className="mt-4 border-t border-gray-100 pt-4 dark:border-gray-800">
-              <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                {t("scheduleCalendar.nurseList")}
-              </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                {currentRole === "SUPERVISOR"
-                  ? t("scheduleCalendar.nurseListSupervisor")
-                  : t("scheduleCalendar.nurseListAll")}
-              </p>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                    {t("scheduleCalendar.nurseList")}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {currentRole === "SUPERVISOR"
+                      ? t("scheduleCalendar.nurseListSupervisor")
+                      : t("scheduleCalendar.nurseListAll")}
+                  </p>
+                </div>
+                <div className="relative w-full shrink-0 sm:w-56">
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                      />
+                    </svg>
+                  </span>
+                  <input
+                    type="search"
+                    placeholder={t("scheduleCalendar.searchNursesPlaceholder")}
+                    value={nurseSearchInput}
+                    onChange={(e) => setNurseSearchInput(e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:placeholder:text-gray-500"
+                  />
+                </div>
+              </div>
 
               <div className="mt-3 max-h-60 space-y-2 overflow-y-auto">
                 {nursesLoading && (
                   <p className="text-sm text-gray-500">{t("scheduleCalendar.loadingShort")}</p>
                 )}
                 {!nursesLoading && nurses.length === 0 && (
-                  <p className="text-sm text-gray-500 dark:text-gray-400">{t("scheduleCalendar.noNurses")}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    {nurseSearchQuery.trim()
+                      ? t("scheduleCalendar.noNursesMatchSearch")
+                      : t("scheduleCalendar.noNurses")}
+                  </p>
                 )}
                 {!nursesLoading &&
                   nurses.map((nurse) => (

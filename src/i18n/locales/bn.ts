@@ -405,6 +405,8 @@ const bn = {
     nurseList: "নার্স তালিকা",
     nurseListSupervisor: "আপনার সুপারভাইজার অ্যাকাউন্ট অনুযায়ী ফিল্টার করা নার্স দেখানো হচ্ছে।",
     nurseListAll: "সব নার্স দেখানো হচ্ছে।",
+    searchNursesPlaceholder: "নার্স খুঁজুন...",
+    noNursesMatchSearch: "আপনার অনুসন্ধানের সাথে কোনো নার্স মিলছে না।",
     loadingShort: "লোড হচ্ছে…",
     noNurses: "কোনো নার্স পাওয়া যায়নি।",
     nurseFallback: "নার্স",
