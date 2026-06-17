@@ -53,6 +53,36 @@ function resolveDefaultShiftHours(value?: number | null): ScheduleShiftHours {
   return 8;
 }
 
+/** Parse service preferred start time (e.g. "9:05 AM") to 24h hour for the schedule modal. */
+function parsePreferredStartTimeToHour24(
+  preferredStartTime?: string | null,
+  fallbackHour = 9
+): number {
+  const raw = preferredStartTime?.trim();
+  if (!raw) return fallbackHour;
+
+  const amPm = raw.match(/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)$/i);
+  if (amPm) {
+    let hour = Number(amPm[1]);
+    const meridiem = amPm[3].toUpperCase();
+    if (!Number.isFinite(hour) || hour < 1 || hour > 12) return fallbackHour;
+    if (meridiem === "AM") {
+      if (hour === 12) hour = 0;
+    } else if (hour !== 12) {
+      hour += 12;
+    }
+    return hour;
+  }
+
+  const h24 = raw.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+  if (h24) {
+    const hour = Number(h24[1]);
+    if (Number.isFinite(hour) && hour >= 0 && hour <= 23) return hour;
+  }
+
+  return fallbackHour;
+}
+
 type Props = {
   requestId: string;
   title: string;
@@ -62,6 +92,7 @@ type Props = {
   baseServiceAmount?: string | number | null;
   consultationTypeId?: number | null;
   defaultShiftDurationHours?: number | null;
+  defaultPreferredStartTime?: string | null;
   initialEvents?: ScheduleEventRecord[];
   /** After create, parent can persist schedule-details payload (request row + initialEvents). */
   onScheduleDetailsSynced?: (scheduleDetailsPayload: unknown) => void;
@@ -148,11 +179,17 @@ export function ScheduleCalendar({
   baseServiceAmount,
   consultationTypeId: requestConsultationTypeId,
   defaultShiftDurationHours,
+  defaultPreferredStartTime,
   initialEvents = [],
   onScheduleDetailsSynced,
 }: Props) {
   const { t, i18n } = useTranslation();
   const dateLoc = i18n.language?.startsWith("bn") ? bn : enUS;
+
+  const defaultStartHour = useMemo(
+    () => parsePreferredStartTimeToHour24(defaultPreferredStartTime),
+    [defaultPreferredStartTime]
+  );
 
   const formatDurationLabel = (start: Date, end: Date): string => {
     const mins = differenceInMinutes(end, start);
@@ -509,10 +546,10 @@ export function ScheduleCalendar({
     }
   };
 
-  const openModalFromHour = (day: Date, hour24: number) => {
+  const openModalFromHour = (day: Date, _hour24: number) => {
     if (!dayInRange(day)) return;
     const shift = resolveDefaultShiftHours(defaultShiftDurationHours);
-    const start = addHours(startOfDay(day), hour24);
+    const start = addHours(startOfDay(day), defaultStartHour);
     setFormError(null);
     setSelectedShiftHours(shift);
     setFeeEstimateAmount(null);
@@ -521,9 +558,9 @@ export function ScheduleCalendar({
       applyShiftToModalDraft(
         {
           startDateStr: format(start, "yyyy-MM-dd"),
-          startHour: hour24,
+          startHour: defaultStartHour,
           endDateStr: format(start, "yyyy-MM-dd"),
-          endHour: hour24,
+          endHour: defaultStartHour,
         },
         shift
       )
@@ -534,7 +571,7 @@ export function ScheduleCalendar({
   const openModalFromDay = (day: Date) => {
     if (!dayInRange(day)) return;
     const shift = resolveDefaultShiftHours(defaultShiftDurationHours);
-    const start = addHours(startOfDay(day), 9);
+    const start = addHours(startOfDay(day), defaultStartHour);
     setFormError(null);
     setSelectedShiftHours(shift);
     setFeeEstimateAmount(null);
@@ -543,9 +580,9 @@ export function ScheduleCalendar({
       applyShiftToModalDraft(
         {
           startDateStr: format(start, "yyyy-MM-dd"),
-          startHour: 9,
+          startHour: defaultStartHour,
           endDateStr: format(start, "yyyy-MM-dd"),
-          endHour: 9,
+          endHour: defaultStartHour,
         },
         shift
       )
