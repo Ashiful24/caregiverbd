@@ -2734,6 +2734,7 @@ export interface LongTermOpportunityListItem {
   status: string;
   requestNo?: string | null;
   patientName?: string | null;
+  caregiverCategory?: string | null;
   location?: string | null;
   amount?: string | null;
   consultationTypeId?: number | null;
@@ -2743,6 +2744,8 @@ export interface LongTermOpportunityListItem {
   startDate?: string | null;
   endDate?: string | null;
   assignedNursesLabel?: string | null;
+  supervisorId?: number | null;
+  supervisorName?: string | null;
   createdAt?: string | null;
 }
 
@@ -2846,16 +2849,47 @@ export function normalizeLongTermOpportunityRow(raw: unknown): LongTermOpportuni
     assignedNursesLabel = an.trim();
   }
 
+  const supervisor =
+    o.supervisor && typeof o.supervisor === "object"
+      ? (o.supervisor as Record<string, unknown>)
+      : null;
+  const supervisorIdRaw = o.supervisorId ?? o.supervisor_id ?? supervisor?.id;
+  const supervisorIdNum = Number(supervisorIdRaw);
+  const supervisorId =
+    Number.isFinite(supervisorIdNum) && supervisorIdNum > 0 ? supervisorIdNum : null;
+  const supervisorName =
+    strOpt(o.supervisorName) ??
+    strOpt(o.supervisor_name) ??
+    (supervisor
+      ? [strOpt(supervisor.firstName), strOpt(supervisor.lastName)].filter(Boolean).join(" ").trim() ||
+        strOpt(supervisor.name) ||
+        strOpt(supervisor.email)
+      : null);
+
   const consultationTypeIdRaw = o.consultationTypeId ?? o.consultation_type_id;
   const consultationTypeId = Number(consultationTypeIdRaw);
   const consultationTypeIdNorm =
     Number.isFinite(consultationTypeId) && consultationTypeId > 0 ? consultationTypeId : null;
+
+  const consultationType =
+    o.consultationType && typeof o.consultationType === "object"
+      ? (o.consultationType as Record<string, unknown>)
+      : null;
+  const caregiverCategory =
+    strOpt(o.caregiverCategory) ??
+    strOpt(o.caregiver_category) ??
+    strOpt(consultationType?.caregiverCategory) ??
+    strOpt(consultationType?.caregiver_category) ??
+    strOpt(consultationType?.name) ??
+    strOpt(o.consultationTypeName) ??
+    strOpt(o.consultation_type_name);
 
   return {
     id: Number.isFinite(id) && id > 0 ? id : 0,
     status,
     requestNo,
     patientName,
+    caregiverCategory,
     location,
     amount: strOpt(o.fee ?? o.amount ?? o.totalFee ?? o.total_fee),
     consultationTypeId: consultationTypeIdNorm,
@@ -2865,6 +2899,8 @@ export function normalizeLongTermOpportunityRow(raw: unknown): LongTermOpportuni
     startDate,
     endDate,
     assignedNursesLabel,
+    supervisorId,
+    supervisorName,
     createdAt: strOpt(o.createdAt ?? o.created_at),
   };
 }
@@ -2994,6 +3030,11 @@ export const adminLongTermOpportunitiesApi = {
     body: Record<string, unknown>
   ) => {
     return httpService.patch<unknown>(`/long-term-opportunities/${id}`, body);
+  },
+
+  /** PUT /v1/admin/long-term-opportunities/:id/supervisor — Assign supervisor to opportunity. */
+  assignSupervisor: async (id: string | number, body: { supervisorId: number }) => {
+    return httpService.put<unknown>(`/admin/long-term-opportunities/${id}/supervisor`, body);
   },
 };
 
@@ -3127,15 +3168,46 @@ export interface AdminSupervisorDto {
 
 /** Unwrap array from common response shapes. */
 export function normalizeAdminSupervisorsResponse(data: unknown): AdminSupervisorDto[] {
-  if (Array.isArray(data)) return data as AdminSupervisorDto[];
+  return normalizeAdminSupervisorsListResponse(data).supervisors;
+}
+
+export interface AdminSupervisorsListResponse {
+  supervisors: AdminSupervisorDto[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+/** Unwrap GET /v1/admin/supervisors with pagination metadata. */
+export function normalizeAdminSupervisorsListResponse(data: unknown): AdminSupervisorsListResponse {
+  const mapRows = (rows: unknown[]): AdminSupervisorDto[] => rows as AdminSupervisorDto[];
+
+  if (Array.isArray(data)) {
+    return {
+      supervisors: mapRows(data),
+      total: data.length,
+      page: 1,
+      limit: data.length || 10,
+    };
+  }
   if (data && typeof data === "object") {
     const o = data as Record<string, unknown>;
     for (const key of ["supervisors", "data", "items", "results"] as const) {
       const arr = o[key];
-      if (Array.isArray(arr)) return arr as AdminSupervisorDto[];
+      if (Array.isArray(arr)) {
+        const explicitTotal = pickProvidersListTotal(o);
+        const limit = Number(o.limit) || Number(o.pageSize) || Number(o.per_page) || 10;
+        const page = Number(o.page) || Number(o.currentPage) || 1;
+        return {
+          supervisors: mapRows(arr),
+          total: explicitTotal ?? 0,
+          page: Number.isFinite(page) ? page : 1,
+          limit: Number.isFinite(limit) ? limit : 10,
+        };
+      }
     }
   }
-  return [];
+  return { supervisors: [], total: 0, page: 1, limit: 10 };
 }
 
 /** Payload used by assign/reassign supervisor-provider endpoints. */
@@ -3185,13 +3257,17 @@ export function normalizeAssignedProvidersToListItems(data: unknown): ProviderLi
 }
 
 export const adminSupervisorsApi = {
-  /** GET /v1/admin/supervisors — list supervisors (admin). Optional free-text search. */
+  /** GET /v1/admin/supervisors — list supervisors (admin). Optional search and pagination. */
   getAll: async (
-    params?: { search?: string },
+    params?: { page?: number; limit?: number; search?: string },
     config?: { signal?: AbortSignal }
   ) => {
+    const query: Record<string, string | number> = {
+      page: params?.page ?? 1,
+      limit: params?.limit ?? 20,
+    };
     const search = params?.search?.trim();
-    const query = search ? { search } : undefined;
+    if (search) query.search = search;
     return httpService.get<unknown>("/admin/supervisors", {
       params: query,
       signal: config?.signal,
