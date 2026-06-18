@@ -752,6 +752,11 @@ export default function AdminSupervisorReporting() {
           <div className="flex flex-col gap-3 border-b border-gray-200 bg-brand-500 px-4 py-3 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <h3 className="text-sm font-semibold uppercase tracking-wide text-white">
               {t(`${R}.table.title`)}
+              {rangeLabel ? (
+                <span className="ml-1.5 text-xs font-normal normal-case opacity-80">
+                  ({rangeLabel})
+                </span>
+              ) : null}
             </h3>
             <div className="flex flex-wrap gap-2">
               <button
