@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { bn } from "date-fns/locale/bn";
 import { enUS } from "date-fns/locale/en-US";
@@ -26,6 +27,7 @@ import {
 } from "../../data/nurseScheduleSeed";
 import {
   adminLongTermOpportunitiesApi,
+  normalizeProvidersAllResponse,
   normalizeServiceRequestFeeEstimate,
   providersApi,
   serviceRequestsApi,
@@ -43,6 +45,8 @@ export type ScheduleViewMode = "month" | "week" | "day";
 
 export const SCHEDULE_SHIFT_HOURS_OPTIONS = [4, 8, 12, 24] as const;
 export type ScheduleShiftHours = (typeof SCHEDULE_SHIFT_HOURS_OPTIONS)[number];
+
+const NURSE_PAGE_SIZE = 20;
 
 function isScheduleShiftHours(value: number): value is ScheduleShiftHours {
   return (SCHEDULE_SHIFT_HOURS_OPTIONS as readonly number[]).includes(value);
@@ -91,6 +95,7 @@ type Props = {
   requestEndDate: string;
   baseServiceAmount?: string | number | null;
   consultationTypeId?: number | null;
+  supervisorName?: string | null;
   defaultShiftDurationHours?: number | null;
   defaultPreferredStartTime?: string | null;
   initialEvents?: ScheduleEventRecord[];
@@ -178,6 +183,7 @@ export function ScheduleCalendar({
   requestEndDate,
   baseServiceAmount,
   consultationTypeId: requestConsultationTypeId,
+  supervisorName,
   defaultShiftDurationHours,
   defaultPreferredStartTime,
   initialEvents = [],
@@ -226,6 +232,10 @@ export function ScheduleCalendar({
   const [selectedNurseId, setSelectedNurseId] = useState<number | null>(null);
   const [nurses, setNurses] = useState<ProviderListItem[]>([]);
   const [nursesLoading, setNursesLoading] = useState(false);
+  const [nursesLoadingMore, setNursesLoadingMore] = useState(false);
+  const [nursesPage, setNursesPage] = useState(1);
+  const [nursesTotal, setNursesTotal] = useState(0);
+  const [nursesLastBatchSize, setNursesLastBatchSize] = useState(0);
   const [nurseSearchInput, setNurseSearchInput] = useState("");
   const [nurseSearchQuery, setNurseSearchQuery] = useState("");
   const [availabilityLoadingId, setAvailabilityLoadingId] = useState<number | null>(null);
@@ -366,6 +376,10 @@ export function ScheduleCalendar({
     if (!isScheduleModalOpen) {
       setNurses([]);
       setNursesLoading(false);
+      setNursesLoadingMore(false);
+      setNursesPage(1);
+      setNursesTotal(0);
+      setNursesLastBatchSize(0);
       return;
     }
 
@@ -375,27 +389,72 @@ export function ScheduleCalendar({
       .getList(
         {
           page: 1,
-          limit: 20,
+          limit: NURSE_PAGE_SIZE,
           search: nurseSearchQuery.trim() || undefined,
           ...(supervisorId != null ? { supervisorId } : {}),
+          ...(requestConsultationTypeId != null && requestConsultationTypeId > 0
+            ? { consultationTypeId: requestConsultationTypeId }
+            : {}),
         },
         { signal: ac.signal }
       )
       .then((res) => {
-        const payload = res.data as { providers?: ProviderListItem[] } | null;
-        const list = Array.isArray(payload?.providers) ? payload.providers : [];
-        setNurses(list);
-        setSelectedNurseId((prev) => (prev != null && list.some((n) => n.id === prev) ? prev : null));
+        const norm = normalizeProvidersAllResponse(res.data);
+        setNurses(norm.providers);
+        setNursesPage(1);
+        setNursesTotal(norm.total);
+        setNursesLastBatchSize(norm.providers.length);
+        setSelectedNurseId((prev) =>
+          prev != null && norm.providers.some((n) => n.id === prev) ? prev : null
+        );
       })
-      .catch(() => {
+      .catch((err: unknown) => {
+        if (err instanceof Error && err.name === "AbortError") return;
         setNurses([]);
+        setNursesTotal(0);
+        setNursesLastBatchSize(0);
       })
       .finally(() => {
-        setNursesLoading(false);
+        if (!ac.signal.aborted) setNursesLoading(false);
       });
 
     return () => ac.abort();
-  }, [isScheduleModalOpen, supervisorId, nurseSearchQuery]);
+  }, [isScheduleModalOpen, supervisorId, nurseSearchQuery, requestConsultationTypeId]);
+
+  const loadMoreNurses = useCallback(async () => {
+    const nextPage = nursesPage + 1;
+    setNursesLoadingMore(true);
+    try {
+      const res = await providersApi.getList({
+        page: nextPage,
+        limit: NURSE_PAGE_SIZE,
+        search: nurseSearchQuery.trim() || undefined,
+        ...(supervisorId != null ? { supervisorId } : {}),
+        ...(requestConsultationTypeId != null && requestConsultationTypeId > 0
+          ? { consultationTypeId: requestConsultationTypeId }
+          : {}),
+      });
+      const norm = normalizeProvidersAllResponse(res.data);
+      setNursesTotal(norm.total);
+      setNursesPage(nextPage);
+      setNursesLastBatchSize(norm.providers.length);
+      setNurses((prev) => {
+        const existing = new Set(prev.map((n) => n.id));
+        const extra = norm.providers.filter((n) => !existing.has(n.id));
+        return [...prev, ...extra];
+      });
+    } catch {
+      // Keep the current list if loading more fails.
+    } finally {
+      setNursesLoadingMore(false);
+    }
+  }, [nursesPage, nurseSearchQuery, supervisorId, requestConsultationTypeId]);
+
+  const nursesCanLoadMore =
+    !nursesLoading &&
+    nursesLastBatchSize > 0 &&
+    nursesLastBatchSize >= NURSE_PAGE_SIZE &&
+    (nursesTotal <= 0 || nurses.length < nursesTotal);
 
   useEffect(() => {
     if (!isScheduleModalOpen) return;
@@ -473,6 +532,10 @@ export function ScheduleCalendar({
     setFeeEstimateLoading(false);
     setFormError(null);
     setNurses([]);
+    setNursesPage(1);
+    setNursesTotal(0);
+    setNursesLastBatchSize(0);
+    setNursesLoadingMore(false);
     setNurseSearchInput("");
     setNurseSearchQuery("");
     setAvailabilityByNurse({});
@@ -774,6 +837,9 @@ export function ScheduleCalendar({
         <div>
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{title}</h2>
           <p className="text-sm text-gray-500 dark:text-gray-400">{subtitle}</p>
+          <p className="text-sm text-gray-600 dark:text-gray-300">
+            {t("schedule.assignedSupervisor")}: {supervisorName?.trim() || "—"}
+          </p>
           <p className="text-sm font-medium text-brand-700 dark:text-brand-400">
             {t("scheduleCalendar.serviceAmount", { amount: formatMoney(totalServiceAmount) })}
           </p>
@@ -892,8 +958,9 @@ export function ScheduleCalendar({
         </div>
       )}
 
-      {modalDraft && computedRange && (
-        <div className="fixed inset-0 z-[10060] flex items-center justify-center bg-black/40 p-4">
+      {modalDraft && computedRange &&
+        createPortal(
+        <div className="fixed inset-0 z-999999 flex items-center justify-center bg-black/40 p-4">
           <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl border border-gray-200 bg-white p-4 shadow-xl dark:border-gray-800 dark:bg-gray-900">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
               {t("scheduleCalendar.scheduleVisit")}
@@ -1108,6 +1175,18 @@ export function ScheduleCalendar({
                     </div>
                   ))}
               </div>
+              {nursesCanLoadMore ? (
+                <button
+                  type="button"
+                  onClick={() => void loadMoreNurses()}
+                  disabled={nursesLoadingMore}
+                  className="mt-2 w-full rounded-lg border border-gray-200 bg-white py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                >
+                  {nursesLoadingMore
+                    ? t("common.actions.loadingMore")
+                    : t("common.actions.loadMore")}
+                </button>
+              ) : null}
             </div>
 
             {formError && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{formError}</p>}
@@ -1130,11 +1209,13 @@ export function ScheduleCalendar({
               </button>
             </div>
           </div>
-        </div>
-      )}
+        </div>,
+        document.body
+        )}
 
-      {removeTarget && (
-        <div className="fixed inset-0 z-[10070] flex items-center justify-center bg-black/40 p-4">
+      {removeTarget &&
+        createPortal(
+        <div className="fixed inset-0 z-999999 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-4 shadow-xl dark:border-gray-800 dark:bg-gray-900">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
               {removeTarget.pending
@@ -1184,8 +1265,9 @@ export function ScheduleCalendar({
               </button>
             </div>
           </div>
-        </div>
-      )}
+        </div>,
+        document.body
+        )}
 
       <ConfirmModal
         isOpen={leaveDialogOpen}

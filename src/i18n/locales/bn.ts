@@ -683,7 +683,7 @@ const bn = {
     checking: "চেক করা হচ্ছে...",
     checkAvailability: "অ্যাভেইলেবিলিটি চেক করুন",
     availableSlots: "উপলব্ধ স্লট",
-    consultationTypeServices: "কনসালটেশন টাইপ সার্ভিসসমূহ",
+    consultationTypeServices: "প্রোভাইডার টাস্ক তালিকা",
     consultationTypeServicesHelp:
       "এই প্রোভাইডারের কনসালটেশন টাইপের সার্ভিস চেকলিস্ট। \"Offered\" = প্রোভাইডার সার্ভিসটি দেন; \"Excluded\" = প্রোভাইডার সার্ভিসটি দেন না।",
     noConsultationServices: "এই কনসালটেশন টাইপের জন্য কোনো সার্ভিস কনফিগার করা নেই।",

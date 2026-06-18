@@ -682,7 +682,7 @@ const en = {
     checking: "Checking...",
     checkAvailability: "Check availability",
     availableSlots: "Available slots",
-    consultationTypeServices: "Consultation type services",
+    consultationTypeServices: "Provider task list",
     consultationTypeServicesHelp:
       "Checklist of services for this provider's consultation type. \"Offered\" = provider offers this; \"Excluded\" = provider does not offer it.",
     noConsultationServices: "No services configured for this consultation type.",

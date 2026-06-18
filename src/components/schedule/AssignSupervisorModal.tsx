@@ -25,7 +25,7 @@ type Props = {
   onAssigned?: (updated: LongTermOpportunityListItem) => void;
 };
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 10;
 
 export function AssignSupervisorModal({ isOpen, onClose, opportunity, onAssigned }: Props) {
   const { t } = useTranslation();
@@ -140,9 +140,11 @@ export function AssignSupervisorModal({ isOpen, onClose, opportunity, onAssigned
     onClose();
   };
 
-  const lastPageFull = lastBatchSize >= PAGE_SIZE;
   const canLoadMore =
-    lastBatchSize > 0 && lastPageFull && (total <= 0 || supervisors.length < total);
+    !listLoading &&
+    !listLoadingMore &&
+    lastBatchSize > 0 &&
+    (total > 0 ? supervisors.length < total : lastBatchSize >= PAGE_SIZE);
 
   const handleAssign = async () => {
     if (!opportunity) return;
@@ -282,27 +284,25 @@ export function AssignSupervisorModal({ isOpen, onClose, opportunity, onAssigned
             </ul>
           )}
 
-          {error ? (
-            <p className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
-              {error}
-            </p>
-          ) : null}
-        </div>
-
-        {!listLoading && canLoadMore ? (
-          <div className="shrink-0 border-t border-gray-200 bg-white px-6 py-4 dark:border-gray-800 dark:bg-gray-950/40">
+          {!listLoading && canLoadMore ? (
             <Button
               type="button"
               variant="outline"
               size="md"
               onClick={() => void fetchMore(page + 1)}
               disabled={listLoadingMore}
-              className="w-full"
+              className="mt-3 w-full"
             >
               {listLoadingMore ? t("common.actions.loadingMore") : t("common.actions.loadMore")}
             </Button>
-          </div>
-        ) : null}
+          ) : null}
+
+          {error ? (
+            <p className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
+              {error}
+            </p>
+          ) : null}
+        </div>
 
         <div className="shrink-0 border-t border-gray-200 bg-gray-50/80 px-6 py-4 dark:border-gray-800 dark:bg-gray-900/50">
           <div className="flex flex-wrap items-center justify-end gap-3">
