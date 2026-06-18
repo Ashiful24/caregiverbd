@@ -3516,6 +3516,8 @@ export interface FinancialReportTxItemDto {
   commission: string | null;
   tax: string | null;
   ait: string | null;
+  supervisorCommission: string | null;
+  isEscrow: boolean;
 }
 
 export interface FinancialReportPaginationDto {
@@ -3546,8 +3548,9 @@ export interface FinancialTxDetailBreakdownPart {
 
 export interface FinancialTxDetailBreakdownDto {
   totalFee: string;
-  commission: FinancialTxDetailBreakdownPart;
   tax: FinancialTxDetailBreakdownPart;
+  supervisorCommission: { amount: string; percent: string };
+  commission: FinancialTxDetailBreakdownPart;
   ait: FinancialTxDetailBreakdownPart;
   providerFee: string;
 }
