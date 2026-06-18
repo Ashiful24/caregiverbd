@@ -227,7 +227,9 @@ export default function NurseScheduleCalendarPage() {
           requestEndDate={requestEndDate}
           baseServiceAmount={request.amount}
           consultationTypeId={request.consultationTypeId}
+          supervisorName={request.supervisorName}
           defaultShiftDurationHours={request.shiftDurationHours}
+          defaultPreferredStartTime={request.preferredStartTime}
           initialEvents={initialEvents}
           onScheduleDetailsSynced={handleScheduleDetailsSynced}
         />

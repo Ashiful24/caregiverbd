@@ -23,6 +23,7 @@ import {
   adminDocumentsApi,
   adminProvidersApi,
   consultationTypeLevelsApi,
+  consultationTypesApi,
 } from "../../services/api";
 import type {
   AdminCertificationDto,
@@ -35,6 +36,7 @@ import type {
   ProviderFullDetailsDto,
   ProviderProfileChecklistItemDto,
   SalaryHistoryResponseDto,
+  ServiceCategoryChecklistItem,
   VitalsEntryDto,
   WalletHistoryEntryDto,
   ConsultationTypeLevel,
@@ -687,10 +689,28 @@ export function ProviderFullDetailsView({
     return [...list].sort((a, b) => a.displayOrder - b.displayOrder);
   }, [profileChecklistRaw]);
   const [openStatus, setOpenStatus] = useState<AdminServiceRequestStatus | null>(null);
-  const [servicesEditMode, setServicesEditMode] = useState(false);
-  const [servicesOffered, setServicesOffered] = useState<Record<number, boolean>>({});
-  const [servicesSaving, setServicesSaving] = useState(false);
-  const [servicesError, setServicesError] = useState<string | null>(null);
+  const [serviceCategoryChecklists, setServiceCategoryChecklists] = useState<ServiceCategoryChecklistItem[]>([]);
+  const [servicesLoading, setServicesLoading] = useState(false);
+  const [servicesLoadError, setServicesLoadError] = useState<string | null>(null);
+  const consultationTypeId =
+    provider.consultationTypeId != null && Number.isFinite(Number(provider.consultationTypeId))
+      ? Number(provider.consultationTypeId)
+      : null;
+  const consultationTypeServicesList = useMemo(() => {
+    const excludedIds = new Set(
+      consultationTypeServices.filter((s) => !s.offered).map((s) => s.id)
+    );
+    return serviceCategoryChecklists
+      .filter((s) => s.isActive !== false)
+      .slice()
+      .sort((a, b) => (a.displayOrder - b.displayOrder) || (a.id - b.id))
+      .map((s) => ({
+        id: s.id,
+        label: s.name,
+        displayOrder: s.displayOrder,
+        offered: !excludedIds.has(s.id),
+      }));
+  }, [serviceCategoryChecklists, consultationTypeServices]);
   const [certifications, setCertifications] = useState<AdminCertificationDto[]>([]);
   const [certsLoading, setCertsLoading] = useState(false);
   const [certsError, setCertsError] = useState<string | null>(null);
@@ -884,30 +904,35 @@ export function ProviderFullDetailsView({
   }, [provider.id, provider.levelId, providerLevelOptions, providerLevelFromApi]);
 
   useEffect(() => {
-    const next: Record<number, boolean> = {};
-    consultationTypeServices.forEach((s) => {
-      next[s.id] = s.offered;
-    });
-    setServicesOffered(next);
-  }, [consultationTypeServices]);
-
-  const handleSaveConsultationServices = async () => {
-    if (!provider.id) return;
-    setServicesSaving(true);
-    setServicesError(null);
-    try {
-      const excludedServiceIds = consultationTypeServices
-        .filter((s) => !servicesOffered[s.id])
-        .map((s) => s.id);
-      await providersApi.updateConsultationServices(provider.id, { excludedServiceIds });
-      setServicesEditMode(false);
-      await onRefresh?.();
-    } catch {
-      setServicesError("Failed to update services.");
-    } finally {
-      setServicesSaving(false);
+    if (consultationTypeId == null) {
+      setServiceCategoryChecklists([]);
+      setServicesLoadError(null);
+      return;
     }
-  };
+    let aborted = false;
+    setServicesLoading(true);
+    setServicesLoadError(null);
+    consultationTypesApi
+      .getServices(consultationTypeId)
+      .then((res) => {
+        if (!aborted) {
+          const list = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+          setServiceCategoryChecklists(list);
+        }
+      })
+      .catch(() => {
+        if (!aborted) {
+          setServiceCategoryChecklists([]);
+          setServicesLoadError("Failed to load consultation type services.");
+        }
+      })
+      .finally(() => {
+        if (!aborted) setServicesLoading(false);
+      });
+    return () => {
+      aborted = true;
+    };
+  }, [consultationTypeId]);
 
   const handleProfileChecklistToggle = async (item: ProviderProfileChecklistItemDto) => {
     if (!provider.id || checklistUpdating) return;
@@ -1667,84 +1692,27 @@ export function ProviderFullDetailsView({
           <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
             {t("providers.consultationTypeServicesHelp")}
           </p>
-          {consultationTypeServices.length === 0 ? (
+          {consultationTypeId == null ? (
             <p className="text-gray-500 dark:text-gray-400">{t("providers.noConsultationServices")}</p>
-          ) : servicesEditMode ? (
-            <div className="space-y-3">
-              {consultationTypeServices
-                .slice()
-                .sort((a, b) => (a.displayOrder - b.displayOrder) || (a.id - b.id))
-                .map((s) => (
-                  <label
-                    key={s.id}
-                    className="flex cursor-pointer items-center gap-3 rounded-lg border border-gray-200 bg-white p-2 dark:border-gray-700 dark:bg-gray-800/50"
-                  >
-                    <Checkbox
-                      checked={servicesOffered[s.id] ?? s.offered}
-                      onChange={(checked) =>
-                        setServicesOffered((prev) => ({ ...prev, [s.id]: checked }))
-                      }
-                      className="h-4 w-4"
-                    />
-                    <span className="text-sm font-medium text-gray-800 dark:text-white/90">{s.label}</span>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">
-                      {servicesOffered[s.id] ?? s.offered ? t("providers.offered") : t("providers.excluded")}
-                    </span>
-                  </label>
-                ))}
-              {servicesError && (
-                <p className="text-sm text-red-600 dark:text-red-400">{servicesError}</p>
-              )}
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  disabled={servicesSaving}
-                  onClick={handleSaveConsultationServices}
-                  className="rounded bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 dark:bg-brand-700 dark:hover:bg-brand-800"
-                >
-                  {servicesSaving ? t("supervisor.saving") : t("common.actions.save")}
-                </button>
-                <button
-                  type="button"
-                  disabled={servicesSaving}
-                  onClick={() => {
-                    setServicesEditMode(false);
-                    setServicesError(null);
-                    const next: Record<number, boolean> = {};
-                    consultationTypeServices.forEach((s) => {
-                      next[s.id] = s.offered;
-                    });
-                    setServicesOffered(next);
-                  }}
-                  className="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700 disabled:opacity-50"
-                >
-                  {t("common.actions.cancel")}
-                </button>
-              </div>
-            </div>
+          ) : servicesLoading ? (
+            <p className="text-gray-500 dark:text-gray-400">{t("systemConfig.loading")}</p>
+          ) : servicesLoadError ? (
+            <p className="text-red-600 dark:text-red-400">{servicesLoadError}</p>
+          ) : consultationTypeServicesList.length === 0 ? (
+            <p className="text-gray-500 dark:text-gray-400">{t("providers.noConsultationServices")}</p>
           ) : (
             <div className="space-y-2">
-              {consultationTypeServices
-                .slice()
-                .sort((a, b) => (a.displayOrder - b.displayOrder) || (a.id - b.id))
-                .map((s) => (
-                  <div
-                    key={s.id}
-                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-800/50"
-                  >
-                    <span className="font-medium text-gray-800 dark:text-white/90">{s.label}</span>
-                    <Badge size="sm" color={s.offered ? "success" : "light"}>
-                      {s.offered ? t("providers.offered") : t("providers.excluded")}
-                    </Badge>
-                  </div>
-                ))}
-              <button
-                type="button"
-                onClick={() => setServicesEditMode(true)}
-                className="mt-2 rounded border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
-              >
-                {t("providers.updateList")}
-              </button>
+              {consultationTypeServicesList.map((s) => (
+                <div
+                  key={s.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-800/50"
+                >
+                  <span className="font-medium text-gray-800 dark:text-white/90">{s.label}</span>
+                  <Badge size="sm" color={s.offered ? "success" : "light"}>
+                    {s.offered ? t("providers.offered") : t("providers.excluded")}
+                  </Badge>
+                </div>
+              ))}
             </div>
           )}
         </DetailBlock>

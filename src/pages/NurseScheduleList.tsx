@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import PageMeta from "../components/common/PageMeta";
+import { AssignSupervisorModal } from "../components/schedule/AssignSupervisorModal";
 import ThemedSelect from "../components/form/ThemedSelect";
 import {
   Table,
@@ -11,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "../components/ui/table";
-import { CalenderIcon, PencilIcon } from "../icons";
+import { CalenderIcon, PencilIcon, UserIcon } from "../icons";
 import {
   adminLongTermOpportunitiesApi,
   normalizeLongTermOpportunitiesListResponse,
@@ -66,6 +67,12 @@ function formatAmount(row: LongTermOpportunityListItem): string {
 
 function formatTimeRange(row: LongTermOpportunityListItem): string {
   return row.timeRange?.trim() || "—";
+}
+
+function formatCaregiverCategory(row: LongTermOpportunityListItem): string {
+  const raw = row.caregiverCategory?.trim();
+  if (!raw) return "—";
+  return formatStatusLabel(raw);
 }
 
 function resolveOpportunityFromScheduleDetails(data: unknown): LongTermOpportunityListItem {
@@ -189,6 +196,7 @@ export default function NurseScheduleList() {
   const [updateSaving, setUpdateSaving] = useState(false);
   const [updateError, setUpdateError] = useState("");
   const [actionLoadingId, setActionLoadingId] = useState<number | null>(null);
+  const [assignItem, setAssignItem] = useState<LongTermOpportunityListItem | null>(null);
 
   const fetchList = useCallback(
     async (signal?: AbortSignal) => {
@@ -300,6 +308,15 @@ export default function NurseScheduleList() {
     setUpdateStartDate(source.startDate?.slice(0, 10) || "");
     setUpdateEndDate(source.endDate?.slice(0, 10) || "");
     setUpdateError("");
+  };
+
+  const openAssignSupervisor = (request: LongTermOpportunityListItem) => {
+    setAssignItem(request);
+  };
+
+  const handleSupervisorAssigned = (updated: LongTermOpportunityListItem) => {
+    setItems((prev) => prev.map((row) => (row.id === updated.id ? { ...row, ...updated } : row)));
+    setDetailsItem((prev) => (prev?.id === updated.id ? { ...prev, ...updated } : prev));
   };
 
   const closeUpdate = () => {
@@ -475,6 +492,19 @@ export default function NurseScheduleList() {
                         </button>
                         <button
                           type="button"
+                          title={t("schedule.assignSupervisor")}
+                          aria-label={t("schedule.assignSupervisor")}
+                          disabled={actionLoadingId === request.id}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openAssignSupervisor(request);
+                          }}
+                          className="rounded-md border border-gray-200 bg-white p-2 text-gray-600 hover:bg-gray-100 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
+                        >
+                          <UserIcon className="size-4" />
+                        </button>
+                        <button
+                          type="button"
                           title={t("common.actions.update")}
                           aria-label={t("common.actions.update")}
                           disabled={actionLoadingId === request.id}
@@ -489,6 +519,10 @@ export default function NurseScheduleList() {
                       </div>
                     </div>
                     <dl className="mt-3 grid grid-cols-1 gap-2 text-sm">
+                      <div className="flex justify-between gap-2">
+                        <dt className="text-gray-500 dark:text-gray-400">{t("schedule.caregiverCategory")}</dt>
+                        <dd className="text-gray-800 dark:text-gray-200">{formatCaregiverCategory(request)}</dd>
+                      </div>
                       <div className="flex justify-between gap-2">
                         <dt className="text-gray-500 dark:text-gray-400">{t("schedule.amount")}</dt>
                         <dd className="text-gray-800 dark:text-gray-200">{formatAmount(request)}</dd>
@@ -526,6 +560,12 @@ export default function NurseScheduleList() {
                         isHeader
                         className="py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
                       >
+                        {t("schedule.caregiverCategory")}
+                      </TableCell>
+                      <TableCell
+                        isHeader
+                        className="py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
+                      >
                         {t("schedule.location")}
                       </TableCell>
                       <TableCell
@@ -554,7 +594,7 @@ export default function NurseScheduleList() {
                       </TableCell>
                       <TableCell
                         isHeader
-                        className="w-[120px] py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
+                        className="w-[160px] py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
                       >
                         {t("supervisor.actions")}
                       </TableCell>
@@ -579,6 +619,9 @@ export default function NurseScheduleList() {
                         </TableCell>
                         <TableCell className="py-3 text-theme-sm text-gray-600 dark:text-gray-400">
                           {request.patientName?.trim() || "—"}
+                        </TableCell>
+                        <TableCell className="py-3 text-theme-sm text-gray-600 dark:text-gray-400">
+                          {formatCaregiverCategory(request)}
                         </TableCell>
                         <TableCell className="py-3 text-theme-sm text-gray-600 dark:text-gray-400">
                           {request.location?.trim() || "—"}
@@ -609,6 +652,19 @@ export default function NurseScheduleList() {
                               className="rounded-md border border-gray-200 bg-white p-2 text-gray-600 hover:bg-gray-100 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
                             >
                               <CalenderIcon className="size-4" />
+                            </button>
+                            <button
+                              type="button"
+                              title={t("schedule.assignSupervisor")}
+                              aria-label={t("schedule.assignSupervisor")}
+                              disabled={actionLoadingId === request.id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openAssignSupervisor(request);
+                              }}
+                              className="rounded-md border border-gray-200 bg-white p-2 text-gray-600 hover:bg-gray-100 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
+                            >
+                              <UserIcon className="size-4" />
                             </button>
                             <button
                               type="button"
@@ -716,6 +772,12 @@ export default function NurseScheduleList() {
                 </p>
               </div>
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-800/40">
+                <p className="text-xs text-gray-500 dark:text-gray-400">{t("schedule.caregiverCategory")}</p>
+                <p className="mt-1 text-sm font-medium text-gray-800 dark:text-gray-200">
+                  {formatCaregiverCategory(detailsItem)}
+                </p>
+              </div>
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-800/40">
                 <p className="text-xs text-gray-500 dark:text-gray-400">{t("schedule.location")}</p>
                 <p className="mt-1 text-sm font-medium text-gray-800 dark:text-gray-200">
                   {detailsItem.location?.trim() || "—"}
@@ -745,10 +807,23 @@ export default function NurseScheduleList() {
                   {detailsItem.assignedNursesLabel ?? "—"}
                 </p>
               </div>
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-800/40">
+                <p className="text-xs text-gray-500 dark:text-gray-400">{t("schedule.assignedSupervisor")}</p>
+                <p className="mt-1 text-sm font-medium text-gray-800 dark:text-gray-200">
+                  {detailsItem.supervisorName?.trim() || "—"}
+                </p>
+              </div>
             </div>
           </div>
         ) : null}
       </Modal>
+
+      <AssignSupervisorModal
+        isOpen={assignItem !== null}
+        onClose={() => setAssignItem(null)}
+        opportunity={assignItem}
+        onAssigned={handleSupervisorAssigned}
+      />
 
       <Modal
         isOpen={updateItem !== null}
