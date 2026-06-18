@@ -910,6 +910,7 @@ export interface ProviderCancelReviewListItemBase {
   createdAt: string | null;
   reasonCategory: string | null;
   reasonNote: string | null;
+  stage: string | null;
   provider: { id: number; userId?: number | null; name: string } | null;
   patient: { id: number; userId?: number; name: string };
 }
@@ -993,6 +994,14 @@ export interface ProviderCancelReviewHistoryItem {
   reasonCategory: string | null;
 }
 
+export interface ServiceTimelineEvent {
+  id: number;
+  eventType: string;
+  actorRole: string;
+  note: string | null;
+  createdAt: string;
+}
+
 export interface ProviderCancelReviewReassignResult {
   id: number;
   reviewStatus: "REASSIGNED";
@@ -1011,6 +1020,7 @@ export interface ProviderCancelReviewDetail extends ProviderCancelReviewSingleIt
   };
   cancelHistory: ProviderCancelReviewHistoryItem[];
   suggestedReplacements: ProviderCancelReviewSuggestedReplacement[];
+  serviceTimeline: ServiceTimelineEvent[];
 }
 
 export const adminProviderCancelApi = {

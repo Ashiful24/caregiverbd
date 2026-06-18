@@ -375,6 +375,12 @@ export default function ProviderCancelRequestDetail() {
             </p>
             <p>
               <span className="text-gray-500 dark:text-gray-400">
+                {t("providerCancelRequests.cancelStage")}:
+              </span>{" "}
+              {detail.stage ? formatStatusLabel(detail.stage) : "—"}
+            </p>
+            <p>
+              <span className="text-gray-500 dark:text-gray-400">
                 {t("providerCancelRequests.colServiceRequest")}:
               </span>{" "}
               <Link
@@ -431,6 +437,61 @@ export default function ProviderCancelRequestDetail() {
               {t("providerCancelRequests.srStatusNote")}
             </p>
           </div>
+        </section>
+
+        <section className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] lg:p-6">
+          <h3 className="mb-4 text-lg font-semibold text-gray-800 dark:text-white/90">
+            {t("providerCancelRequests.serviceTimeline")}
+          </h3>
+          {detail.serviceTimeline.length === 0 ? (
+            <p className="text-sm text-gray-400">{t("providerCancelRequests.timelineEmpty")}</p>
+          ) : (
+            <ol className="relative border-l border-gray-200 dark:border-gray-700 ml-3">
+              {detail.serviceTimeline.map((ev) => {
+                const isCancelEvent =
+                  ev.eventType === "PROVIDER_CANCEL_REQUEST_SUBMITTED" ||
+                  ev.eventType === "SERVICE_CANCELLED" ||
+                  ev.eventType === "SERVICE_REJECTED" ||
+                  ev.eventType === "SERVICE_EXPIRED";
+                const isPositiveEvent =
+                  ev.eventType === "SERVICE_ACCEPTED" ||
+                  ev.eventType === "PAYMENT_COMPLETED" ||
+                  ev.eventType === "SERVICE_COMPLETED" ||
+                  ev.eventType === "REFUND_COMPLETED" ||
+                  ev.eventType === "SERVICE_IN_PROGRESS";
+                const dotColor = isCancelEvent
+                  ? "bg-rose-500"
+                  : isPositiveEvent
+                    ? "bg-emerald-500"
+                    : "bg-brand-500";
+                const label =
+                  (t(`providerCancelRequests.eventType.${ev.eventType}`, { defaultValue: "" }) as string) ||
+                  formatStatusLabel(ev.eventType);
+                return (
+                  <li key={ev.id} className="mb-5 ml-5">
+                    <span
+                      className={`absolute -left-1.5 mt-1.5 h-3 w-3 rounded-full border-2 border-white dark:border-gray-900 ${dotColor}`}
+                    />
+                    <div className="flex flex-wrap items-baseline gap-x-2">
+                      <span className="text-sm font-medium text-gray-800 dark:text-white/90">
+                        {label}
+                      </span>
+                      <span className="text-xs text-gray-400 dark:text-gray-500">
+                        {t("providerCancelRequests.timelineActorRole")}{" "}
+                        {formatStatusLabel(ev.actorRole)}
+                      </span>
+                    </div>
+                    <time className="block text-xs text-gray-400 dark:text-gray-500">
+                      {formatDateTime(ev.createdAt)}
+                    </time>
+                    {ev.note ? (
+                      <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{ev.note}</p>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ol>
+          )}
         </section>
 
         <section className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] lg:p-6">
