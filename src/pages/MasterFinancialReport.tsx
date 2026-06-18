@@ -694,8 +694,14 @@ export default function MasterFinancialReport() {
                       </TableCell>
                       <TableCell isHeader className="text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400 py-3">
                         <span className="inline-flex items-center gap-1.5">
-                          {t(`${M}.txnList.colProvider`)}
-                          <InfoTooltip text={t(`${M}.txnList.ttProviderNet`)} />
+                          {t(`${M}.txnList.colTax`)}
+                          <InfoTooltip text={t(`${M}.txnList.ttTax`)} />
+                        </span>
+                      </TableCell>
+                      <TableCell isHeader className="text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400 py-3">
+                        <span className="inline-flex items-center gap-1.5">
+                          {t(`${M}.txnList.colSupervisorComm`)}
+                          <InfoTooltip text={t(`${M}.txnList.ttSupervisorComm`)} />
                         </span>
                       </TableCell>
                       <TableCell isHeader className="text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400 py-3">
@@ -706,14 +712,14 @@ export default function MasterFinancialReport() {
                       </TableCell>
                       <TableCell isHeader className="text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400 py-3">
                         <span className="inline-flex items-center gap-1.5">
-                          {t(`${M}.txnList.colTax`)}
-                          <InfoTooltip text={t(`${M}.txnList.ttTax`)} />
+                          {t(`${M}.txnList.colAit`)}
+                          <InfoTooltip text={t(`${M}.txnList.ttAit`)} />
                         </span>
                       </TableCell>
                       <TableCell isHeader className="text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400 py-3">
                         <span className="inline-flex items-center gap-1.5">
-                          {t(`${M}.txnList.colAit`)}
-                          <InfoTooltip text={t(`${M}.txnList.ttAit`)} />
+                          {t(`${M}.txnList.colProvider`)}
+                          <InfoTooltip text={t(`${M}.txnList.ttProviderNet`)} />
                         </span>
                       </TableCell>
                       <TableCell isHeader className="text-center text-xs font-medium uppercase text-gray-500 dark:text-gray-400 py-3">
@@ -725,11 +731,13 @@ export default function MasterFinancialReport() {
                     </TableRow>
                   </TableHeader>
                   <TableBody className="divide-y divide-gray-100 dark:divide-gray-800">
-                    {txList.map((row: FinancialReportTxItemDto) => (
+                    {txList.map((row: FinancialReportTxItemDto) => {
+                      const isEscrow = row.isEscrow;
+                      return (
                       <TableRow
                         key={row.transactionId}
                         onClick={() => openDetail(row.transactionId)}
-                        className="cursor-pointer hover:bg-gray-50 dark:hover:bg-white/[0.02]"
+                        className={`cursor-pointer ${isEscrow ? 'bg-amber-50 dark:bg-amber-900/10 hover:bg-amber-100/70 dark:hover:bg-amber-900/20' : 'hover:bg-gray-50 dark:hover:bg-white/[0.02]'}`}
                       >
                         <TableCell className="text-gray-700 dark:text-gray-300 py-2.5">
                           {formatDateTime(row.date)}
@@ -778,25 +786,31 @@ export default function MasterFinancialReport() {
                         <TableCell className="text-right font-medium text-gray-800 dark:text-white/90 py-2.5">
                           {fmtBDT(row.totalFee)}
                         </TableCell>
-                        <TableCell className="text-right text-gray-700 dark:text-gray-300 py-2.5">
-                          {fmtBDT(row.providerFee)}
+                        <TableCell className="text-right text-gray-600 dark:text-gray-400 py-2.5">
+                          {fmtBDT(row.tax)}
+                        </TableCell>
+                        <TableCell className="text-right text-gray-600 dark:text-gray-400 py-2.5">
+                          {fmtBDT(row.supervisorCommission)}
                         </TableCell>
                         <TableCell className="text-right text-gray-600 dark:text-gray-400 py-2.5">
                           {fmtBDT(row.commission)}
                         </TableCell>
                         <TableCell className="text-right text-gray-600 dark:text-gray-400 py-2.5">
-                          {fmtBDT(row.tax)}
-                        </TableCell>
-                        <TableCell className="text-right text-gray-600 dark:text-gray-400 py-2.5">
                           {fmtBDT(row.ait)}
                         </TableCell>
+                        <TableCell className="text-right text-gray-700 dark:text-gray-300 py-2.5">
+                          {fmtBDT(row.providerFee)}
+                        </TableCell>
                         <TableCell className="text-center py-2.5">
-                          <Badge color={statusBadgeColor(row.status)} size="sm">
-                            {t(`${M}.txStatus.${row.status}`, { defaultValue: row.status })}
-                          </Badge>
+                          <span title={isEscrow ? t(`${M}.txStatus.escrowHint`) : undefined}>
+                            <Badge color={isEscrow ? "warning" : statusBadgeColor(row.status)} size="sm">
+                              {t(`${M}.txStatus.${row.status}`, { defaultValue: row.status })}
+                            </Badge>
+                          </span>
                         </TableCell>
                       </TableRow>
-                    ))}
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
@@ -1054,6 +1068,7 @@ function TransactionDetailView({ detail }: { detail: FinancialTxDetailResponseDt
           ) : null}
           <Table>
             <TableBody className="divide-y divide-gray-100 dark:divide-gray-800">
+              {/* Row 1: Total fee */}
               <TableRow>
                 <TableCell className="text-gray-700 dark:text-gray-300 py-2">
                   {t(`${M}.detail.rowTotalFee`)}
@@ -1062,20 +1077,7 @@ function TransactionDetailView({ detail }: { detail: FinancialTxDetailResponseDt
                   {fmtBDT(detail.breakdown.totalFee)}
                 </TableCell>
               </TableRow>
-              <TableRow>
-                <TableCell className="text-gray-700 dark:text-gray-300 py-2">
-                  {t(`${M}.detail.rowCommission`)}
-                  <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
-                    {detail.breakdown.commission.percent}%{" "}
-                    {detail.breakdown.commission.inclusive
-                      ? t(`${M}.detail.inclusive`)
-                      : t(`${M}.detail.exclusive`)}
-                  </span>
-                </TableCell>
-                <TableCell className="text-right text-gray-800 dark:text-white/90 py-2">
-                  − {fmtBDT(detail.breakdown.commission.amount)}
-                </TableCell>
-              </TableRow>
+              {/* Row 2: VAT (first deduction) */}
               <TableRow>
                 <TableCell className="text-gray-700 dark:text-gray-300 py-2">
                   {t(`${M}.detail.rowTax`)}
@@ -1090,7 +1092,37 @@ function TransactionDetailView({ detail }: { detail: FinancialTxDetailResponseDt
                   − {fmtBDT(detail.breakdown.tax.amount)}
                 </TableCell>
               </TableRow>
-              {detail.breakdown.ait ? (
+              {/* Row 3: Supervisor commission (second deduction — always shown as part of the flow) */}
+              <TableRow>
+                <TableCell className="text-gray-700 dark:text-gray-300 py-2">
+                  {t(`${M}.detail.rowSupervisorCommission`)}
+                  <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                    {detail.breakdown.supervisorCommission.percent}%{" "}
+                    {t(`${M}.detail.supervisorCommissionSuffix`)}
+                  </span>
+                </TableCell>
+                <TableCell className="text-right text-gray-800 dark:text-white/90 py-2">
+                  − {fmtBDT(detail.breakdown.supervisorCommission.amount)}
+                </TableCell>
+              </TableRow>
+              {/* Row 4: Platform commission (third deduction) */}
+              <TableRow>
+                <TableCell className="text-gray-700 dark:text-gray-300 py-2">
+                  {t(`${M}.detail.rowCommission`)}
+                  <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                    {detail.breakdown.commission.percent}%{" "}
+                    {detail.breakdown.commission.inclusive
+                      ? t(`${M}.detail.inclusive`)
+                      : t(`${M}.detail.exclusive`)}
+                  </span>
+                </TableCell>
+                <TableCell className="text-right text-gray-800 dark:text-white/90 py-2">
+                  − {fmtBDT(detail.breakdown.commission.amount)}
+                </TableCell>
+              </TableRow>
+              {/* Row 5: AIT (fourth deduction) */}
+              {detail.breakdown.ait &&
+               parseFloat(detail.breakdown.ait.amount) > 0 ? (
                 <TableRow>
                   <TableCell className="text-gray-700 dark:text-gray-300 py-2">
                     {t(`${M}.detail.rowAit`)}
@@ -1103,6 +1135,7 @@ function TransactionDetailView({ detail }: { detail: FinancialTxDetailResponseDt
                   </TableCell>
                 </TableRow>
               ) : null}
+              {/* Row 6: Provider net */}
               <TableRow>
                 <TableCell className="font-medium text-emerald-700 dark:text-emerald-400 py-2">
                   {heldInEscrow

@@ -1178,6 +1178,7 @@ const en = {
         PENDING: "Pending",
         FAILED: "Failed",
         CANCELLED: "Cancelled",
+        escrowHint: "Payment received — funds held in escrow, pending service completion before disbursement to provider",
       },
       kpi: {
         totalInflow: "Total inflow",
@@ -1238,6 +1239,7 @@ const en = {
         colProvider: "Provider",
         colComm: "Comm.",
         colTax: "Tax",
+        colSupervisorComm: "Sup. Comm.",
         colAit: "AIT",
         colStatus: "Status",
         ttDate: "When the transaction was created (date and time, Bangladesh display).",
@@ -1248,9 +1250,10 @@ const en = {
         ttService:
           "Consultation type, short or long-term mode, and scheduled date when it applies.",
         ttTotal: "Total fee charged to the patient for this line — platform inflow.",
-        ttProviderNet: "What the provider gets after commission, tax, and AIT on this payment.",
+        ttProviderNet: "What the provider gets after commission, tax, supervisor commission, and AIT on this payment.",
         ttCommission: "Commission earned by the platform on this payment.",
         ttTax: "Tax collected on this payment.",
+        ttSupervisorComm: "Supervisor commission deducted from the post-VAT pool and credited to the assigned supervisor.",
         ttAit: "Advance Income Tax withheld from the provider on this payment.",
         ttStatus:
           "Completed means money settled. Pending means waiting on the gateway or processing. Failed or cancelled means it did not complete.",
@@ -1298,8 +1301,10 @@ const en = {
         realizedBannerHint:
           "Service is COMPLETED. Commission / VAT / AIT have been deducted and the remainder is in the provider's claimable wallet.",
         rowTotalFee: "Total fee (patient paid)",
-        rowCommission: "Commission",
         rowTax: "Tax",
+        rowSupervisorCommission: "Supervisor commission",
+        supervisorCommissionSuffix: "(deducted from provider)",
+        rowCommission: "Commission",
         rowAit: "AIT",
         aitWithheldSuffix: "(withheld from provider)",
         inclusive: "(inclusive)",
