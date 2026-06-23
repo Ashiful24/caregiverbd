@@ -653,25 +653,28 @@ function ShiftTableRows({
     [currentProviderId, providers]
   );
 
-  const fullRefund = parseFloat(shift.refundPreview.refundAmount || "0");
-  const refundValue = decision ? parseFloat(decision.refundAmount || "0") : fullRefund;
-  const pct = fullRefund > 0 ? Math.round((refundValue / fullRefund) * 100) : 100;
+  // paidAmount = what the patient actually paid for this shift (the correct base for percentages)
+  // policyRefund = what the policy recommends refunding (pre-filled default; can be 0 for IN_PROGRESS)
+  const paidAmount = parseFloat(shift.fee || "0");
+  const policyRefund = parseFloat(shift.refundPreview.refundAmount || "0");
+  const refundValue = decision ? parseFloat(decision.refundAmount || "0") : policyRefund;
+  const pct = paidAmount > 0 ? Math.round((refundValue / paidAmount) * 100) : 0;
   const isPartialRefund =
-    decision?.decision === "approve" && refundValue < fullRefund && refundValue >= 0;
+    decision?.decision === "approve" && refundValue > 0 && refundValue < paidAmount;
 
   const handlePercentChange = (raw: string) => {
     setPercentInput(raw);
     const p = Math.min(100, Math.max(0, parseFloat(raw) || 0));
-    onPatch({ refundAmount: ((p / 100) * fullRefund).toFixed(2) });
+    onPatch({ refundAmount: ((p / 100) * paidAmount).toFixed(2) });
   };
 
   const handleAmountChange = (raw: string) => {
     onPatch({ refundAmount: raw });
-    if (fullRefund > 0) {
-      setPercentInput(
-        String(Math.min(100, Math.max(0, Math.round(((parseFloat(raw) || 0) / fullRefund) * 100))))
-      );
-    }
+    setPercentInput(
+      String(paidAmount > 0
+        ? Math.min(100, Math.max(0, Math.round(((parseFloat(raw) || 0) / paidAmount) * 100)))
+        : 0)
+    );
   };
 
   const switchMode = (mode: "amount" | "percent") => {
@@ -808,7 +811,7 @@ function ShiftTableRows({
               </div>
 
               {/* Fields row */}
-              <div className="flex flex-wrap items-end gap-5">
+              <div className="flex flex-wrap items-start gap-5">
 
                 {/* Approve: refund amount / % */}
                 {decision.decision === "approve" ? (
@@ -848,7 +851,7 @@ function ShiftTableRows({
                         <input
                           type="number"
                           min={0}
-                          max={fullRefund}
+                          max={paidAmount}
                           step="0.01"
                           value={decision.refundAmount}
                           onChange={(e) => handleAmountChange(e.target.value)}
@@ -895,7 +898,7 @@ function ShiftTableRows({
 
                 {/* Reassign: provider select */}
                 {decision.decision === "reassign" ? (
-                  <div className="w-56">
+                  <div className="min-w-[200px] flex-1 max-w-xs">
                     <p className="mb-1.5 text-xs font-medium text-gray-500 dark:text-gray-400">
                       New provider <span className="text-rose-500">*</span>
                     </p>
@@ -906,21 +909,21 @@ function ShiftTableRows({
                         {t("providerCancelRequests.noReplacementProviders")}
                       </p>
                     ) : (
-                      <>
-                        <SearchableSelect<number>
-                          value={decision.newProviderId}
-                          onChange={(v) => onPatch({ newProviderId: v ?? null })}
-                          placeholder={t("providerCancelRequests.reassignSelectPlaceholder")}
-                          clearLabel={t("providerCancelRequests.reassignClear")}
-                          searchPlaceholder={t("providerCancelRequests.reassignSearchPlaceholder")}
-                          className="min-h-[38px]"
-                          options={providerOptions}
-                        />
-                        {!decision.newProviderId ? (
-                          <p className="mt-1 text-xs text-rose-500">Select a provider</p>
-                        ) : null}
-                      </>
+                      <SearchableSelect<number>
+                        value={decision.newProviderId}
+                        onChange={(v) => onPatch({ newProviderId: v ?? null })}
+                        placeholder={t("providerCancelRequests.reassignSelectPlaceholder")}
+                        clearLabel={t("providerCancelRequests.reassignClear")}
+                        searchPlaceholder={t("providerCancelRequests.reassignSearchPlaceholder")}
+                        className="min-h-[38px]"
+                        options={providerOptions}
+                      />
                     )}
+                    <p className="mt-1 min-h-[1rem] text-xs text-rose-500">
+                      {!loadingProviders && providerOptions.length > 0 && !decision.newProviderId
+                        ? "Select a provider"
+                        : ""}
+                    </p>
                   </div>
                 ) : null}
 
@@ -945,9 +948,11 @@ function ShiftTableRows({
                         : t("providerCancelRequests.adminNotesPlaceholder")
                     }
                   />
-                  {decision.decision === "reject" && !decision.notes.trim() ? (
-                    <p className="mt-1 text-xs text-rose-500">Required when rejecting</p>
-                  ) : null}
+                  <p className="mt-1 min-h-[1rem] text-xs text-rose-500">
+                    {decision.decision === "reject" && !decision.notes.trim()
+                      ? "Required when rejecting"
+                      : ""}
+                  </p>
                 </div>
               </div>
             </div>
