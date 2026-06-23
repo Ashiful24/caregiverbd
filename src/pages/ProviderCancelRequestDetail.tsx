@@ -94,30 +94,35 @@ export default function ProviderCancelRequestDetail() {
 
   useEffect(() => {
     if (selectedAction === "approve" && detail) {
+      const pa = parseFloat(detail.serviceRequest?.fee ?? "0") || 0;
+      const pr = parseFloat(detail.refundPreview.refundAmount ?? "0") || 0;
       setRefundAmount(detail.refundPreview.refundAmount ?? "");
       setRefundMode("amount");
-      setPercentInput("100");
+      setPercentInput(String(pa > 0 ? Math.round((pr / pa) * 100) : 0));
     }
   }, [selectedAction, detail?.id]);
 
   // ── Approve-panel derived values ─────────────────────────────────────────
-  const fullRefundValue = parseFloat(detail?.refundPreview.refundAmount ?? "0") || 0;
+  // paidAmount = what the patient actually paid (correct base for percentage)
+  // policyRefundValue = what the policy recommends (pre-filled default; can be 0 for IN_PROGRESS)
+  const paidAmount = parseFloat(detail?.serviceRequest?.fee ?? "0") || 0;
   const currentRefundValue = parseFloat(refundAmount) || 0;
   const approveRefundPct =
-    fullRefundValue > 0 ? Math.round((currentRefundValue / fullRefundValue) * 100) : 0;
-  const isPartialRefund = currentRefundValue < fullRefundValue && currentRefundValue >= 0;
+    paidAmount > 0 ? Math.round((currentRefundValue / paidAmount) * 100) : 0;
+  const isPartialRefund = currentRefundValue > 0 && currentRefundValue < paidAmount;
 
   const handleApproveAmountChange = (raw: string) => {
     setRefundAmount(raw);
-    if (fullRefundValue > 0)
-      setPercentInput(
-        String(Math.min(100, Math.max(0, Math.round(((parseFloat(raw) || 0) / fullRefundValue) * 100))))
-      );
+    setPercentInput(
+      String(paidAmount > 0
+        ? Math.min(100, Math.max(0, Math.round(((parseFloat(raw) || 0) / paidAmount) * 100)))
+        : 0)
+    );
   };
   const handleApprovePercentChange = (raw: string) => {
     setPercentInput(raw);
     const p = Math.min(100, Math.max(0, parseFloat(raw) || 0));
-    setRefundAmount(((p / 100) * fullRefundValue).toFixed(2));
+    setRefundAmount(((p / 100) * paidAmount).toFixed(2));
   };
   const switchApproveRefundMode = (mode: "amount" | "percent") => {
     setRefundMode(mode);
@@ -237,12 +242,14 @@ export default function ProviderCancelRequestDetail() {
     setError("");
     try {
       if (confirmAction === "approve") {
-        const fullAmt = parseFloat(detail?.refundPreview.refundAmount ?? "0");
+        const policyAmt = parseFloat(detail?.refundPreview.refundAmount ?? "0");
         const customAmt = parseFloat(refundAmount);
+        // Send refundAmount whenever it differs from the policy default so that
+        // admin overrides (including ৳X on a 0-refund IN_PROGRESS shift) are honored.
         await adminProviderCancelApi.approve(requestId, {
           adminNotes: adminNotes.trim() || undefined,
           refundAmount:
-            Number.isFinite(customAmt) && customAmt < fullAmt ? customAmt : undefined,
+            Number.isFinite(customAmt) && customAmt !== policyAmt ? customAmt : undefined,
         });
         setSuccessMessage(t("providerCancelRequests.approveSuccess"));
       } else if (confirmAction === "reject") {
@@ -692,7 +699,7 @@ export default function ProviderCancelRequestDetail() {
                           </button>
                         </span>
                         {refundMode === "amount" ? (
-                          <input type="number" min={0} max={fullRefundValue} step="0.01" value={refundAmount}
+                          <input type="number" min={0} max={paidAmount} step="0.01" value={refundAmount}
                             onChange={(e) => handleApproveAmountChange(e.target.value)}
                             className="w-32 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm shadow-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100" />
                         ) : (
