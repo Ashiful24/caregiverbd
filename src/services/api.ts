@@ -1139,6 +1139,54 @@ export const adminCancellationApi = {
   },
 };
 
+// ============== Admin: Service Checklist Groups ==============
+
+export interface ServiceChecklistGroupItem {
+  id: number;
+  name: string;
+  nameBn: string;
+  description: string;
+  descriptionBn: string;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface ServiceChecklistGroupPayload {
+  name: string;
+  nameBn: string;
+  description: string;
+  descriptionBn: string;
+}
+
+export type ServiceChecklistGroupLang = "en" | "bn";
+
+export const serviceChecklistGroupsApi = {
+  /** GET /admin/service-checklist-groups — List all service checklist groups. */
+  list: async (params?: { lang?: ServiceChecklistGroupLang }) => {
+    return httpService.get<ServiceChecklistGroupItem[]>("/admin/service-checklist-groups", {
+      params: { lang: params?.lang ?? "en" },
+    });
+  },
+  /** GET /admin/service-checklist-groups/:id — Get a service checklist group by id. */
+  getById: async (id: number, params?: { lang?: ServiceChecklistGroupLang }) => {
+    return httpService.get<ServiceChecklistGroupItem>(`/admin/service-checklist-groups/${id}`, {
+      params: params?.lang ? { lang: params.lang } : undefined,
+    });
+  },
+  /** POST /admin/service-checklist-groups — Create a service checklist group. */
+  create: async (data: ServiceChecklistGroupPayload) => {
+    return httpService.post<ServiceChecklistGroupItem>("/admin/service-checklist-groups", data);
+  },
+  /** PATCH /admin/service-checklist-groups/:id — Update a service checklist group. */
+  update: async (id: number, data: ServiceChecklistGroupPayload) => {
+    return httpService.patch<ServiceChecklistGroupItem>(`/admin/service-checklist-groups/${id}`, data);
+  },
+  /** DELETE /admin/service-checklist-groups/:id — Delete a service checklist group. */
+  delete: async (id: number) => {
+    return httpService.delete<void>(`/admin/service-checklist-groups/${id}`);
+  },
+};
+
 // ============== Admin: Verification Document Types ==============
 
 /** Admin-managed verification document type (add, update, deactivate). */
