@@ -3926,7 +3926,7 @@ export const adminProvidersApi = {
   },
 };
 
-/** Admin: verify certification (approve/reject). PATCH /v1/admin/certifications/:id/verify (api_business_flow §4b) */
+/** Admin: verify certification (approve/reject). PATCH /v1/certifications/:id/verify (api_business_flow §4b) */
 export interface AdminVerifyCertificationRequest {
   status: "APPROVED" | "REJECTED";
   adminComment?: string;
@@ -3935,7 +3935,7 @@ export interface AdminVerifyCertificationRequest {
 export const adminCertificationsApi = {
   verify: async (certificationId: number, data: AdminVerifyCertificationRequest) => {
     return httpService.patch<AdminCertificationDto>(
-      `/admin/certifications/${certificationId}/verify`,
+      `/certifications/${certificationId}/verify`,
       data
     );
   },

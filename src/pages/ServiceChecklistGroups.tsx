@@ -16,50 +16,19 @@ import { PencilIcon, PlusIcon, TrashBinIcon } from "../icons";
 const inputClass =
   "h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30";
 
-type VisibleFormState = {
-  name: string;
-  description: string;
-};
+type FormState = ServiceChecklistGroupPayload;
 
-const emptyVisibleForm = (): VisibleFormState => ({
+const emptyForm = (): FormState => ({
   name: "",
+  nameBn: "",
   description: "",
+  descriptionBn: "",
 });
 
 function truncate(text: string, max = 60): string {
   const t = text.trim();
   if (t.length <= max) return t;
   return `${t.slice(0, max)}…`;
-}
-
-function toPayload(
-  form: VisibleFormState,
-  sibling: VisibleFormState,
-  lang: "en" | "bn"
-): ServiceChecklistGroupPayload {
-  const name = form.name.trim();
-  const description = form.description.trim();
-  const siblingName = sibling.name.trim();
-  const siblingDescription = sibling.description.trim();
-
-  if (lang === "en") {
-    return {
-      name,
-      description,
-      nameBn: siblingName,
-      descriptionBn: siblingDescription,
-    };
-  }
-
-  // Bangla mode: form binds to name/description; mirror into nameBn/descriptionBn.
-  // Keep existing English from sibling when editing; on create sibling is empty so
-  // name and description receive the same Bangla values as nameBn/descriptionBn.
-  return {
-    name: siblingName || name,
-    description: siblingDescription || description,
-    nameBn: name,
-    descriptionBn: description,
-  };
 }
 export default function ServiceChecklistGroups() {
   const { t, i18n } = useTranslation();
@@ -70,8 +39,7 @@ export default function ServiceChecklistGroups() {
   const [formModal, setFormModal] = useState<
     { mode: "add" } | { mode: "edit"; item: ServiceChecklistGroupItem } | null
   >(null);
-  const [form, setForm] = useState<VisibleFormState>(emptyVisibleForm);
-  const [siblingForm, setSiblingForm] = useState<VisibleFormState>(emptyVisibleForm);
+  const [form, setForm] = useState<FormState>(emptyForm);
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -101,38 +69,41 @@ export default function ServiceChecklistGroups() {
     fetchData();
   }, [fetchData]);
 
-  const loadFormForEdit = useCallback(
-    async (id: number, lang: "en" | "bn") => {
-      setFormLoading(true);
+  const loadFormForEdit = useCallback(async (id: number) => {
+    setFormLoading(true);
+    try {
+      const [enRes, bnRes] = await Promise.all([
+        serviceChecklistGroupsApi.getById(id, { lang: "en" }),
+        serviceChecklistGroupsApi.getById(id, { lang: "bn" }),
+      ]);
+      const en = (enRes?.data ?? enRes) as ServiceChecklistGroupItem;
+      const bn = (bnRes?.data ?? bnRes) as ServiceChecklistGroupItem;
+      setForm({
+        name: en.name ?? "",
+        description: en.description ?? "",
+        nameBn: bn.nameBn ?? bn.name ?? "",
+        descriptionBn: bn.descriptionBn ?? bn.description ?? "",
+      });
+    } catch {
       try {
-        const siblingLang = lang === "en" ? "bn" : "en";
-        const [currentRes, siblingRes] = await Promise.all([
-          serviceChecklistGroupsApi.getById(id, { lang }),
-          serviceChecklistGroupsApi.getById(id, { lang: siblingLang }),
-        ]);
-        const current = (currentRes?.data ?? currentRes) as ServiceChecklistGroupItem;
-        const sibling = (siblingRes?.data ?? siblingRes) as ServiceChecklistGroupItem;
+        const res = await serviceChecklistGroupsApi.getById(id);
+        const data = (res?.data ?? res) as ServiceChecklistGroupItem;
         setForm({
-          name: current.name ?? "",
-          description: current.description ?? "",
-        });
-        setSiblingForm({
-          name: sibling.name ?? "",
-          description: sibling.description ?? "",
+          name: data.name ?? "",
+          nameBn: data.nameBn ?? "",
+          description: data.description ?? "",
+          descriptionBn: data.descriptionBn ?? "",
         });
       } catch {
-        setForm(emptyVisibleForm());
-        setSiblingForm(emptyVisibleForm());
-      } finally {
-        setFormLoading(false);
+        setForm(emptyForm());
       }
-    },
-    []
-  );
+    } finally {
+      setFormLoading(false);
+    }
+  }, []);
 
   const openAdd = () => {
-    setForm(emptyVisibleForm());
-    setSiblingForm(emptyVisibleForm());
+    setForm(emptyForm());
     setFormError(null);
     setFormModal({ mode: "add" });
   };
@@ -140,31 +111,34 @@ export default function ServiceChecklistGroups() {
   const openEdit = (item: ServiceChecklistGroupItem) => {
     setFormError(null);
     setFormModal({ mode: "edit", item });
-    void loadFormForEdit(item.id, apiLang);
+    void loadFormForEdit(item.id);
   };
-
-  useEffect(() => {
-    if (formModal?.mode === "edit") {
-      void loadFormForEdit(formModal.item.id, apiLang);
-    }
-  }, [apiLang, formModal, loadFormForEdit]);
 
   const closeFormModal = () => {
     if (submitting) return;
     setFormModal(null);
-    setForm(emptyVisibleForm());
-    setSiblingForm(emptyVisibleForm());
+    setForm(emptyForm());
     setFormError(null);
     setFormLoading(false);
   };
 
-  const formInvalid = !form.name.trim() || !form.description.trim();
+  const banglaRequired = apiLang === "bn";
+
+  const formInvalid =
+    !form.name.trim() ||
+    !form.description.trim() ||
+    (banglaRequired && (!form.nameBn.trim() || !form.descriptionBn.trim()));
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!formModal || formInvalid) return;
 
-    const payload = toPayload(form, siblingForm, apiLang);
+    const payload: ServiceChecklistGroupPayload = {
+      name: form.name.trim(),
+      nameBn: form.nameBn.trim(),
+      description: form.description.trim(),
+      descriptionBn: form.descriptionBn.trim(),
+    };
 
     setSubmitting(true);
     setFormError(null);
@@ -337,7 +311,7 @@ export default function ServiceChecklistGroups() {
                 {formTitle}
               </h3>
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                {apiLang === "bn"
+                {banglaRequired
                   ? t("serviceChecklistGroups.formIntroBn")
                   : t("serviceChecklistGroups.formIntroEn")}
               </p>
@@ -352,7 +326,12 @@ export default function ServiceChecklistGroups() {
                 ) : (
                   <div className="grid gap-5">
                     <div>
-                      <Label htmlFor="scg-name">{t("serviceChecklistGroups.colName")}</Label>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-brand-600 dark:text-brand-400">
+                        {t("serviceChecklistGroups.sectionEnglish")}
+                      </p>
+                    </div>
+                    <div>
+                      <Label htmlFor="scg-name">{t("serviceChecklistGroups.nameEn")}</Label>
                       <input
                         id="scg-name"
                         type="text"
@@ -362,33 +341,74 @@ export default function ServiceChecklistGroups() {
                           setFormError(null);
                         }}
                         className={inputClass}
-                        placeholder={
-                          apiLang === "bn"
-                            ? t("serviceChecklistGroups.nameBnPlaceholder")
-                            : t("serviceChecklistGroups.nameEnPlaceholder")
-                        }
-                        dir="auto"
+                        placeholder={t("serviceChecklistGroups.nameEnPlaceholder")}
                         autoComplete="off"
                         required
                       />
                     </div>
                     <div>
-                      <Label htmlFor="scg-description">
-                        {t("serviceChecklistGroups.colDescription")}
+                      <Label htmlFor="scg-description-en">
+                        {t("serviceChecklistGroups.descriptionEn")}
                       </Label>
                       <TextArea
-                        id="scg-description"
+                        id="scg-description-en"
                         rows={3}
                         value={form.description}
                         onChange={(value) => {
                           setForm((f) => ({ ...f, description: value }));
                           setFormError(null);
                         }}
-                        placeholder={
-                          apiLang === "bn"
-                            ? t("serviceChecklistGroups.descriptionBnPlaceholder")
-                            : t("serviceChecklistGroups.descriptionEnPlaceholder")
-                        }
+                        placeholder={t("serviceChecklistGroups.descriptionEnPlaceholder")}
+                      />
+                    </div>
+
+                    <div className="mt-1 border-t border-gray-100 pt-4 dark:border-gray-800">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-brand-600 dark:text-brand-400">
+                        {t("serviceChecklistGroups.sectionBangla")}
+                      </p>
+                    </div>
+                    <div>
+                      <Label htmlFor="scg-name-bn">
+                        {t("serviceChecklistGroups.nameBn")}
+                        {!banglaRequired && (
+                          <span className="ml-1 font-normal text-gray-400 dark:text-gray-500">
+                            ({t("serviceChecklistGroups.optional")})
+                          </span>
+                        )}
+                      </Label>
+                      <input
+                        id="scg-name-bn"
+                        type="text"
+                        value={form.nameBn}
+                        onChange={(e) => {
+                          setForm((f) => ({ ...f, nameBn: e.target.value }));
+                          setFormError(null);
+                        }}
+                        className={inputClass}
+                        placeholder={t("serviceChecklistGroups.nameBnPlaceholder")}
+                        dir="auto"
+                        autoComplete="off"
+                        required={banglaRequired}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="scg-description-bn">
+                        {t("serviceChecklistGroups.descriptionBn")}
+                        {!banglaRequired && (
+                          <span className="ml-1 font-normal text-gray-400 dark:text-gray-500">
+                            ({t("serviceChecklistGroups.optional")})
+                          </span>
+                        )}
+                      </Label>
+                      <TextArea
+                        id="scg-description-bn"
+                        rows={3}
+                        value={form.descriptionBn}
+                        onChange={(value) => {
+                          setForm((f) => ({ ...f, descriptionBn: value }));
+                          setFormError(null);
+                        }}
+                        placeholder={t("serviceChecklistGroups.descriptionBnPlaceholder")}
                       />
                     </div>
                   </div>
