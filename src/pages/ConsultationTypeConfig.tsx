@@ -10,15 +10,18 @@ import { Modal } from "../components/ui/modal";
 import {
   consultationTypesApi,
   verificationDocumentTypesApi,
+  serviceChecklistGroupsApi,
   type ServiceCategoryChecklistItem,
   type ServiceCategoryChecklistType,
+  type ServiceChecklistGroupItem,
   type ConsultationTypeVerificationRequirementItem,
   type VerificationDocumentTypeItem,
 } from "../services/api";
 import { PencilIcon, PlusIcon, TrashBinIcon } from "../icons";
 
 export default function ConsultationTypeConfig() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const apiLang: "en" | "bn" = i18n.resolvedLanguage === "bn" ? "bn" : "en";
   const { id } = useParams<{ id: string }>();
   const typeId = id != null ? parseInt(id, 10) : NaN;
   const isValidId = Number.isInteger(typeId) && typeId > 0;
@@ -42,6 +45,9 @@ export default function ConsultationTypeConfig() {
   const [serviceName, setServiceName] = useState("");
   const [serviceDescription, setServiceDescription] = useState("");
   const [serviceType, setServiceType] = useState<ServiceCategoryChecklistType>("CHECKLIST");
+  const [serviceGroupId, setServiceGroupId] = useState<number | "">("");
+  const [checklistGroups, setChecklistGroups] = useState<ServiceChecklistGroupItem[]>([]);
+  const [groupsLoading, setGroupsLoading] = useState(false);
   const [serviceIsActive, setServiceIsActive] = useState(true);
   const [serviceDisplayOrder, setServiceDisplayOrder] = useState(0);
   const [documentTypes, setDocumentTypes] = useState<VerificationDocumentTypeItem[]>([]);
@@ -97,23 +103,61 @@ export default function ConsultationTypeConfig() {
     fetchData();
   }, [fetchData]);
 
+  const loadChecklistGroups = useCallback(async () => {
+    setGroupsLoading(true);
+    try {
+      const res = await serviceChecklistGroupsApi.list({ lang: apiLang });
+      const data = res?.data ?? res;
+      const groups = Array.isArray(data) ? data : [];
+      setChecklistGroups(groups);
+      return groups;
+    } catch {
+      setChecklistGroups([]);
+      return [];
+    } finally {
+      setGroupsLoading(false);
+    }
+  }, [apiLang]);
+
+  useEffect(() => {
+    if (!serviceModal) return;
+    void loadChecklistGroups();
+  }, [serviceModal, loadChecklistGroups]);
+
+  const buildServicePayload = () => {
+    const base = {
+      name: serviceName.trim(),
+      description: serviceDescription.trim() || null,
+      type: serviceType,
+      isActive: serviceIsActive,
+      displayOrder: serviceDisplayOrder,
+    };
+    if (serviceType === "CHECKLIST" && serviceGroupId !== "") {
+      return { ...base, groupId: serviceGroupId };
+    }
+    return base;
+  };
+
+  const resetServiceForm = () => {
+    setServiceName("");
+    setServiceDescription("");
+    setServiceType("CHECKLIST");
+    setServiceGroupId("");
+    setServiceIsActive(true);
+    setServiceDisplayOrder(0);
+  };
+
+  const serviceFormInvalid =
+    !serviceName.trim() ||
+    (serviceType === "CHECKLIST" && (serviceGroupId === "" || groupsLoading));
+
   const handleAddService = async () => {
-    if (!isValidId) return;
+    if (!isValidId || serviceFormInvalid) return;
     setSubmitting(true);
     try {
-      await consultationTypesApi.createService(typeId, {
-        name: serviceName.trim(),
-        description: serviceDescription.trim() || null,
-        type: serviceType,
-        isActive: serviceIsActive,
-        displayOrder: serviceDisplayOrder,
-      });
+      await consultationTypesApi.createService(typeId, buildServicePayload());
       setServiceModal(null);
-      setServiceName("");
-      setServiceDescription("");
-      setServiceType("CHECKLIST");
-      setServiceIsActive(true);
-      setServiceDisplayOrder(0);
+      resetServiceForm();
       await fetchData();
     } finally {
       setSubmitting(false);
@@ -121,16 +165,10 @@ export default function ConsultationTypeConfig() {
   };
 
   const handleEditService = async () => {
-    if (!serviceModal || serviceModal.mode !== "edit") return;
+    if (!serviceModal || serviceModal.mode !== "edit" || serviceFormInvalid) return;
     setSubmitting(true);
     try {
-      await consultationTypesApi.updateService(typeId, serviceModal.item.id, {
-        name: serviceName.trim(),
-        description: serviceDescription.trim() || null,
-        type: serviceType,
-        isActive: serviceIsActive,
-        displayOrder: serviceDisplayOrder,
-      });
+      await consultationTypesApi.updateService(typeId, serviceModal.item.id, buildServicePayload());
       setServiceModal(null);
       await fetchData();
     } finally {
@@ -285,6 +323,9 @@ export default function ConsultationTypeConfig() {
                             setServiceName(s.name);
                             setServiceDescription(s.description ?? "");
                             setServiceType(s.type ?? "CHECKLIST");
+                            setServiceGroupId(
+                              s.type === "CHECKLIST" && s.groupId != null ? s.groupId : ""
+                            );
                             setServiceIsActive(s.isActive);
                             setServiceDisplayOrder(s.displayOrder);
                           }}
@@ -308,13 +349,14 @@ export default function ConsultationTypeConfig() {
                 size="sm"
                 className="mt-3"
                 startIcon={<PlusIcon className="h-4 w-4" />}
-                onClick={() => {
+                onClick={async () => {
                   setServiceModal({ mode: "add" });
-                  setServiceName("");
-                  setServiceDescription("");
-                  setServiceType("CHECKLIST");
-                  setServiceIsActive(true);
+                  resetServiceForm();
                   setServiceDisplayOrder(services.length);
+                  const groups = await loadChecklistGroups();
+                  if (groups.length > 0) {
+                    setServiceGroupId(groups[0].id);
+                  }
                 }}
               >
                 {t("consultationConfig.addService")}
@@ -417,7 +459,15 @@ export default function ConsultationTypeConfig() {
               <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("consultationConfig.serviceItemType")}</span>
               <ThemedSelect
                 value={serviceType}
-                onChange={(e) => setServiceType(e.target.value as ServiceCategoryChecklistType)}
+                onChange={(e) => {
+                  const next = e.target.value as ServiceCategoryChecklistType;
+                  setServiceType(next);
+                  if (next === "VITALS") {
+                    setServiceGroupId("");
+                  } else if (serviceGroupId === "" && checklistGroups.length > 0) {
+                    setServiceGroupId(checklistGroups[0].id);
+                  }
+                }}
                 className="mt-1"
               >
                 <option value="CHECKLIST">{t("consultationConfig.serviceTypeChecklist")}</option>
@@ -427,6 +477,34 @@ export default function ConsultationTypeConfig() {
                 {t("consultationConfig.serviceItemTypeHelp")}
               </span>
             </label>
+            {serviceType === "CHECKLIST" && (
+              <label className="block">
+                <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                  {t("consultationConfig.serviceItemGroup")}
+                </span>
+                <ThemedSelect
+                  value={serviceGroupId === "" ? "" : String(serviceGroupId)}
+                  onChange={(e) =>
+                    setServiceGroupId(e.target.value ? parseInt(e.target.value, 10) : "")
+                  }
+                  disabled={groupsLoading || checklistGroups.length === 0}
+                  className="mt-1"
+                >
+                  <option value="">
+                    {groupsLoading
+                      ? t("consultationConfig.serviceItemGroupLoading")
+                      : t("consultationConfig.serviceItemGroupPlaceholder")}
+                  </option>
+                  {checklistGroups
+                    .sort((a, b) => a.id - b.id)
+                    .map((group) => (
+                      <option key={group.id} value={group.id}>
+                        {group.name}
+                      </option>
+                    ))}
+                </ThemedSelect>
+              </label>
+            )}
             <label className="block">
               <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("consultationConfig.serviceItemDescription")}</span>
               <textarea
@@ -465,7 +543,7 @@ export default function ConsultationTypeConfig() {
               </button>
               <button
                 type="button"
-                disabled={submitting || !serviceName.trim()}
+                disabled={submitting || serviceFormInvalid}
                 onClick={serviceModal.mode === "add" ? handleAddService : handleEditService}
                 className="rounded bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
               >

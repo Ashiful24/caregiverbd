@@ -661,6 +661,7 @@ export const consultationTypesApi = {
       type?: ServiceCategoryChecklistType;
       isActive?: boolean;
       displayOrder?: number;
+      groupId?: number;
     }
   ) => {
     return httpService.post<ServiceCategoryChecklistItem>(
@@ -678,6 +679,7 @@ export const consultationTypesApi = {
       type?: ServiceCategoryChecklistType;
       isActive?: boolean;
       displayOrder?: number;
+      groupId?: number;
     }
   ) => {
     return httpService.patch<ServiceCategoryChecklistItem>(
@@ -740,6 +742,7 @@ export interface ServiceCategoryChecklistItem {
   type?: ServiceCategoryChecklistType;
   isActive: boolean;
   displayOrder: number;
+  groupId?: number | null;
 }
 
 /** Verification requirement item (admin). */
@@ -1136,6 +1139,54 @@ export const adminCancellationApi = {
   /** POST /admin/refunds/reconcile — poll SSL Commerz for pending gateway refunds */
   reconcileRefunds: async () => {
     return httpService.post<RefundReconcileResult>("/admin/refunds/reconcile", {});
+  },
+};
+
+// ============== Admin: Service Checklist Groups ==============
+
+export interface ServiceChecklistGroupItem {
+  id: number;
+  name: string;
+  nameBn: string;
+  description: string;
+  descriptionBn: string;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface ServiceChecklistGroupPayload {
+  name: string;
+  nameBn: string;
+  description: string;
+  descriptionBn: string;
+}
+
+export type ServiceChecklistGroupLang = "en" | "bn";
+
+export const serviceChecklistGroupsApi = {
+  /** GET /admin/service-checklist-groups — List all service checklist groups. */
+  list: async (params?: { lang?: ServiceChecklistGroupLang }) => {
+    return httpService.get<ServiceChecklistGroupItem[]>("/admin/service-checklist-groups", {
+      params: { lang: params?.lang ?? "en" },
+    });
+  },
+  /** GET /admin/service-checklist-groups/:id — Get a service checklist group by id. */
+  getById: async (id: number, params?: { lang?: ServiceChecklistGroupLang }) => {
+    return httpService.get<ServiceChecklistGroupItem>(`/admin/service-checklist-groups/${id}`, {
+      params: params?.lang ? { lang: params.lang } : undefined,
+    });
+  },
+  /** POST /admin/service-checklist-groups — Create a service checklist group. */
+  create: async (data: ServiceChecklistGroupPayload) => {
+    return httpService.post<ServiceChecklistGroupItem>("/admin/service-checklist-groups", data);
+  },
+  /** PATCH /admin/service-checklist-groups/:id — Update a service checklist group. */
+  update: async (id: number, data: ServiceChecklistGroupPayload) => {
+    return httpService.patch<ServiceChecklistGroupItem>(`/admin/service-checklist-groups/${id}`, data);
+  },
+  /** DELETE /admin/service-checklist-groups/:id — Delete a service checklist group. */
+  delete: async (id: number) => {
+    return httpService.delete<void>(`/admin/service-checklist-groups/${id}`);
   },
 };
 
@@ -3875,7 +3926,7 @@ export const adminProvidersApi = {
   },
 };
 
-/** Admin: verify certification (approve/reject). PATCH /v1/admin/certifications/:id/verify (api_business_flow §4b) */
+/** Admin: verify certification (approve/reject). PATCH /v1/certifications/:id/verify (api_business_flow §4b) */
 export interface AdminVerifyCertificationRequest {
   status: "APPROVED" | "REJECTED";
   adminComment?: string;
@@ -3884,7 +3935,7 @@ export interface AdminVerifyCertificationRequest {
 export const adminCertificationsApi = {
   verify: async (certificationId: number, data: AdminVerifyCertificationRequest) => {
     return httpService.patch<AdminCertificationDto>(
-      `/admin/certifications/${certificationId}/verify`,
+      `/certifications/${certificationId}/verify`,
       data
     );
   },
