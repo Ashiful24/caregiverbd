@@ -661,6 +661,7 @@ export const consultationTypesApi = {
       type?: ServiceCategoryChecklistType;
       isActive?: boolean;
       displayOrder?: number;
+      groupId?: number;
     }
   ) => {
     return httpService.post<ServiceCategoryChecklistItem>(
@@ -678,6 +679,7 @@ export const consultationTypesApi = {
       type?: ServiceCategoryChecklistType;
       isActive?: boolean;
       displayOrder?: number;
+      groupId?: number;
     }
   ) => {
     return httpService.patch<ServiceCategoryChecklistItem>(
@@ -740,6 +742,7 @@ export interface ServiceCategoryChecklistItem {
   type?: ServiceCategoryChecklistType;
   isActive: boolean;
   displayOrder: number;
+  groupId?: number | null;
 }
 
 /** Verification requirement item (admin). */
