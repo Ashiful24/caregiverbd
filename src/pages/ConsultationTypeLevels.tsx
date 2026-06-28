@@ -40,8 +40,14 @@ function flattenConsultationTypes(nodes: ConsultationType[]): ConsultationType[]
   return out;
 }
 
+type ConsultationTypeLevelDetail = ConsultationTypeLevel & {
+  localizedNameEn: string;
+  localizedNameBn: string;
+};
+
 export default function ConsultationTypeLevels() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const apiLang: "en" | "bn" = i18n.resolvedLanguage === "bn" ? "bn" : "en";
   const [category, setCategory] = useState<ConsultationTypeLevelCategory>("CAREGIVER");
   const [list, setList] = useState<ConsultationTypeLevel[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,10 +55,12 @@ export default function ConsultationTypeLevels() {
 
   const [addModal, setAddModal] = useState(false);
   const [editModal, setEditModal] = useState<ConsultationTypeLevel | null>(null);
-  const [detailItem, setDetailItem] = useState<ConsultationTypeLevel | null>(null);
+  const [detailItem, setDetailItem] = useState<ConsultationTypeLevelDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
 
   const [name, setName] = useState("");
+  const [nameBn, setNameBn] = useState("");
+  const [formLoading, setFormLoading] = useState(false);
   const [levelNumber, setLevelNumber] = useState(1);
   const [formCategory, setFormCategory] = useState<ConsultationTypeLevelCategory>("CAREGIVER");
   const [minSalary, setMinSalary] = useState(0);
@@ -75,6 +83,7 @@ export default function ConsultationTypeLevels() {
   const resetForm = useCallback(
     (cat: ConsultationTypeLevelCategory) => {
       setName("");
+      setNameBn("");
       setLevelNumber(1);
       setFormCategory(cat);
       setMinSalary(0);
@@ -83,19 +92,44 @@ export default function ConsultationTypeLevels() {
     []
   );
 
-  const applyFromItem = useCallback((item: ConsultationTypeLevel) => {
+  const applyFromItem = useCallback((item: ConsultationTypeLevel, bnName?: string) => {
     setName(item.name);
+    setNameBn(bnName ?? item.nameBn ?? "");
     setLevelNumber(item.levelNumber);
     setFormCategory(item.category);
     setMinSalary(item.minSalary);
     setMaxSalary(item.maxSalary);
   }, []);
 
+  const loadFormForEdit = useCallback(async (id: number) => {
+    setFormLoading(true);
+    try {
+      const [enRes, bnRes] = await Promise.all([
+        consultationTypeLevelsApi.getById(id, { lang: "en" }),
+        consultationTypeLevelsApi.getById(id, { lang: "bn" }),
+      ]);
+      const en = (enRes?.data ?? enRes) as ConsultationTypeLevel;
+      const bn = (bnRes?.data ?? bnRes) as ConsultationTypeLevel;
+      applyFromItem(en, bn.nameBn ?? bn.name ?? "");
+    } catch {
+      try {
+        const res = await consultationTypeLevelsApi.getById(id);
+        const data = (res?.data ?? res) as ConsultationTypeLevel;
+        applyFromItem(data);
+      } catch {
+        setName("");
+        setNameBn("");
+      }
+    } finally {
+      setFormLoading(false);
+    }
+  }, [applyFromItem]);
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const res = await consultationTypeLevelsApi.list({ category });
+      const res = await consultationTypeLevelsApi.list({ category, lang: apiLang });
       const data = res?.data ?? res;
       setList(Array.isArray(data) ? data : []);
     } catch (err: unknown) {
@@ -108,7 +142,7 @@ export default function ConsultationTypeLevels() {
     } finally {
       setLoading(false);
     }
-  }, [category, t]);
+  }, [category, t, apiLang]);
 
   useEffect(() => {
     void fetchData();
@@ -127,9 +161,9 @@ export default function ConsultationTypeLevels() {
     setMappingChecklistItems([]);
     try {
       const [typesRes, caregiverRes, doctorRes] = await Promise.all([
-        consultationTypesApi.getAll(),
-        consultationTypeLevelsApi.list({ category: "CAREGIVER" }),
-        consultationTypeLevelsApi.list({ category: "DOCTOR" }),
+        consultationTypesApi.getAll({ lang: apiLang }),
+        consultationTypeLevelsApi.list({ category: "CAREGIVER", lang: apiLang }),
+        consultationTypeLevelsApi.list({ category: "DOCTOR", lang: apiLang }),
       ]);
       const treeRaw = typesRes?.data ?? typesRes;
       const tree = Array.isArray(treeRaw) ? treeRaw : [treeRaw];
@@ -159,10 +193,10 @@ export default function ConsultationTypeLevels() {
     setLoadingDetail(true);
     setError("");
     try {
-      const res = await consultationTypeLevelsApi.getById(item.id);
+      const res = await consultationTypeLevelsApi.getById(item.id, { lang: apiLang });
       const data = (res?.data ?? res) as ConsultationTypeLevel;
       setEditModal(data);
-      applyFromItem(data);
+      void loadFormForEdit(item.id);
     } catch (err: unknown) {
       const msg =
         err && typeof err === "object" && "message" in err
@@ -179,15 +213,35 @@ export default function ConsultationTypeLevels() {
     setError("");
     setDetailItem(null);
     try {
-      const res = await consultationTypeLevelsApi.getById(item.id);
-      const data = (res?.data ?? res) as ConsultationTypeLevel;
-      setDetailItem(data);
+      const [enRes, bnRes] = await Promise.all([
+        consultationTypeLevelsApi.getById(item.id, { lang: "en" }),
+        consultationTypeLevelsApi.getById(item.id, { lang: "bn" }),
+      ]);
+      const en = (enRes?.data ?? enRes) as ConsultationTypeLevel;
+      const bn = (bnRes?.data ?? bnRes) as ConsultationTypeLevel;
+      setDetailItem({
+        ...en,
+        localizedNameEn: en.name,
+        localizedNameBn: bn.nameBn ?? bn.name ?? "",
+      });
     } catch (err: unknown) {
-      const msg =
-        err && typeof err === "object" && "message" in err
-          ? String((err as { message: string }).message)
-          : t("consultationTypeLevels.failedGet");
-      setError(msg);
+      try {
+        const res = await consultationTypeLevelsApi.getById(item.id, { lang: apiLang });
+        const data = (res?.data ?? res) as ConsultationTypeLevel;
+        setDetailItem({
+          ...data,
+          localizedNameEn: data.name,
+          localizedNameBn: data.nameBn ?? data.name,
+        });
+      } catch (innerErr: unknown) {
+        const msg =
+          innerErr && typeof innerErr === "object" && "message" in innerErr
+            ? String((innerErr as { message: string }).message)
+            : err && typeof err === "object" && "message" in err
+              ? String((err as { message: string }).message)
+              : t("consultationTypeLevels.failedGet");
+        setError(msg);
+      }
     } finally {
       setLoadingDetail(false);
     }
@@ -199,6 +253,7 @@ export default function ConsultationTypeLevels() {
     try {
       await consultationTypeLevelsApi.create({
         name: name.trim(),
+        nameBn: nameBn.trim(),
         levelNumber,
         category: formCategory,
         minSalary,
@@ -225,6 +280,7 @@ export default function ConsultationTypeLevels() {
     try {
       await consultationTypeLevelsApi.update(editModal.id, {
         name: name.trim(),
+        nameBn: nameBn.trim(),
         levelNumber,
         category: formCategory,
         minSalary,
@@ -263,8 +319,14 @@ export default function ConsultationTypeLevels() {
     }
   };
 
+  const banglaRequired = apiLang === "bn";
+
   const formInvalid =
-    !name.trim() || minSalary < 0 || maxSalary < 0 || minSalary > maxSalary;
+    !name.trim() ||
+    (banglaRequired && !nameBn.trim()) ||
+    minSalary < 0 ||
+    maxSalary < 0 ||
+    minSalary > maxSalary;
 
   useEffect(() => {
     if (!mappingModal || !mappingConsultationTypeId || !mappingLevelId) return;
@@ -470,7 +532,7 @@ export default function ConsultationTypeLevels() {
                               : "cursor-pointer hover:bg-gray-50 dark:hover:bg-white/[0.02]"
                           }
                         >
-                          <td className="py-3 font-medium text-gray-800 dark:text-white/90">
+                          <td className="py-3 font-medium text-gray-800 dark:text-white/90" dir="auto">
                             {item.name}
                           </td>
                           <td className="py-3 text-gray-600 dark:text-gray-400">
@@ -534,16 +596,45 @@ export default function ConsultationTypeLevels() {
           className="w-full max-w-lg"
         >
           <div className="space-y-3">
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              {banglaRequired
+                ? t("consultationTypeLevels.formIntroBn")
+                : t("consultationTypeLevels.formIntroEn")}
+            </p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-brand-600 dark:text-brand-400">
+              {t("consultationTypeLevels.sectionEnglish")}
+            </p>
             <label className="block">
               <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                {t("consultationTypeLevels.name")}
+                {t("consultationTypeLevels.nameEn")}
               </span>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
-                placeholder={t("consultationTypeLevels.namePlaceholder")}
+                placeholder={t("consultationTypeLevels.nameEnPlaceholder")}
+              />
+            </label>
+            <p className="text-xs font-semibold uppercase tracking-wide text-brand-600 dark:text-brand-400">
+              {t("consultationTypeLevels.sectionBangla")}
+            </p>
+            <label className="block">
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                {t("consultationTypeLevels.nameBn")}
+                {!banglaRequired && (
+                  <span className="ml-1 font-normal text-gray-400 dark:text-gray-500">
+                    ({t("consultationTypeLevels.optional")})
+                  </span>
+                )}
+              </span>
+              <input
+                type="text"
+                value={nameBn}
+                onChange={(e) => setNameBn(e.target.value)}
+                className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                placeholder={t("consultationTypeLevels.nameBnPlaceholder")}
+                dir="auto"
               />
             </label>
             <label className="block">
@@ -758,17 +849,55 @@ export default function ConsultationTypeLevels() {
             <p className="text-xs text-gray-500 dark:text-gray-400">
               {t("consultationTypeLevels.idLabel", { id: editModal.id })}
             </p>
-            <label className="block">
-              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                {t("consultationTypeLevels.name")}
-              </span>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
-              />
-            </label>
+            {formLoading ? (
+              <div className="py-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                {t("consultationTypeLevels.loading")}
+              </div>
+            ) : (
+              <>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  {banglaRequired
+                    ? t("consultationTypeLevels.formIntroBn")
+                    : t("consultationTypeLevels.formIntroEn")}
+                </p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-brand-600 dark:text-brand-400">
+                  {t("consultationTypeLevels.sectionEnglish")}
+                </p>
+                <label className="block">
+                  <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                    {t("consultationTypeLevels.nameEn")}
+                  </span>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                    placeholder={t("consultationTypeLevels.nameEnPlaceholder")}
+                  />
+                </label>
+                <p className="text-xs font-semibold uppercase tracking-wide text-brand-600 dark:text-brand-400">
+                  {t("consultationTypeLevels.sectionBangla")}
+                </p>
+                <label className="block">
+                  <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                    {t("consultationTypeLevels.nameBn")}
+                    {!banglaRequired && (
+                      <span className="ml-1 font-normal text-gray-400 dark:text-gray-500">
+                        ({t("consultationTypeLevels.optional")})
+                      </span>
+                    )}
+                  </span>
+                  <input
+                    type="text"
+                    value={nameBn}
+                    onChange={(e) => setNameBn(e.target.value)}
+                    className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                    placeholder={t("consultationTypeLevels.nameBnPlaceholder")}
+                    dir="auto"
+                  />
+                </label>
+              </>
+            )}
             <label className="block">
               <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
                 {t("consultationTypeLevels.levelNumber")}
@@ -840,7 +969,7 @@ export default function ConsultationTypeLevels() {
               </button>
               <button
                 type="button"
-                disabled={submitting || formInvalid}
+                disabled={submitting || formInvalid || formLoading}
                 onClick={() => void handleUpdate()}
                 className="rounded bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
               >
@@ -854,7 +983,13 @@ export default function ConsultationTypeLevels() {
       <Modal
         isOpen={detailItem != null}
         onClose={() => !loadingDetail && setDetailItem(null)}
-        title={detailItem?.name ?? t("consultationTypeLevels.detailTitle")}
+        title={
+          detailItem
+            ? apiLang === "bn"
+              ? detailItem.localizedNameBn || detailItem.localizedNameEn
+              : detailItem.localizedNameEn || detailItem.localizedNameBn
+            : t("consultationTypeLevels.detailTitle")
+        }
         className="w-full max-w-lg overflow-hidden"
       >
         {detailItem && (
@@ -864,6 +999,30 @@ export default function ConsultationTypeLevels() {
               <span className="mx-1.5 text-gray-300 dark:text-gray-600">·</span>
               <span className="tabular-nums">{t("consultationTypeLevels.idLabel", { id: detailItem.id })}</span>
             </p>
+
+            <div className="rounded-xl border border-gray-200 bg-gray-50/80 p-4 dark:border-gray-700 dark:bg-gray-800/40">
+              <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                {t("consultationTypeLevels.detailNamesSection")}
+              </p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <div>
+                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                    {t("consultationTypeLevels.nameEn")}
+                  </p>
+                  <p className="mt-0.5 text-sm font-medium text-gray-900 dark:text-white" dir="auto">
+                    {detailItem.localizedNameEn || "—"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                    {t("consultationTypeLevels.nameBn")}
+                  </p>
+                  <p className="mt-0.5 text-sm font-medium text-gray-900 dark:text-white" dir="auto">
+                    {detailItem.localizedNameBn || "—"}
+                  </p>
+                </div>
+              </div>
+            </div>
 
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-gradient-to-r from-gray-50/90 to-white px-4 py-4 dark:border-gray-700 dark:from-gray-800/50 dark:to-gray-900/30">
               <div>

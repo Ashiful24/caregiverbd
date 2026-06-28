@@ -66,10 +66,10 @@ export default function ConsultationTypeConfig() {
     setError("");
     try {
       const [treeRes, servicesRes, reqsRes, docTypesRes] = await Promise.all([
-        consultationTypesApi.getAll(),
+        consultationTypesApi.getAll({ lang: apiLang }),
         consultationTypesApi.getServices(typeId),
         consultationTypesApi.getVerificationRequirements(typeId),
-        verificationDocumentTypesApi.list({ activeOnly: true }),
+        verificationDocumentTypesApi.list({ activeOnly: true, lang: apiLang }),
       ]);
       const docTypes = Array.isArray(docTypesRes?.data) ? docTypesRes.data : Array.isArray(docTypesRes) ? docTypesRes : [];
       setDocumentTypes(docTypes);
@@ -97,7 +97,7 @@ export default function ConsultationTypeConfig() {
     } finally {
       setLoading(false);
     }
-  }, [typeId, isValidId, t]);
+  }, [typeId, isValidId, t, apiLang]);
 
   useEffect(() => {
     fetchData();

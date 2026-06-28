@@ -667,7 +667,8 @@ export function ProviderFullDetailsView({
   data: ProviderFullDetailsDto;
   onRefresh?: () => void | Promise<void>;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const apiLang: "en" | "bn" = i18n.resolvedLanguage === "bn" ? "bn" : "en";
   const {
     user,
     provider,
@@ -840,8 +841,8 @@ export function ProviderFullDetailsView({
     setLevelsLoading(true);
     setLevelsLoadError(null);
     Promise.all([
-      consultationTypeLevelsApi.list({ category: "CAREGIVER" }),
-      consultationTypeLevelsApi.list({ category: "DOCTOR" }),
+      consultationTypeLevelsApi.list({ category: "CAREGIVER", lang: apiLang }),
+      consultationTypeLevelsApi.list({ category: "DOCTOR", lang: apiLang }),
     ])
       .then(([caregiverRes, doctorRes]) => {
         if (aborted) return;
@@ -865,7 +866,7 @@ export function ProviderFullDetailsView({
     return () => {
       aborted = true;
     };
-  }, [t]);
+  }, [t, apiLang]);
 
   useEffect(() => {
     if (!provider.id) return;

@@ -67,7 +67,8 @@ function serviceRequestStatusBadgeColor(
 }
 
 export default function ServiceRequestList() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const apiLang: "en" | "bn" = i18n.resolvedLanguage === "bn" ? "bn" : "en";
   const [list, setList] = useState<AdminServiceRequestListDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -87,7 +88,7 @@ export default function ServiceRequestList() {
 
   const fetchConsultationTypes = useCallback(async () => {
     try {
-      const response = await consultationTypesApi.getAll();
+      const response = await consultationTypesApi.getAll({ lang: apiLang });
       const data = response.data as
         | ConsultationType[]
         | ConsultationType
@@ -97,7 +98,7 @@ export default function ServiceRequestList() {
     } catch {
       setConsultationTypes([]);
     }
-  }, []);
+  }, [apiLang]);
 
   useEffect(() => {
     fetchConsultationTypes();
