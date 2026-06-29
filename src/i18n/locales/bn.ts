@@ -321,7 +321,9 @@ const bn = {
   pagination: {
     rowsPerPage: "প্রতি পেজে সারি",
     showingRangeOf: "{{total}} {{entity}} এর মধ্যে {{from}} থেকে {{to}} দেখানো হচ্ছে",
+    showingRangeNoTotal: "{{from}} থেকে {{to}} {{entity}} দেখানো হচ্ছে",
     pageOf: "পৃষ্ঠা {{page}} / {{totalPages}}",
+    pageNumber: "পৃষ্ঠা {{page}}",
   },
   schedule: {
     metaTitle: "সার্ভিস রিকোয়েস্ট | Hope - BMQAS",
@@ -479,6 +481,8 @@ const bn = {
     type: "টাইপ",
     amount: "অ্যামাউন্ট",
     scheduled: "নির্ধারিত",
+    scheduleDate: "শিডিউল তারিখ",
+    scheduleTime: "শিডিউল সময়",
     created: "তৈরির তারিখ",
     failedToLoad: "অ্যাপয়েন্টমেন্ট লোড করা যায়নি।",
     provider: "প্রোভাইডার",

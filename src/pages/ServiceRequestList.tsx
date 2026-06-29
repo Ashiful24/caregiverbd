@@ -14,10 +14,11 @@ import Badge from "../components/ui/badge/Badge";
 import {
   adminServiceRequestsApi,
   consultationTypesApi,
+  normalizeAdminServiceRequestListResponse,
   type AdminServiceRequestListDto,
   type ConsultationType,
 } from "../services/api";
-import { formatDate, formatDateTime, formatStatusLabel } from "../utils/format";
+import { formatDate, formatStatusLabel, formatTime } from "../utils/format";
 import { ServiceRequestDetailModal } from "../components/service-requests/ServiceRequestDetailModal";
 
 const LIMIT_OPTIONS = [10, 20, 50];
@@ -66,6 +67,20 @@ function serviceRequestStatusBadgeColor(
   }
 }
 
+function formatScheduleDate(item: AdminServiceRequestListDto): string {
+  const raw = item.scheduledDate?.trim();
+  if (raw) return formatDate(raw);
+  if (item.scheduledAt?.trim()) return formatDate(item.scheduledAt);
+  return "—";
+}
+
+function formatScheduleTime(item: AdminServiceRequestListDto): string {
+  const raw = item.scheduledTime?.trim();
+  if (raw) return raw;
+  if (item.scheduledAt?.trim()) return formatTime(item.scheduledAt);
+  return "—";
+}
+
 export default function ServiceRequestList() {
   const { t, i18n } = useTranslation();
   const apiLang: "en" | "bn" = i18n.resolvedLanguage === "bn" ? "bn" : "en";
@@ -74,8 +89,10 @@ export default function ServiceRequestList() {
   const [error, setError] = useState("");
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
-  const [total, setTotal] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [total, setTotal] = useState<number | null>(null);
+  /** pageCursors[i] = cursor query param to load page i + 1 (index 0 = first page). */
+  const [pageCursors, setPageCursors] = useState<(string | undefined)[]>([undefined]);
   const [consultationTypes, setConsultationTypes] = useState<ConsultationType[]>([]);
   const [consultationTypeFilterId, setConsultationTypeFilterId] = useState<
     number | ""
@@ -85,6 +102,15 @@ export default function ServiceRequestList() {
   const [searchPatientInput, setSearchPatientInput] = useState("");
   const [searchPatientQuery, setSearchPatientQuery] = useState("");
   const [detailItem, setDetailItem] = useState<AdminServiceRequestListDto | null>(null);
+
+  const resetPagination = useCallback(() => {
+    setPage(1);
+    setPageCursors([undefined]);
+    setHasMore(false);
+    setTotal(null);
+  }, []);
+
+  const cursor = pageCursors[page - 1];
 
   const fetchConsultationTypes = useCallback(async () => {
     try {
@@ -106,19 +132,25 @@ export default function ServiceRequestList() {
 
   useEffect(() => {
     const t = setTimeout(() => {
-      setSearchDoctorQuery(searchDoctorInput.trim());
-      setPage(1);
+      const next = searchDoctorInput.trim();
+      setSearchDoctorQuery((prev) => {
+        if (prev !== next) resetPagination();
+        return next;
+      });
     }, SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(t);
-  }, [searchDoctorInput]);
+  }, [searchDoctorInput, resetPagination]);
 
   useEffect(() => {
     const t = setTimeout(() => {
-      setSearchPatientQuery(searchPatientInput.trim());
-      setPage(1);
+      const next = searchPatientInput.trim();
+      setSearchPatientQuery((prev) => {
+        if (prev !== next) resetPagination();
+        return next;
+      });
     }, SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(t);
-  }, [searchPatientInput]);
+  }, [searchPatientInput, resetPagination]);
 
   const consultationTypeOptions = useMemo(
     () => flattenConsultationTypes(consultationTypes),
@@ -133,8 +165,8 @@ export default function ServiceRequestList() {
       try {
         const response = await adminServiceRequestsApi.getList(
           {
-            page,
             limit,
+            cursor,
             consultationTypeId:
               consultationTypeFilterId === "" || consultationTypeFilterId == null
                 ? undefined
@@ -144,18 +176,17 @@ export default function ServiceRequestList() {
           },
           { signal }
         );
-        const payload = response.data as {
-          data?: AdminServiceRequestListDto[];
-          total?: number;
-          page?: number;
-          limit?: number;
-        } | null;
-        const items = payload?.data ?? [];
-        const totalCount = payload?.total ?? 0;
-        const limitVal = payload?.limit ?? limit;
-        setList(Array.isArray(items) ? items : []);
-        setTotal(totalCount);
-        setTotalPages(limitVal > 0 ? Math.ceil(totalCount / limitVal) || 1 : 1);
+        const parsed = normalizeAdminServiceRequestListResponse(response.data, limit);
+        setList(parsed.items);
+        setHasMore(parsed.hasMore);
+        setTotal(parsed.total);
+        if (parsed.nextCursor) {
+          setPageCursors((prev) => {
+            const next = [...prev];
+            next[page] = parsed.nextCursor ?? undefined;
+            return next;
+          });
+        }
       } catch (err: unknown) {
         if (err instanceof Error && err.name === "AbortError") {
           aborted = true;
@@ -167,8 +198,8 @@ export default function ServiceRequestList() {
             : t("appointments.failedToLoad");
         setError(message);
         setList([]);
-        setTotal(0);
-        setTotalPages(0);
+        setHasMore(false);
+        setTotal(null);
       } finally {
         if (!aborted) setLoading(false);
       }
@@ -176,6 +207,7 @@ export default function ServiceRequestList() {
     [
       page,
       limit,
+      cursor,
       consultationTypeFilterId,
       searchDoctorQuery,
       searchPatientQuery,
@@ -189,8 +221,8 @@ export default function ServiceRequestList() {
     return () => controller.abort();
   }, [fetchList]);
 
-  const from = total === 0 ? 0 : (page - 1) * limit + 1;
-  const to = Math.min(page * limit, total);
+  const from = list.length === 0 ? 0 : (page - 1) * limit + 1;
+  const to = list.length === 0 ? 0 : (page - 1) * limit + list.length;
 
   return (
     <>
@@ -219,7 +251,7 @@ export default function ServiceRequestList() {
                 onChange={(e) => {
                   const v = e.target.value;
                   setConsultationTypeFilterId(v === "" ? "" : Number(v));
-                  setPage(1);
+                  resetPagination();
                 }}
                 className="min-w-[180px] rounded-lg border border-gray-300 bg-white py-2 pl-3 pr-8 text-sm text-gray-800 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
               >
@@ -328,16 +360,22 @@ export default function ServiceRequestList() {
                           {item.amount ?? "—"}
                         </dd>
                       </div>
-                      {item.scheduledAt && (
-                        <div className="flex justify-between gap-2">
-                          <dt className="text-gray-500 dark:text-gray-400">
-                          {t("appointments.scheduled")}
-                          </dt>
-                          <dd className="text-gray-800 dark:text-gray-200">
-                            {formatDateTime(item.scheduledAt)}
-                          </dd>
-                        </div>
-                      )}
+                      <div className="flex justify-between gap-2">
+                        <dt className="text-gray-500 dark:text-gray-400">
+                          {t("appointments.scheduleDate")}
+                        </dt>
+                        <dd className="text-gray-800 dark:text-gray-200">
+                          {formatScheduleDate(item)}
+                        </dd>
+                      </div>
+                      <div className="flex justify-between gap-2">
+                        <dt className="text-gray-500 dark:text-gray-400">
+                          {t("appointments.scheduleTime")}
+                        </dt>
+                        <dd className="text-gray-800 dark:text-gray-200">
+                          {formatScheduleTime(item)}
+                        </dd>
+                      </div>
                       {item.createdAt && (
                         <div className="flex justify-between gap-2">
                           <dt className="text-gray-500 dark:text-gray-400">
@@ -398,9 +436,15 @@ export default function ServiceRequestList() {
                       </TableCell>
                       <TableCell
                         isHeader
-                        className="w-[16%] py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
+                        className="w-[12%] py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
                       >
-                        {t("appointments.scheduled")}
+                        {t("appointments.scheduleDate")}
+                      </TableCell>
+                      <TableCell
+                        isHeader
+                        className="w-[12%] py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
+                      >
+                        {t("appointments.scheduleTime")}
                       </TableCell>
                       <TableCell
                         isHeader
@@ -441,9 +485,10 @@ export default function ServiceRequestList() {
                           {item.amount ?? "—"}
                         </TableCell>
                         <TableCell className="py-3 text-theme-sm text-gray-600 dark:text-gray-400">
-                          {item.scheduledAt
-                            ? formatDateTime(item.scheduledAt)
-                            : "—"}
+                          {formatScheduleDate(item)}
+                        </TableCell>
+                        <TableCell className="py-3 text-theme-sm text-gray-600 dark:text-gray-400">
+                          {formatScheduleTime(item)}
                         </TableCell>
                         <TableCell className="py-3 text-theme-sm text-gray-600 dark:text-gray-400">
                           {item.createdAt
@@ -459,7 +504,7 @@ export default function ServiceRequestList() {
           )}
         </div>
 
-        {!loading && list.length > 0 && totalPages > 0 && (
+        {!loading && list.length > 0 && (
           <div className="flex flex-col gap-4 border-t border-gray-200 px-4 py-4 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <div className="flex flex-wrap items-center gap-4">
               <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
@@ -469,7 +514,7 @@ export default function ServiceRequestList() {
                   value={limit}
                   onChange={(e) => {
                     setLimit(Number(e.target.value));
-                    setPage(1);
+                    resetPagination();
                   }}
                 >
                   {LIMIT_OPTIONS.map((n) => (
@@ -480,12 +525,18 @@ export default function ServiceRequestList() {
                 </ThemedSelect>
               </label>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                {t("pagination.showingRangeOf", {
-                  from,
-                  to,
-                  total,
-                  entity: t("appointments.pageTitle").toLowerCase(),
-                })}
+                {total != null
+                  ? t("pagination.showingRangeOf", {
+                      from,
+                      to,
+                      total,
+                      entity: t("appointments.pageTitle").toLowerCase(),
+                    })
+                  : t("pagination.showingRangeNoTotal", {
+                      from,
+                      to,
+                      entity: t("appointments.pageTitle").toLowerCase(),
+                    })}
               </p>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-end">
@@ -498,13 +549,13 @@ export default function ServiceRequestList() {
                 {t("common.actions.previous")}
               </button>
               <span className="px-3 py-2 text-sm text-gray-600 dark:text-gray-400">
-                {t("pagination.pageOf", { page, totalPages })}
+                {t("pagination.pageNumber", { page })}
               </span>
               <button
                 type="button"
                 className="min-h-[44px] min-w-[44px] rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page >= totalPages}
+                onClick={() => setPage((p) => p + 1)}
+                disabled={!hasMore}
               >
                 {t("common.actions.next")}
               </button>

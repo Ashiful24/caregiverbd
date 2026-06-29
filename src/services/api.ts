@@ -1817,17 +1817,141 @@ export interface AdminServiceRequestListDto {
   consultationTypeName?: string | null;
   amount: string;
   scheduledAt?: string | null;
+  scheduledDate?: string | null;
+  scheduledTime?: string | null;
   createdAt: string;
   /** Present when this SR belongs to a long-term opportunity (used by GET /service-event-logs/timeline). */
   longTermOpportunityId?: number | null;
 }
 
-/** Response for GET /v1/admin/service-requests. */
+/** Response for GET /v1/admin/service-requests (cursor-paginated). */
 export interface AdminServiceRequestListResponse {
   data: AdminServiceRequestListDto[];
-  total: number;
-  page: number;
   limit: number;
+  nextCursor?: string | null;
+  hasMore?: boolean;
+  /** Present on some legacy/page-based responses. */
+  total?: number;
+  page?: number;
+}
+
+/** Map one row from GET /v1/admin/service-requests (tolerates snake_case). */
+export function normalizeAdminServiceRequestListItem(raw: unknown): AdminServiceRequestListDto {
+  if (!raw || typeof raw !== "object") {
+    return {
+      id: 0,
+      status: "",
+      patientId: 0,
+      consultationTypeId: 0,
+      amount: "",
+      createdAt: "",
+    };
+  }
+  const o = raw as Record<string, unknown>;
+  const id = Number(o.id);
+  const patientId = Number(o.patientId ?? o.patient_id);
+  const consultationTypeId = Number(o.consultationTypeId ?? o.consultation_type_id);
+  const providerIdRaw = o.providerId ?? o.provider_id;
+  const providerIdNum = Number(providerIdRaw);
+  const longTermRaw = o.longTermOpportunityId ?? o.long_term_opportunity_id;
+
+  return {
+    id: Number.isFinite(id) && id > 0 ? id : 0,
+    status: String(o.status ?? "").toUpperCase(),
+    patientId: Number.isFinite(patientId) ? patientId : 0,
+    patientName: strOpt(o.patientName ?? o.patient_name),
+    providerId:
+      providerIdRaw == null || providerIdRaw === ""
+        ? null
+        : Number.isFinite(providerIdNum)
+          ? providerIdNum
+          : null,
+    providerName: strOpt(o.providerName ?? o.provider_name),
+    consultationTypeId: Number.isFinite(consultationTypeId) ? consultationTypeId : 0,
+    consultationTypeName: strOpt(o.consultationTypeName ?? o.consultation_type_name),
+    amount: String(o.amount ?? o.fee ?? ""),
+    scheduledAt: strOpt(o.scheduledAt ?? o.scheduled_at),
+    scheduledDate: strOpt(o.scheduledDate ?? o.scheduled_date),
+    scheduledTime: strOpt(o.scheduledTime ?? o.scheduled_time),
+    createdAt: String(o.createdAt ?? o.created_at ?? ""),
+    longTermOpportunityId: (() => {
+      const n = Number(longTermRaw);
+      return Number.isFinite(n) && n > 0 ? n : null;
+    })(),
+  };
+}
+
+function parsePaginationNumber(value: unknown): number | undefined {
+  if (value == null || value === "") return undefined;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+/** Normalize GET /v1/admin/service-requests list payload (cursor + legacy page shapes). */
+export function normalizeAdminServiceRequestListResponse(
+  data: unknown,
+  requestLimit = 10
+): {
+  items: AdminServiceRequestListDto[];
+  limit: number;
+  nextCursor: string | null;
+  hasMore: boolean;
+  total: number | null;
+} {
+  const unwrapRows = (value: unknown): unknown[] => {
+    if (Array.isArray(value)) return value;
+    if (value && typeof value === "object") {
+      const o = value as Record<string, unknown>;
+      for (const key of [
+        "data",
+        "items",
+        "results",
+        "serviceRequests",
+        "service_requests",
+        "appointments",
+      ] as const) {
+        if (Array.isArray(o[key])) return o[key] as unknown[];
+      }
+      if (o.data && typeof o.data === "object" && !Array.isArray(o.data)) {
+        return unwrapRows(o.data);
+      }
+    }
+    return [];
+  };
+
+  const top =
+    data && typeof data === "object" && !Array.isArray(data)
+      ? (data as Record<string, unknown>)
+      : null;
+
+  const rows = unwrapRows(data);
+  const items = rows.map(normalizeAdminServiceRequestListItem).filter((row) => row.id > 0);
+
+  const limit =
+    parsePaginationNumber(top?.limit ?? top?.pageSize) ?? requestLimit;
+
+  const nextCursorRaw = top?.nextCursor ?? top?.next_cursor;
+  const nextCursor =
+    typeof nextCursorRaw === "string" && nextCursorRaw.trim()
+      ? nextCursorRaw.trim()
+      : null;
+
+  const hasMoreExplicit = top?.hasMore ?? top?.has_more;
+  const hasMore =
+    typeof hasMoreExplicit === "boolean"
+      ? hasMoreExplicit
+      : Boolean(nextCursor);
+
+  const total =
+    parsePaginationNumber(top?.total ?? top?.totalCount ?? top?.total_count) ?? null;
+
+  return {
+    items,
+    limit: limit > 0 ? limit : requestLimit,
+    nextCursor,
+    hasMore,
+    total,
+  };
 }
 
 /**
@@ -2744,12 +2868,13 @@ export const patientsApi = {
 
 export const adminServiceRequestsApi = {
   /**
-   * GET /v1/admin/service-requests — List all appointments. Query: page, limit, consultationTypeId, searchDoctor, searchPatient.
+   * GET /v1/admin/service-requests — Cursor-paginated appointments list.
+   * First page: limit (+ optional filters). Next pages: cursor from previous response.
    */
   getList: async (
     params?: {
-      page?: number;
       limit?: number;
+      cursor?: string;
       consultationTypeId?: number;
       searchDoctor?: string;
       searchPatient?: string;
@@ -2757,9 +2882,14 @@ export const adminServiceRequestsApi = {
     config?: { signal?: AbortSignal }
   ) => {
     const query: Record<string, string | number> = {
-      page: params?.page ?? 1,
       limit: params?.limit ?? 10,
     };
+    const cursor = params?.cursor?.trim();
+    if (cursor) {
+      query.cursor = cursor;
+    } else {
+      query.page = 1;
+    }
     if (params?.consultationTypeId != null) query.consultationTypeId = params.consultationTypeId;
     const doc = params?.searchDoctor?.trim();
     if (doc) query.searchDoctor = doc;
