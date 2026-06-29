@@ -321,7 +321,9 @@ const en = {
   pagination: {
     rowsPerPage: "Rows per page",
     showingRangeOf: "Showing {{from}} to {{to}} of {{total}} {{entity}}",
+    showingRangeNoTotal: "Showing {{from}} to {{to}} {{entity}}",
     pageOf: "Page {{page}} of {{totalPages}}",
+    pageNumber: "Page {{page}}",
   },
   schedule: {
     metaTitle: "Service requests | Hope - BMQAS",
@@ -479,6 +481,8 @@ const en = {
     type: "Type",
     amount: "Amount",
     scheduled: "Scheduled",
+    scheduleDate: "Schedule date",
+    scheduleTime: "Schedule time",
     created: "Created",
     failedToLoad: "Failed to load appointments.",
     provider: "Provider",
