@@ -12,18 +12,41 @@ const DOCUMENT_BASE_URL = (import.meta.env.VITE_DOCUMENT_BASE_URL as string)?.tr
  *
  * - If accessUrl is empty, returns "".
  * - If accessUrl already starts with http:// or https://, returns it as-is.
- * - Otherwise prepends VITE_DOCUMENT_BASE_URL (no double slashes).
+ * - Paths under `/files/...` are served by the file upload microservice (`VITE_FILE_UPLOAD_URL`).
+ * - Other relative paths prepend `VITE_DOCUMENT_BASE_URL` (no double slashes).
  *
  * @param accessUrl - Path or endpoint from API (e.g. "/uploads/doc.pdf" or "profile/123.jpg")
  * @returns Full URL string, or "" if accessUrl is falsy
  */
 export function getAssetUrl(accessUrl: string | null | undefined): string {
   if (accessUrl == null || typeof accessUrl !== "string") return "";
-  const trimmed = accessUrl.trim();
+  let trimmed = accessUrl.trim();
   if (!trimmed) return "";
+
+  try {
+    const parsed = JSON.parse(trimmed) as { accessUrl?: string; path?: string };
+    if (parsed && typeof parsed === "object") {
+      if (typeof parsed.accessUrl === "string" && parsed.accessUrl.trim()) {
+        trimmed = parsed.accessUrl.trim();
+      } else if (typeof parsed.path === "string" && parsed.path.trim()) {
+        trimmed = parsed.path.trim();
+      }
+    }
+  } catch {
+    /* plain path */
+  }
 
   if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
     return trimmed;
+  }
+
+  if (trimmed.startsWith("/files/") || trimmed.startsWith("files/")) {
+    const base = FILE_UPLOAD_PUBLIC_BASE;
+    if (base) {
+      const path = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+      return `${base}${path}`;
+    }
+    return trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
   }
 
   if (!DOCUMENT_BASE_URL) return trimmed;

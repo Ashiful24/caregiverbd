@@ -155,6 +155,8 @@ export interface ConsultationType {
   children?: ConsultationType[];
 }
 
+export type ConsultationTypeLang = "en" | "bn";
+
 export interface ProviderSearchRequest {
   latitude?: number;
   longitude?: number;
@@ -543,7 +545,9 @@ export const authApi = {
 /** Payload for creating a consultation type (admin). */
 export interface CreateConsultationTypeRequest {
   name: string;
+  nameBn?: string;
   description?: string;
+  descriptionBn?: string;
   code?: string;
   employmentType?: string;
   parentId?: number;
@@ -556,7 +560,9 @@ export interface CreateConsultationTypeRequest {
 /** Payload for updating a consultation type (admin). */
 export interface UpdateConsultationTypeRequest {
   name: string;
+  nameBn?: string;
   description?: string;
+  descriptionBn?: string;
   code?: string | null;
   employmentType?: string | null;
   parentId?: number | null;
@@ -620,9 +626,12 @@ export interface ReorderConsultationTypesRequest {
 
 export const consultationTypesApi = {
   /** GET /consultation-types - Hierarchical tree. Optional code returns single-root subtree or 404. */
-  getAll: async (code?: string) => {
-    const params = code?.trim() ? { code: code.trim() } : undefined;
-    return httpService.get<ConsultationType[] | ConsultationType>("/consultation-types", params ? { params } : undefined);
+  getAll: async (params?: { code?: string; lang?: ConsultationTypeLang }) => {
+    const query: Record<string, string> = { lang: params?.lang ?? "en" };
+    if (params?.code?.trim()) query.code = params.code.trim();
+    return httpService.get<ConsultationType[] | ConsultationType>("/consultation-types", {
+      params: query,
+    });
   },
 
   /** POST /admin/consultation-types - Create (root or child). Backend may not exist yet. */
@@ -646,10 +655,11 @@ export const consultationTypesApi = {
   },
 
   // --- Admin: Service category checklists per consultation type ---
-  /** GET /admin/consultation-types/:id/service-category-checklists */
-  getServices: async (consultationTypeId: number) => {
+  /** GET /admin/consultation-types/:id/service-category-checklists?lang=en|bn */
+  getServices: async (consultationTypeId: number, params?: { lang?: ConsultationTypeLang }) => {
     return httpService.get<ServiceCategoryChecklistItem[]>(
-      `/admin/consultation-types/${consultationTypeId}/service-category-checklists`
+      `/admin/consultation-types/${consultationTypeId}/service-category-checklists`,
+      { params: { lang: params?.lang ?? "en" } }
     );
   },
   /** POST /admin/consultation-types/:id/service-category-checklists */
@@ -657,7 +667,9 @@ export const consultationTypesApi = {
     consultationTypeId: number,
     data: {
       name: string;
+      nameBn?: string;
       description?: string | null;
+      descriptionBn?: string | null;
       type?: ServiceCategoryChecklistType;
       isActive?: boolean;
       displayOrder?: number;
@@ -675,7 +687,9 @@ export const consultationTypesApi = {
     serviceId: number,
     data: {
       name?: string;
+      nameBn?: string;
       description?: string | null;
+      descriptionBn?: string | null;
       type?: ServiceCategoryChecklistType;
       isActive?: boolean;
       displayOrder?: number;
@@ -738,7 +752,9 @@ export interface ServiceCategoryChecklistItem {
   id: number;
   consultationTypeId?: number;
   name: string;
+  nameBn?: string;
   description?: string | null;
+  descriptionBn?: string | null;
   type?: ServiceCategoryChecklistType;
   isActive: boolean;
   displayOrder: number;
@@ -1197,26 +1213,37 @@ export interface VerificationDocumentTypeItem {
   id: number;
   code: string;
   label: string;
+  labelBn?: string;
   isActive: boolean;
   displayOrder: number;
   createdAt: string | null;
   updatedAt: string | null;
 }
 
+export type VerificationDocumentTypeLang = "en" | "bn";
+
 export const verificationDocumentTypesApi = {
-  list: async (params?: { activeOnly?: boolean }) => {
+  list: async (params?: { activeOnly?: boolean; lang?: VerificationDocumentTypeLang }) => {
+    const query: Record<string, string> = { lang: params?.lang ?? "en" };
+    if (params?.activeOnly) query.activeOnly = "true";
     return httpService.get<VerificationDocumentTypeItem[]>(
       "/admin/verification-document-types",
-      { params: params as Record<string, string> }
+      { params: query }
     );
   },
-  create: async (data: { code: string; label: string; isActive?: boolean; displayOrder?: number }) => {
+  create: async (data: {
+    code: string;
+    label: string;
+    labelBn?: string;
+    isActive?: boolean;
+    displayOrder?: number;
+  }) => {
     return httpService.post<VerificationDocumentTypeItem>(
       "/admin/verification-document-types",
       data
     );
   },
-  update: async (id: number, data: { label?: string; displayOrder?: number }) => {
+  update: async (id: number, data: { label?: string; labelBn?: string; displayOrder?: number }) => {
     return httpService.patch<VerificationDocumentTypeItem>(
       `/admin/verification-document-types/${id}`,
       data
@@ -1234,9 +1261,12 @@ export const verificationDocumentTypesApi = {
 
 export type ConsultationTypeLevelCategory = "DOCTOR" | "CAREGIVER";
 
+export type ConsultationTypeLevelLang = "en" | "bn";
+
 export interface ConsultationTypeLevel {
   id: number;
   name: string;
+  nameBn?: string;
   levelNumber: number;
   category: ConsultationTypeLevelCategory;
   minSalary: number;
@@ -1245,6 +1275,7 @@ export interface ConsultationTypeLevel {
 
 export type ConsultationTypeLevelPayload = {
   name: string;
+  nameBn: string;
   levelNumber: number;
   category: ConsultationTypeLevelCategory;
   minSalary: number;
@@ -1260,6 +1291,7 @@ function toConsultationTypeLevelPatchBody(
 ): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   if (data.name !== undefined) out.name = data.name;
+  if (data.nameBn !== undefined) out.name_bn = data.nameBn;
   if (data.levelNumber !== undefined) out.level_number = data.levelNumber;
   if (data.category !== undefined) out.category = data.category;
   if (data.minSalary !== undefined) out.min_salary = data.minSalary;
@@ -1268,15 +1300,20 @@ function toConsultationTypeLevelPatchBody(
 }
 
 export const consultationTypeLevelsApi = {
-  /** GET /admin/consultation-type-levels?category=DOCTOR|CAREGIVER */
-  list: async (params: { category: ConsultationTypeLevelCategory }) => {
+  /** GET /admin/consultation-type-levels?category=DOCTOR|CAREGIVER&lang=en|bn */
+  list: async (params: {
+    category: ConsultationTypeLevelCategory;
+    lang?: ConsultationTypeLevelLang;
+  }) => {
     return httpService.get<ConsultationTypeLevel[]>("/admin/consultation-type-levels", {
-      params: { category: params.category },
+      params: { category: params.category, lang: params.lang ?? "en" },
     });
   },
-  /** GET /admin/consultation-type-levels/:id */
-  getById: async (id: number) => {
-    return httpService.get<ConsultationTypeLevel>(`/admin/consultation-type-levels/${id}`);
+  /** GET /admin/consultation-type-levels/:id?lang=en|bn */
+  getById: async (id: number, params?: { lang?: ConsultationTypeLevelLang }) => {
+    return httpService.get<ConsultationTypeLevel>(`/admin/consultation-type-levels/${id}`, {
+      params: params?.lang ? { lang: params.lang } : undefined,
+    });
   },
   /** POST /admin/consultation-type-levels */
   create: async (data: ConsultationTypeLevelPayload) => {

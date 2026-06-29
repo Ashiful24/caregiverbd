@@ -25,7 +25,8 @@ import { viewDocument, downloadDocument, printDocument } from "../utils/document
 import { DownloadIcon } from "../icons";
 
 export default function UpgradeRequestDetail() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const apiLang: "en" | "bn" = i18n.resolvedLanguage === "bn" ? "bn" : "en";
   const { id } = useParams<{ id: string }>();
   const requestId = id ? parseInt(id, 10) : NaN;
 
@@ -49,7 +50,7 @@ export default function UpgradeRequestDetail() {
     try {
       const [reqRes, typesRes] = await Promise.all([
         upgradeRequestsApi.getById(requestId),
-        verificationDocumentTypesApi.list(),
+        verificationDocumentTypesApi.list({ lang: apiLang }),
       ]);
       const typesList = Array.isArray(typesRes?.data) ? typesRes.data : Array.isArray(typesRes) ? typesRes : [];
       const labels: Record<string, string> = {};
@@ -88,7 +89,7 @@ export default function UpgradeRequestDetail() {
     } finally {
       setLoading(false);
     }
-  }, [requestId, t]);
+  }, [requestId, t, apiLang]);
 
   useEffect(() => {
     fetchData();

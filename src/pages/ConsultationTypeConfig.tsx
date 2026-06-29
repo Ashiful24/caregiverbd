@@ -19,9 +19,24 @@ import {
 } from "../services/api";
 import { PencilIcon, PlusIcon, TrashBinIcon } from "../icons";
 
+function resolveServiceText(
+  item: ServiceCategoryChecklistItem,
+  field: "name" | "description",
+  lang: "en" | "bn"
+): string {
+  if (field === "name") {
+    return lang === "bn"
+      ? (item.nameBn?.trim() || item.name || "")
+      : (item.name || item.nameBn || "");
+  }
+  return lang === "bn"
+    ? (item.descriptionBn?.trim() || item.description || "")
+    : (item.description || item.descriptionBn || "");
+}
+
 export default function ConsultationTypeConfig() {
   const { t, i18n } = useTranslation();
-  const apiLang: "en" | "bn" = i18n.resolvedLanguage === "bn" ? "bn" : "en";
+  const apiLang: "en" | "bn" = i18n.language?.startsWith("bn") ? "bn" : "en";
   const { id } = useParams<{ id: string }>();
   const typeId = id != null ? parseInt(id, 10) : NaN;
   const isValidId = Number.isInteger(typeId) && typeId > 0;
@@ -43,7 +58,10 @@ export default function ConsultationTypeConfig() {
     | null
   >(null);
   const [serviceName, setServiceName] = useState("");
+  const [serviceNameBn, setServiceNameBn] = useState("");
   const [serviceDescription, setServiceDescription] = useState("");
+  const [serviceDescriptionBn, setServiceDescriptionBn] = useState("");
+  const [serviceFormLoading, setServiceFormLoading] = useState(false);
   const [serviceType, setServiceType] = useState<ServiceCategoryChecklistType>("CHECKLIST");
   const [serviceGroupId, setServiceGroupId] = useState<number | "">("");
   const [checklistGroups, setChecklistGroups] = useState<ServiceChecklistGroupItem[]>([]);
@@ -66,10 +84,10 @@ export default function ConsultationTypeConfig() {
     setError("");
     try {
       const [treeRes, servicesRes, reqsRes, docTypesRes] = await Promise.all([
-        consultationTypesApi.getAll(),
-        consultationTypesApi.getServices(typeId),
+        consultationTypesApi.getAll({ lang: apiLang }),
+        consultationTypesApi.getServices(typeId, { lang: apiLang }),
         consultationTypesApi.getVerificationRequirements(typeId),
-        verificationDocumentTypesApi.list({ activeOnly: true }),
+        verificationDocumentTypesApi.list({ activeOnly: true, lang: apiLang }),
       ]);
       const docTypes = Array.isArray(docTypesRes?.data) ? docTypesRes.data : Array.isArray(docTypesRes) ? docTypesRes : [];
       setDocumentTypes(docTypes);
@@ -86,8 +104,10 @@ export default function ConsultationTypeConfig() {
         return "";
       };
       setTypeName(findName(tree) || `${t("consultationConfig.typePrefix")} #${typeId}`);
-      setServices(Array.isArray(servicesRes.data) ? servicesRes.data : []);
-      setRequirements(Array.isArray(reqsRes.data) ? reqsRes.data : []);
+      const servicesRaw = servicesRes?.data ?? servicesRes;
+      setServices(Array.isArray(servicesRaw) ? servicesRaw : []);
+      const reqsRaw = reqsRes?.data ?? reqsRes;
+      setRequirements(Array.isArray(reqsRaw) ? reqsRaw : []);
     } catch (err: unknown) {
       const message =
         err && typeof err === "object" && "message" in err
@@ -97,7 +117,7 @@ export default function ConsultationTypeConfig() {
     } finally {
       setLoading(false);
     }
-  }, [typeId, isValidId, t]);
+  }, [typeId, isValidId, t, apiLang]);
 
   useEffect(() => {
     fetchData();
@@ -124,10 +144,14 @@ export default function ConsultationTypeConfig() {
     void loadChecklistGroups();
   }, [serviceModal, loadChecklistGroups]);
 
+  const banglaRequired = apiLang === "bn";
+
   const buildServicePayload = () => {
     const base = {
       name: serviceName.trim(),
+      nameBn: serviceNameBn.trim() || undefined,
       description: serviceDescription.trim() || null,
+      descriptionBn: serviceDescriptionBn.trim() || null,
       type: serviceType,
       isActive: serviceIsActive,
       displayOrder: serviceDisplayOrder,
@@ -140,15 +164,54 @@ export default function ConsultationTypeConfig() {
 
   const resetServiceForm = () => {
     setServiceName("");
+    setServiceNameBn("");
     setServiceDescription("");
+    setServiceDescriptionBn("");
     setServiceType("CHECKLIST");
     setServiceGroupId("");
     setServiceIsActive(true);
     setServiceDisplayOrder(0);
+    setServiceFormLoading(false);
   };
+
+  const loadServiceFormForEdit = useCallback(
+    async (item: ServiceCategoryChecklistItem) => {
+      if (!isValidId) return;
+      setServiceFormLoading(true);
+      try {
+        const [enRes, bnRes] = await Promise.all([
+          consultationTypesApi.getServices(typeId, { lang: "en" }),
+          consultationTypesApi.getServices(typeId, { lang: "bn" }),
+        ]);
+        const enList = (() => {
+          const raw = enRes?.data ?? enRes;
+          return Array.isArray(raw) ? raw : [];
+        })();
+        const bnList = (() => {
+          const raw = bnRes?.data ?? bnRes;
+          return Array.isArray(raw) ? raw : [];
+        })();
+        const en = enList.find((s) => s.id === item.id);
+        const bn = bnList.find((s) => s.id === item.id);
+        setServiceName(en?.name ?? item.name);
+        setServiceDescription(en?.description ?? "");
+        setServiceNameBn(bn?.nameBn ?? bn?.name ?? "");
+        setServiceDescriptionBn(bn?.descriptionBn ?? bn?.description ?? "");
+      } catch {
+        setServiceName(item.name);
+        setServiceDescription(item.description ?? "");
+        setServiceNameBn(item.nameBn ?? "");
+        setServiceDescriptionBn(item.descriptionBn ?? "");
+      } finally {
+        setServiceFormLoading(false);
+      }
+    },
+    [isValidId, typeId]
+  );
 
   const serviceFormInvalid =
     !serviceName.trim() ||
+    (banglaRequired && !serviceNameBn.trim()) ||
     (serviceType === "CHECKLIST" && (serviceGroupId === "" || groupsLoading));
 
   const handleAddService = async () => {
@@ -288,15 +351,18 @@ export default function ConsultationTypeConfig() {
               <ul className="space-y-2">
                 {services
                   .sort((a, b) => a.displayOrder - b.displayOrder || a.id - b.id)
-                  .map((s) => (
+                  .map((s) => {
+                    const displayName = resolveServiceText(s, "name", apiLang);
+                    const displayDescription = resolveServiceText(s, "description", apiLang);
+                    return (
                     <li
                       key={s.id}
                       className="flex items-center justify-between gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-800/50"
                     >
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-medium text-gray-800 dark:text-white/90">
-                            {s.name}
+                          <span className="font-medium text-gray-800 dark:text-white/90" dir="auto">
+                            {displayName}
                           </span>
                           {s.type === "VITALS" && (
                             <span className="rounded bg-blue-100 px-1.5 text-xs font-medium text-blue-700 dark:bg-blue-900/40 dark:text-blue-200">
@@ -309,9 +375,9 @@ export default function ConsultationTypeConfig() {
                             </span>
                           )}
                         </div>
-                        {s.description && (
-                          <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
-                            {s.description}
+                        {displayDescription && (
+                          <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400 line-clamp-2" dir="auto">
+                            {displayDescription}
                           </p>
                         )}
                       </div>
@@ -321,13 +387,16 @@ export default function ConsultationTypeConfig() {
                           onClick={() => {
                             setServiceModal({ mode: "edit", item: s });
                             setServiceName(s.name);
+                            setServiceNameBn("");
                             setServiceDescription(s.description ?? "");
+                            setServiceDescriptionBn("");
                             setServiceType(s.type ?? "CHECKLIST");
                             setServiceGroupId(
                               s.type === "CHECKLIST" && s.groupId != null ? s.groupId : ""
                             );
                             setServiceIsActive(s.isActive);
                             setServiceDisplayOrder(s.displayOrder);
+                            void loadServiceFormForEdit(s);
                           }}
                           className="rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-gray-200"
                         >
@@ -342,7 +411,8 @@ export default function ConsultationTypeConfig() {
                         </button>
                       </div>
                     </li>
-                  ))}
+                    );
+                  })}
               </ul>
               <Button
                 variant="outline"
@@ -441,114 +511,195 @@ export default function ConsultationTypeConfig() {
         <Modal
           isOpen={true}
           onClose={() => !submitting && setServiceModal(null)}
-          title={serviceModal.mode === "add" ? t("consultationConfig.addChecklistService") : t("consultationConfig.editService")}
-          className="w-full max-w-lg"
+          showCloseButton
+          className="max-h-[min(90vh,720px)] w-full max-w-lg overflow-hidden p-0 sm:p-0"
         >
-          <div className="space-y-3">
-            <label className="block">
-              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("consultationConfig.serviceItemName")}</span>
-              <input
-                type="text"
-                value={serviceName}
-                onChange={(e) => setServiceName(e.target.value)}
-                className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
-                placeholder={t("consultationConfig.serviceItemNamePlaceholder")}
-              />
-            </label>
-            <label className="block">
-              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("consultationConfig.serviceItemType")}</span>
-              <ThemedSelect
-                value={serviceType}
-                onChange={(e) => {
-                  const next = e.target.value as ServiceCategoryChecklistType;
-                  setServiceType(next);
-                  if (next === "VITALS") {
-                    setServiceGroupId("");
-                  } else if (serviceGroupId === "" && checklistGroups.length > 0) {
-                    setServiceGroupId(checklistGroups[0].id);
-                  }
-                }}
-                className="mt-1"
-              >
-                <option value="CHECKLIST">{t("consultationConfig.serviceTypeChecklist")}</option>
-                <option value="VITALS">{t("consultationConfig.serviceTypeVitals")}</option>
-              </ThemedSelect>
-              <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
-                {t("consultationConfig.serviceItemTypeHelp")}
-              </span>
-            </label>
-            {serviceType === "CHECKLIST" && (
-              <label className="block">
-                <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                  {t("consultationConfig.serviceItemGroup")}
-                </span>
-                <ThemedSelect
-                  value={serviceGroupId === "" ? "" : String(serviceGroupId)}
-                  onChange={(e) =>
-                    setServiceGroupId(e.target.value ? parseInt(e.target.value, 10) : "")
-                  }
-                  disabled={groupsLoading || checklistGroups.length === 0}
-                  className="mt-1"
-                >
-                  <option value="">
-                    {groupsLoading
-                      ? t("consultationConfig.serviceItemGroupLoading")
-                      : t("consultationConfig.serviceItemGroupPlaceholder")}
-                  </option>
-                  {checklistGroups
-                    .sort((a, b) => a.id - b.id)
-                    .map((group) => (
-                      <option key={group.id} value={group.id}>
-                        {group.name}
-                      </option>
-                    ))}
-                </ThemedSelect>
-              </label>
-            )}
-            <label className="block">
-              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("consultationConfig.serviceItemDescription")}</span>
-              <textarea
-                value={serviceDescription}
-                onChange={(e) => setServiceDescription(e.target.value)}
-                rows={3}
-                className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
-                placeholder={t("consultationConfig.serviceItemDescriptionPlaceholder")}
-              />
-            </label>
-            <label className="flex items-center gap-2">
-              <Checkbox
-                checked={serviceIsActive}
-                onChange={setServiceIsActive}
-                className="h-4 w-4"
-              />
-              <span className="text-sm text-gray-700 dark:text-gray-300">{t("consultationConfig.serviceItemActive")}</span>
-            </label>
-            <label className="block">
-              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("consultationConfig.displayOrder")}</span>
-              <input
-                type="number"
-                min={0}
-                value={serviceDisplayOrder}
-                onChange={(e) => setServiceDisplayOrder(parseInt(e.target.value, 10) || 0)}
-                className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
-              />
-            </label>
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => !submitting && setServiceModal(null)}
-                className="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
-              >
-                {t("common.actions.cancel")}
-              </button>
-              <button
-                type="button"
-                disabled={submitting || serviceFormInvalid}
-                onClick={serviceModal.mode === "add" ? handleAddService : handleEditService}
-                className="rounded bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
-              >
-                {submitting ? t("supervisor.saving") : t("common.actions.save")}
-              </button>
+          <div className="flex max-h-[min(90vh,720px)] flex-col">
+            <div className="shrink-0 border-b border-gray-200 px-6 pb-4 pt-6 dark:border-gray-800">
+              <h3 className="pr-10 text-xl font-semibold text-gray-900 dark:text-white/90">
+                {serviceModal.mode === "add"
+                  ? t("consultationConfig.addChecklistService")
+                  : t("consultationConfig.editService")}
+              </h3>
+            </div>
+
+            <div className="flex min-h-0 flex-1 flex-col">
+              <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-6 py-4">
+                <div className="space-y-3">
+                  {serviceFormLoading ? (
+                    <div className="py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+                      {t("consultationConfig.loadingForm")}
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        {banglaRequired
+                          ? t("consultationConfig.formIntroBn")
+                          : t("consultationConfig.formIntroEn")}
+                      </p>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-brand-600 dark:text-brand-400">
+                        {t("consultationConfig.sectionEnglish")}
+                      </p>
+                      <label className="block">
+                        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                          {t("consultationConfig.nameEn")}
+                        </span>
+                        <input
+                          type="text"
+                          value={serviceName}
+                          onChange={(e) => setServiceName(e.target.value)}
+                          className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                          placeholder={t("consultationConfig.serviceItemNamePlaceholder")}
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                          {t("consultationConfig.descriptionEn")}
+                        </span>
+                        <textarea
+                          value={serviceDescription}
+                          onChange={(e) => setServiceDescription(e.target.value)}
+                          rows={2}
+                          className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                          placeholder={t("consultationConfig.serviceItemDescriptionPlaceholder")}
+                        />
+                      </label>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-brand-600 dark:text-brand-400">
+                        {t("consultationConfig.sectionBangla")}
+                      </p>
+                      <label className="block">
+                        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                          {t("consultationConfig.nameBn")}
+                          {!banglaRequired && (
+                            <span className="ml-1 font-normal text-gray-400 dark:text-gray-500">
+                              ({t("consultationConfig.optional")})
+                            </span>
+                          )}
+                        </span>
+                        <input
+                          type="text"
+                          value={serviceNameBn}
+                          onChange={(e) => setServiceNameBn(e.target.value)}
+                          className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                          placeholder={t("consultationConfig.nameBnPlaceholder")}
+                          dir="auto"
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                          {t("consultationConfig.descriptionBn")}
+                          <span className="ml-1 font-normal text-gray-400 dark:text-gray-500">
+                            ({t("consultationConfig.optional")})
+                          </span>
+                        </span>
+                        <textarea
+                          value={serviceDescriptionBn}
+                          onChange={(e) => setServiceDescriptionBn(e.target.value)}
+                          rows={2}
+                          className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                          placeholder={t("consultationConfig.descriptionBnPlaceholder")}
+                          dir="auto"
+                        />
+                      </label>
+                    </>
+                  )}
+                  <label className="block">
+                    <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                      {t("consultationConfig.serviceItemType")}
+                    </span>
+                    <ThemedSelect
+                      value={serviceType}
+                      onChange={(e) => {
+                        const next = e.target.value as ServiceCategoryChecklistType;
+                        setServiceType(next);
+                        if (next === "VITALS") {
+                          setServiceGroupId("");
+                        } else if (serviceGroupId === "" && checklistGroups.length > 0) {
+                          setServiceGroupId(checklistGroups[0].id);
+                        }
+                      }}
+                      className="mt-1"
+                    >
+                      <option value="CHECKLIST">{t("consultationConfig.serviceTypeChecklist")}</option>
+                      <option value="VITALS">{t("consultationConfig.serviceTypeVitals")}</option>
+                    </ThemedSelect>
+                    <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
+                      {t("consultationConfig.serviceItemTypeHelp")}
+                    </span>
+                  </label>
+                  {serviceType === "CHECKLIST" && (
+                    <label className="block">
+                      <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                        {t("consultationConfig.serviceItemGroup")}
+                      </span>
+                      <ThemedSelect
+                        value={serviceGroupId === "" ? "" : String(serviceGroupId)}
+                        onChange={(e) =>
+                          setServiceGroupId(e.target.value ? parseInt(e.target.value, 10) : "")
+                        }
+                        disabled={groupsLoading || checklistGroups.length === 0}
+                        className="mt-1"
+                      >
+                        <option value="">
+                          {groupsLoading
+                            ? t("consultationConfig.serviceItemGroupLoading")
+                            : t("consultationConfig.serviceItemGroupPlaceholder")}
+                        </option>
+                        {checklistGroups
+                          .sort((a, b) => a.id - b.id)
+                          .map((group) => (
+                            <option key={group.id} value={group.id}>
+                              {group.name}
+                            </option>
+                          ))}
+                      </ThemedSelect>
+                    </label>
+                  )}
+                  <label className="flex items-center gap-2">
+                    <Checkbox
+                      checked={serviceIsActive}
+                      onChange={setServiceIsActive}
+                      className="h-4 w-4"
+                    />
+                    <span className="text-sm text-gray-700 dark:text-gray-300">
+                      {t("consultationConfig.serviceItemActive")}
+                    </span>
+                  </label>
+                  <label className="block">
+                    <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                      {t("consultationConfig.displayOrder")}
+                    </span>
+                    <input
+                      type="number"
+                      min={0}
+                      value={serviceDisplayOrder}
+                      onChange={(e) => setServiceDisplayOrder(parseInt(e.target.value, 10) || 0)}
+                      className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div className="shrink-0 border-t border-gray-200 bg-gray-50/80 px-6 py-4 dark:border-gray-800 dark:bg-gray-900/50">
+                <div className="flex flex-wrap items-center justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => !submitting && setServiceModal(null)}
+                    disabled={submitting}
+                    className="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                  >
+                    {t("common.actions.cancel")}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={submitting || serviceFormInvalid || serviceFormLoading}
+                    onClick={serviceModal.mode === "add" ? handleAddService : handleEditService}
+                    className="rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
+                  >
+                    {submitting ? t("supervisor.saving") : t("common.actions.save")}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </Modal>
