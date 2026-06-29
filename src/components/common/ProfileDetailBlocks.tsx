@@ -914,7 +914,7 @@ export function ProviderFullDetailsView({
     setServicesLoading(true);
     setServicesLoadError(null);
     consultationTypesApi
-      .getServices(consultationTypeId)
+      .getServices(consultationTypeId, { lang: apiLang })
       .then((res) => {
         if (!aborted) {
           const list = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
@@ -933,7 +933,7 @@ export function ProviderFullDetailsView({
     return () => {
       aborted = true;
     };
-  }, [consultationTypeId]);
+  }, [consultationTypeId, apiLang]);
 
   const handleProfileChecklistToggle = async (item: ProviderProfileChecklistItemDto) => {
     if (!provider.id || checklistUpdating) return;

@@ -336,7 +336,7 @@ export default function ConsultationTypeLevels() {
       setMappingChecklistIds([]);
       try {
         const [checklistsRes, mappedRes] = await Promise.all([
-          consultationTypesApi.getServices(mappingConsultationTypeId),
+          consultationTypesApi.getServices(mappingConsultationTypeId, { lang: apiLang }),
           levelChecklistMappingsApi.getMappedChecklists(mappingConsultationTypeId, mappingLevelId),
         ]);
         const data = checklistsRes?.data ?? checklistsRes;
@@ -391,7 +391,7 @@ export default function ConsultationTypeLevels() {
     return () => {
       cancelled = true;
     };
-  }, [mappingModal, mappingConsultationTypeId, mappingLevelId]);
+  }, [mappingModal, mappingConsultationTypeId, mappingLevelId, apiLang]);
 
   const toggleChecklist = (id: number) => {
     setMappingChecklistIds((prev) =>

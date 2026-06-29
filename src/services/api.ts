@@ -655,10 +655,11 @@ export const consultationTypesApi = {
   },
 
   // --- Admin: Service category checklists per consultation type ---
-  /** GET /admin/consultation-types/:id/service-category-checklists */
-  getServices: async (consultationTypeId: number) => {
+  /** GET /admin/consultation-types/:id/service-category-checklists?lang=en|bn */
+  getServices: async (consultationTypeId: number, params?: { lang?: ConsultationTypeLang }) => {
     return httpService.get<ServiceCategoryChecklistItem[]>(
-      `/admin/consultation-types/${consultationTypeId}/service-category-checklists`
+      `/admin/consultation-types/${consultationTypeId}/service-category-checklists`,
+      { params: { lang: params?.lang ?? "en" } }
     );
   },
   /** POST /admin/consultation-types/:id/service-category-checklists */
@@ -666,7 +667,9 @@ export const consultationTypesApi = {
     consultationTypeId: number,
     data: {
       name: string;
+      nameBn?: string;
       description?: string | null;
+      descriptionBn?: string | null;
       type?: ServiceCategoryChecklistType;
       isActive?: boolean;
       displayOrder?: number;
@@ -684,7 +687,9 @@ export const consultationTypesApi = {
     serviceId: number,
     data: {
       name?: string;
+      nameBn?: string;
       description?: string | null;
+      descriptionBn?: string | null;
       type?: ServiceCategoryChecklistType;
       isActive?: boolean;
       displayOrder?: number;
@@ -747,7 +752,9 @@ export interface ServiceCategoryChecklistItem {
   id: number;
   consultationTypeId?: number;
   name: string;
+  nameBn?: string;
   description?: string | null;
+  descriptionBn?: string | null;
   type?: ServiceCategoryChecklistType;
   isActive: boolean;
   displayOrder: number;
