@@ -230,6 +230,7 @@ export default function NurseScheduleCalendarPage() {
           supervisorName={request.supervisorName}
           defaultShiftDurationHours={request.shiftDurationHours}
           defaultPreferredStartTime={request.preferredStartTime}
+          requestStatus={request.status}
           initialEvents={initialEvents}
           onScheduleDetailsSynced={handleScheduleDetailsSynced}
         />

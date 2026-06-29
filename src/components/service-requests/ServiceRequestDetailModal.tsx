@@ -45,7 +45,7 @@ function serviceRequestStatusBadgeColor(
 
 type TimelineView =
   | { kind: "pending" }
-  | { kind: "empty" }
+  | { kind: "empty"; terminalState?: string | null }
   | { kind: "error"; message: string }
   | { kind: "api"; steps: ReturnType<typeof mapEventLogToLifecycleStep>[]; activeIndex: number };
 
@@ -57,6 +57,7 @@ export function ServiceRequestDetailModal({
   const { t } = useTranslation();
   const [eventLogs, setEventLogs] = useState<ServiceRequestEventLogDto[]>([]);
   const [eventLogsIsTerminal, setEventLogsIsTerminal] = useState(false);
+  const [eventLogsTerminalState, setEventLogsTerminalState] = useState<string | null>(null);
   const [eventLogsLoading, setEventLogsLoading] = useState(false);
   const [eventLogsError, setEventLogsError] = useState<string | null>(null);
   const [eventLogsFetched, setEventLogsFetched] = useState(false);
@@ -65,6 +66,7 @@ export function ServiceRequestDetailModal({
     if (!item || !isOpen) {
       setEventLogs([]);
       setEventLogsIsTerminal(false);
+      setEventLogsTerminalState(null);
       setEventLogsError(null);
       setEventLogsLoading(false);
       setEventLogsFetched(false);
@@ -74,6 +76,7 @@ export function ServiceRequestDetailModal({
     const controller = new AbortController();
     setEventLogs([]);
     setEventLogsIsTerminal(false);
+    setEventLogsTerminalState(null);
     setEventLogsError(null);
     setEventLogsFetched(false);
     setEventLogsLoading(true);
@@ -90,6 +93,7 @@ export function ServiceRequestDetailModal({
         const parsed = normalizeServiceRequestTimeline(res.data);
         setEventLogs(parsed.timeline);
         setEventLogsIsTerminal(parsed.isTerminal);
+        setEventLogsTerminalState(parsed.terminalState ?? null);
         setEventLogsFetched(true);
       })
       .catch((err: unknown) => {
@@ -112,11 +116,41 @@ export function ServiceRequestDetailModal({
     if (!item) return { kind: "pending" };
     if (!eventLogsFetched) return { kind: "pending" };
     if (eventLogsError) return { kind: "error", message: eventLogsError };
-    if (eventLogs.length === 0) return { kind: "empty" };
+    if (eventLogs.length === 0) {
+      return {
+        kind: "empty",
+        terminalState:
+          eventLogsIsTerminal && eventLogsTerminalState
+            ? eventLogsTerminalState
+            : null,
+      };
+    }
     const steps = eventLogs.map((log) => mapEventLogToLifecycleStep(log, t));
     const activeIndex = lifecycleActiveIndexForTimeline(eventLogs, eventLogsIsTerminal);
     return { kind: "api", steps, activeIndex };
-  }, [item, eventLogs, eventLogsIsTerminal, eventLogsFetched, eventLogsError, t]);
+  }, [
+    item,
+    eventLogs,
+    eventLogsIsTerminal,
+    eventLogsTerminalState,
+    eventLogsFetched,
+    eventLogsError,
+    t,
+  ]);
+
+  const emptyLifecycleMessage = useMemo(() => {
+    if (timelineView.kind !== "empty") return "";
+    const terminalState = timelineView.terminalState?.toUpperCase();
+    if (terminalState === "REJECTED") {
+      return t("appointments.eventLogsEmptyRejected");
+    }
+    if (terminalState) {
+      return t("appointments.eventLogsEmptyTerminal", {
+        state: formatStatusLabel(terminalState),
+      });
+    }
+    return t("appointments.eventLogsEmpty");
+  }, [timelineView, t]);
 
   const showLifecycleSection = eventLogsLoading || eventLogsFetched;
 
@@ -215,7 +249,7 @@ export function ServiceRequestDetailModal({
 
                 {!eventLogsLoading && timelineView.kind === "empty" && (
                   <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">
-                    {t("appointments.eventLogsEmpty")}
+                    {emptyLifecycleMessage}
                   </p>
                 )}
 

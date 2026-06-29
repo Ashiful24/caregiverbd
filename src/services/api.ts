@@ -1865,6 +1865,7 @@ export interface ServiceRequestEventLogDto {
 export interface ServiceRequestTimelineResponseDto {
   serviceType: string;
   isTerminal: boolean;
+  terminalState?: string | null;
   timeline: ServiceRequestEventLogDto[];
 }
 
@@ -1875,6 +1876,7 @@ export function normalizeServiceRequestTimeline(
   const empty: ServiceRequestTimelineResponseDto = {
     serviceType: "",
     isTerminal: false,
+    terminalState: null,
     timeline: [],
   };
   if (!raw || typeof raw !== "object") return empty;
@@ -1886,9 +1888,14 @@ export function normalizeServiceRequestTimeline(
       ? (root.data as Record<string, unknown>)
       : root;
   const timelineRaw = Array.isArray(body.timeline) ? body.timeline : [];
+  const terminalStateRaw = body.terminalState;
   return {
     serviceType: typeof body.serviceType === "string" ? body.serviceType : "",
     isTerminal: Boolean(body.isTerminal),
+    terminalState:
+      typeof terminalStateRaw === "string" && terminalStateRaw.trim()
+        ? terminalStateRaw.trim()
+        : null,
     timeline: timelineRaw.filter(
       (x): x is ServiceRequestEventLogDto => !!x && typeof x === "object"
     ),

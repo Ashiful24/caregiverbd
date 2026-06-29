@@ -24,6 +24,7 @@ type Props = {
   weekAnchor: Date;
   events: ScheduleEventRecord[];
   dayInRange: (day: Date) => boolean;
+  readOnly?: boolean;
   onSelectHour: (day: Date, hour24: number) => void;
   onEventClick: (event: ScheduleEventRecord) => void;
 };
@@ -62,6 +63,7 @@ export function ScheduleWeekView({
   weekAnchor,
   events,
   dayInRange,
+  readOnly = false,
   onSelectHour,
   onEventClick,
 }: Props) {
@@ -110,27 +112,32 @@ export function ScheduleWeekView({
                 </div>
                 {days.map((day, dayIdx) => {
                   const inRange = dayInRange(day);
+                  const selectable = inRange && !readOnly;
                   const isLastDayCol = dayIdx === days.length - 1;
                   return (
                     <button
                       key={`${format(day, "yyyy-MM-dd")}-${h}`}
                       type="button"
-                      disabled={!inRange}
+                      disabled={!selectable}
                       onClick={() => onSelectHour(day, h)}
                       className={`box-border border-b border-gray-300 text-left transition-colors dark:border-gray-600 ${
                         isLastDayCol ? "border-r-0" : "border-r"
                       } ${
-                        inRange
+                        selectable
                           ? "cursor-pointer bg-white hover:bg-brand-50/50 dark:bg-gray-900/40 dark:hover:bg-brand-950/20"
-                          : "cursor-not-allowed border-dashed border-gray-400 bg-gray-200/90 opacity-100 dark:border-gray-500 dark:bg-gray-800/90"
+                          : inRange && readOnly
+                            ? "cursor-not-allowed bg-brand-50/20 dark:bg-brand-950/10"
+                            : "cursor-not-allowed border-dashed border-gray-400 bg-gray-200/90 opacity-100 dark:border-gray-500 dark:bg-gray-800/90"
                       }`}
                       style={{ height: PX_PER_HOUR, minHeight: PX_PER_HOUR }}
                       title={
-                        inRange
+                        selectable
                           ? t("scheduleCalendar.scheduleFrom", {
                               time: format(new Date(2000, 0, 1, h), "h a", { locale: dateLoc }),
                             })
-                          : t("scheduleCalendar.outsideWindow")
+                          : inRange && readOnly
+                            ? t("scheduleCalendar.readOnlyCell")
+                            : t("scheduleCalendar.outsideWindow")
                       }
                     />
                   );
@@ -164,17 +171,23 @@ export function ScheduleWeekView({
                       end.getHours() === 0 && end > start ? new Date(end.getTime() - 60_000) : end;
                     return (
                       <div
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => onEventClick(e)}
+                        role={readOnly ? undefined : "button"}
+                        tabIndex={readOnly ? undefined : 0}
+                        onClick={() => {
+                          if (readOnly) return;
+                          onEventClick(e);
+                        }}
                         onKeyDown={(ev) => {
+                          if (readOnly) return;
                           if (ev.key === "Enter" || ev.key === " ") {
                             ev.preventDefault();
                             onEventClick(e);
                           }
                         }}
                         key={e.id}
-                        className={`pointer-events-auto absolute left-0.5 right-0.5 overflow-hidden rounded-md border px-1 py-0.5 text-[10px] leading-tight shadow-sm sm:left-1 sm:right-1 sm:text-xs cursor-pointer ${eventDisplayClasses(e.type, e.pending)}`}
+                        className={`pointer-events-auto absolute left-0.5 right-0.5 overflow-hidden rounded-md border px-1 py-0.5 text-[10px] leading-tight shadow-sm sm:left-1 sm:right-1 sm:text-xs ${
+                          readOnly ? "cursor-default" : "cursor-pointer"
+                        } ${eventDisplayClasses(e.type, e.pending)}`}
                         style={{
                           top: `${layout.topPct}%`,
                           height: `${layout.heightPct}%`,
