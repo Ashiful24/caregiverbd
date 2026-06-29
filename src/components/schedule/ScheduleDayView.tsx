@@ -17,6 +17,7 @@ type Props = {
   day: Date;
   events: ScheduleEventRecord[];
   dayInRange: (day: Date) => boolean;
+  readOnly?: boolean;
   onSelectHour: (day: Date, hour24: number) => void;
   onEventClick: (event: ScheduleEventRecord) => void;
 };
@@ -55,6 +56,7 @@ export function ScheduleDayView({
   day,
   events,
   dayInRange,
+  readOnly = false,
   onSelectHour,
   onEventClick,
 }: Props) {
@@ -64,6 +66,7 @@ export function ScheduleDayView({
   const hours = Array.from({ length: HOUR_COUNT }, (_, i) => START_HOUR + i);
   const dayEvents = eventsForDay(events, day);
   const inRange = dayInRange(day);
+  const selectable = inRange && !readOnly;
 
   return (
     <div className="overflow-x-auto">
@@ -73,7 +76,11 @@ export function ScheduleDayView({
             {format(day, "EEEE, MMMM d, yyyy", { locale: dateLoc })}
           </p>
           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            {inRange ? t("scheduleCalendar.dayViewClickHint") : t("scheduleCalendar.dayOutsideWindow")}
+            {selectable
+              ? t("scheduleCalendar.dayViewClickHint")
+              : inRange && readOnly
+                ? t("scheduleCalendar.readOnlyCell")
+                : t("scheduleCalendar.dayOutsideWindow")}
           </p>
         </div>
         <div className="relative rounded-xl border-2 border-gray-300 bg-white dark:border-gray-600 dark:bg-gray-900/40">
@@ -91,12 +98,14 @@ export function ScheduleDayView({
                 </div>
                 <button
                   type="button"
-                  disabled={!inRange}
+                  disabled={!selectable}
                   onClick={() => onSelectHour(day, h)}
                   className={`box-border border-b border-gray-300 text-left transition-colors dark:border-gray-600 ${
-                    inRange
+                    selectable
                       ? "cursor-pointer bg-white hover:bg-brand-50/50 dark:bg-gray-900/40 dark:hover:bg-brand-950/20"
-                      : "cursor-not-allowed border-dashed border-gray-400 bg-gray-200/90 opacity-100 dark:border-gray-500 dark:bg-gray-800/90"
+                      : inRange && readOnly
+                        ? "cursor-not-allowed bg-brand-50/20 dark:bg-brand-950/10"
+                        : "cursor-not-allowed border-dashed border-gray-400 bg-gray-200/90 opacity-100 dark:border-gray-500 dark:bg-gray-800/90"
                   }`}
                   style={{ height: PX_PER_HOUR, minHeight: PX_PER_HOUR }}
                 />
@@ -117,17 +126,23 @@ export function ScheduleDayView({
                   end.getHours() === 0 && end > start ? new Date(end.getTime() - 60_000) : end;
                 return (
                   <div
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => onEventClick(e)}
+                    role={readOnly ? undefined : "button"}
+                    tabIndex={readOnly ? undefined : 0}
+                    onClick={() => {
+                      if (readOnly) return;
+                      onEventClick(e);
+                    }}
                     onKeyDown={(ev) => {
+                      if (readOnly) return;
                       if (ev.key === "Enter" || ev.key === " ") {
                         ev.preventDefault();
                         onEventClick(e);
                       }
                     }}
                     key={e.id}
-                    className={`pointer-events-auto absolute left-2 right-3 overflow-hidden rounded-lg border px-2 py-1.5 shadow-sm sm:left-3 sm:right-4 cursor-pointer ${eventDisplayClasses(e.type, e.pending)}`}
+                    className={`pointer-events-auto absolute left-2 right-3 overflow-hidden rounded-lg border px-2 py-1.5 shadow-sm sm:left-3 sm:right-4 ${
+                      readOnly ? "cursor-default" : "cursor-pointer"
+                    } ${eventDisplayClasses(e.type, e.pending)}`}
                     style={{
                       top: `${layout.topPct}%`,
                       height: `${layout.heightPct}%`,

@@ -336,6 +336,7 @@ const bn = {
     patient: "রোগী",
     caregiverCategory: "কেয়ারগিভার ক্যাটাগরি",
     location: "লোকেশন",
+    supervisor: "সুপারভাইজার",
     amount: "অ্যামাউন্ট",
     timeRange: "সময়ের পরিসর",
     requestedWindow: "চাওয়া সময়সীমা",
@@ -385,6 +386,9 @@ const bn = {
     ariaNext: "পরবর্তী",
     clickHourHint:
       "শিডিউল করতে যেকোনো ঘণ্টায় ক্লিক করুন (কমপক্ষে ১ ঘণ্টা, পূর্ণ ঘণ্টা)।",
+    readOnlyHint:
+      "এই সার্ভিস রিকোয়েস্ট {{status}} হওয়ায় শিডিউলিং লক করা আছে।",
+    readOnlyCell: "এই সার্ভিস রিকোয়েস্টের স্ট্যাটাসের জন্য শিডিউলিং উপলব্ধ নয়।",
     dayViewClickHint: "ভিজিট যোগ করতে একটি ঘণ্টার সারিতে ক্লিক করুন (কমপক্ষে ১ ঘণ্টা)।",
     dayOutsideWindow: "এই দিনটি সার্ভিস রিকোয়েস্টের সময়সীমার বাইরে।",
     scheduleVisit: "ভিজিট শিডিউল",
@@ -486,6 +490,10 @@ const bn = {
     eventLogsLoading: "টাইমলাইন লোড হচ্ছে…",
     eventLogsLoadError: "এই রিকোয়েস্টের টাইমলাইন লোড করা যায়নি।",
     eventLogsEmpty: "এই রিকোয়েস্টের জন্য এখনও কোনো টাইমলাইন ইভেন্ট নেই।",
+    eventLogsEmptyRejected:
+      "এই সার্ভিস রিকোয়েস্ট প্রত্যাখ্যাত হওয়ায় কোনো লাইফসাইকেল পাওয়া যায়নি।",
+    eventLogsEmptyTerminal:
+      "এই সার্ভিস রিকোয়েস্ট {{state}} অবস্থায় শেষ হওয়ায় কোনো লাইফসাইকেল পাওয়া যায়নি।",
     eventLogUntitled: "ইভেন্ট",
     eventLogNoDetail: "আর কোনো বিস্তারিত নেই।",
     lifecycle: {

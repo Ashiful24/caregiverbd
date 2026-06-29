@@ -34,12 +34,14 @@ import {
   type ProviderListItem,
 } from "../../services/api";
 import { buildEventsFromScheduleDetails } from "../../utils/longTermScheduleEvents";
+import { formatStatusLabel } from "../../utils/format";
 import { useAuth } from "../../context/AuthContext";
 import { useUnsavedDraftNavigationGuard } from "../../hooks/useUnsavedDraftNavigationGuard";
 import { ConfirmModal } from "../ui/confirm-modal";
 import { ScheduleMonthView } from "./ScheduleMonthView";
 import { ScheduleWeekView } from "./ScheduleWeekView";
 import { ScheduleDayView } from "./ScheduleDayView";
+import { isScheduleCalendarReadOnly } from "./scheduleReadOnly";
 
 export type ScheduleViewMode = "month" | "week" | "day";
 
@@ -98,6 +100,7 @@ type Props = {
   supervisorName?: string | null;
   defaultShiftDurationHours?: number | null;
   defaultPreferredStartTime?: string | null;
+  requestStatus?: string | null;
   initialEvents?: ScheduleEventRecord[];
   /** After create, parent can persist schedule-details payload (request row + initialEvents). */
   onScheduleDetailsSynced?: (scheduleDetailsPayload: unknown) => void;
@@ -186,6 +189,7 @@ export function ScheduleCalendar({
   supervisorName,
   defaultShiftDurationHours,
   defaultPreferredStartTime,
+  requestStatus,
   initialEvents = [],
   onScheduleDetailsSynced,
 }: Props) {
@@ -320,12 +324,19 @@ export function ScheduleCalendar({
     return null;
   };
 
+  const scheduleReadOnly = isScheduleCalendarReadOnly(requestStatus);
+
   const dayInRange = useCallback(
     (day: Date) => {
       const d = startOfDay(day);
       return !isBefore(d, startOfDay(requestStart)) && !isAfter(d, startOfDay(requestEnd));
     },
     [requestStart, requestEnd]
+  );
+
+  const daySelectable = useCallback(
+    (day: Date) => dayInRange(day) && !scheduleReadOnly,
+    [dayInRange, scheduleReadOnly]
   );
 
   const computedRange = useMemo(() => {
@@ -544,6 +555,7 @@ export function ScheduleCalendar({
   };
 
   const handleOpenRemove = (event: ScheduleEventRecord) => {
+    if (scheduleReadOnly) return;
     setRemoveTarget(event);
     setRemoveReason("");
     setRemoveError(null);
@@ -621,7 +633,7 @@ export function ScheduleCalendar({
   };
 
   const openModalFromHour = (day: Date, _hour24: number) => {
-    if (!dayInRange(day)) return;
+    if (!daySelectable(day)) return;
     const shift = resolveDefaultShiftHours(defaultShiftDurationHours);
     const start = addHours(startOfDay(day), defaultStartHour);
     setFormError(null);
@@ -643,7 +655,7 @@ export function ScheduleCalendar({
   };
 
   const openModalFromDay = (day: Date) => {
-    if (!dayInRange(day)) return;
+    if (!daySelectable(day)) return;
     const shift = resolveDefaultShiftHours(defaultShiftDurationHours);
     const start = addHours(startOfDay(day), defaultStartHour);
     setFormError(null);
@@ -898,7 +910,13 @@ export function ScheduleCalendar({
       <div className="rounded-xl border-2 border-gray-300 bg-white pt-3 shadow-sm dark:border-gray-600 dark:bg-gray-900/30 sm:pt-4">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-gray-300 pb-3 dark:border-gray-600">
           <p className="text-base font-semibold text-gray-900 dark:text-white">{rangeTitle}</p>
-          <p className="text-xs text-gray-500 dark:text-gray-400">{t("scheduleCalendar.clickHourHint")}</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            {scheduleReadOnly
+              ? t("scheduleCalendar.readOnlyHint", {
+                  status: formatStatusLabel(String(requestStatus ?? "")),
+                })
+              : t("scheduleCalendar.clickHourHint")}
+          </p>
         </div>
 
         {view === "month" && (
@@ -906,6 +924,7 @@ export function ScheduleCalendar({
             visibleMonth={visibleMonth}
             events={displayEvents}
             dayInRange={dayInRange}
+            readOnly={scheduleReadOnly}
             onSelectDay={openModalFromDay}
             onEventClick={handleOpenRemove}
           />
@@ -915,6 +934,7 @@ export function ScheduleCalendar({
             weekAnchor={anchor}
             events={displayEvents}
             dayInRange={dayInRange}
+            readOnly={scheduleReadOnly}
             onSelectHour={openModalFromHour}
             onEventClick={handleOpenRemove}
           />
@@ -924,6 +944,7 @@ export function ScheduleCalendar({
             day={anchor}
             events={displayEvents}
             dayInRange={dayInRange}
+            readOnly={scheduleReadOnly}
             onSelectHour={openModalFromHour}
             onEventClick={handleOpenRemove}
           />

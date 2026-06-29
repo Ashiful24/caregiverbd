@@ -336,6 +336,7 @@ const en = {
     patient: "Patient",
     caregiverCategory: "Caregiver category",
     location: "Location",
+    supervisor: "Supervisor",
     amount: "Amount",
     timeRange: "Time range",
     requestedWindow: "Requested window",
@@ -385,6 +386,9 @@ const en = {
     ariaNext: "Next",
     clickHourHint:
       "Click any hour to schedule (minimum 1 hour, full-hour times only)",
+    readOnlyHint:
+      "Scheduling is locked because this service request is {{status}}.",
+    readOnlyCell: "Scheduling is not available for this service request status.",
     dayViewClickHint: "Click an hour row to add a visit (minimum 1 hour).",
     dayOutsideWindow: "This day is outside the service request window.",
     scheduleVisit: "Schedule visit",
@@ -486,6 +490,10 @@ const en = {
     eventLogsLoading: "Loading timeline…",
     eventLogsLoadError: "Could not load the timeline for this request.",
     eventLogsEmpty: "No timeline events have been recorded for this request yet.",
+    eventLogsEmptyRejected:
+      "No lifecycle is available because this service request was rejected.",
+    eventLogsEmptyTerminal:
+      "No lifecycle is available because this service request ended as {{state}}.",
     eventLogUntitled: "Event",
     eventLogNoDetail: "No additional details.",
     lifecycle: {
