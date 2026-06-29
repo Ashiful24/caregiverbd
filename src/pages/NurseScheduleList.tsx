@@ -524,6 +524,12 @@ export default function NurseScheduleList() {
                         <dd className="text-gray-800 dark:text-gray-200">{formatCaregiverCategory(request)}</dd>
                       </div>
                       <div className="flex justify-between gap-2">
+                        <dt className="text-gray-500 dark:text-gray-400">{t("schedule.supervisor")}</dt>
+                        <dd className="text-gray-800 dark:text-gray-200">
+                          {request.supervisorName?.trim() || "—"}
+                        </dd>
+                      </div>
+                      <div className="flex justify-between gap-2">
                         <dt className="text-gray-500 dark:text-gray-400">{t("schedule.amount")}</dt>
                         <dd className="text-gray-800 dark:text-gray-200">{formatAmount(request)}</dd>
                       </div>
@@ -567,6 +573,12 @@ export default function NurseScheduleList() {
                         className="py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
                       >
                         {t("schedule.location")}
+                      </TableCell>
+                      <TableCell
+                        isHeader
+                        className="py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
+                      >
+                        {t("schedule.supervisor")}
                       </TableCell>
                       <TableCell
                         isHeader
@@ -625,6 +637,9 @@ export default function NurseScheduleList() {
                         </TableCell>
                         <TableCell className="py-3 text-theme-sm text-gray-600 dark:text-gray-400">
                           {request.location?.trim() || "—"}
+                        </TableCell>
+                        <TableCell className="py-3 text-theme-sm text-gray-600 dark:text-gray-400">
+                          {request.supervisorName?.trim() || "—"}
                         </TableCell>
                         <TableCell className="py-3 text-theme-sm leading-snug text-gray-600 dark:text-gray-400">
                           {request.status?.trim() ? formatStatusLabel(request.status) : "—"}

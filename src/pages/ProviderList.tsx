@@ -79,7 +79,8 @@ function providerStatusBadgeColor(status: string): "success" | "warning" | "erro
 }
 
 export default function ProviderList() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const apiLang: "en" | "bn" = i18n.resolvedLanguage === "bn" ? "bn" : "en";
   const { user } = useAuth();
   const currentRole = String(user?.role ?? "").toUpperCase();
   const supervisorId =
@@ -118,13 +119,13 @@ export default function ProviderList() {
   /** Dropdown options from GET /consultation-types. Backend GET /admin/providers accepts consultationTypeId (single ID) and includes type + descendants. */
   const fetchConsultationTypes = useCallback(async () => {
     try {
-      const response = await consultationTypesApi.getAll();
+      const response = await consultationTypesApi.getAll({ lang: apiLang });
       const data = response.data as ConsultationType[] | ConsultationType | null | undefined;
       setConsultationTypes(normalizeTree(data));
     } catch {
       setConsultationTypes([]);
     }
-  }, []);
+  }, [apiLang]);
 
   useEffect(() => {
     fetchConsultationTypes();
@@ -133,14 +134,14 @@ export default function ProviderList() {
   /** Dropdown options from GET /admin/verification-document-types. */
   const fetchDocumentTypes = useCallback(async () => {
     try {
-      const response = await verificationDocumentTypesApi.list({ activeOnly: true });
+      const response = await verificationDocumentTypesApi.list({ activeOnly: true, lang: apiLang });
       const data = response?.data;
       const list = Array.isArray(data) ? data : Array.isArray(response) ? response : [];
       setDocumentTypes(list);
     } catch {
       setDocumentTypes([]);
     }
-  }, []);
+  }, [apiLang]);
 
   useEffect(() => {
     fetchDocumentTypes();

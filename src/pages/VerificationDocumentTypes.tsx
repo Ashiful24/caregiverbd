@@ -16,8 +16,83 @@ import { PencilIcon, PlusIcon } from "../icons";
 const inputClass =
   "h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30";
 
-export default function VerificationDocumentTypes() {
+function BilingualLabelFields({
+  idPrefix,
+  label,
+  setLabel,
+  labelBn,
+  setLabelBn,
+  banglaRequired,
+  onClearError,
+}: {
+  idPrefix: string;
+  label: string;
+  setLabel: (v: string) => void;
+  labelBn: string;
+  setLabelBn: (v: string) => void;
+  banglaRequired: boolean;
+  onClearError?: () => void;
+}) {
   const { t } = useTranslation();
+  return (
+    <>
+      <p className="text-sm text-gray-500 dark:text-gray-400">
+        {banglaRequired
+          ? t("verificationDocumentTypes.formIntroBn")
+          : t("verificationDocumentTypes.formIntroEn")}
+      </p>
+      <p className="text-xs font-semibold uppercase tracking-wide text-brand-600 dark:text-brand-400">
+        {t("verificationDocumentTypes.sectionEnglish")}
+      </p>
+      <label className="block">
+        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+          {t("verificationDocumentTypes.labelEn")}
+        </span>
+        <input
+          id={`${idPrefix}-label-en`}
+          type="text"
+          value={label}
+          onChange={(e) => {
+            setLabel(e.target.value);
+            onClearError?.();
+          }}
+          className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+          placeholder={t("verificationDocumentTypes.labelPlaceholder")}
+        />
+      </label>
+      <p className="text-xs font-semibold uppercase tracking-wide text-brand-600 dark:text-brand-400">
+        {t("verificationDocumentTypes.sectionBangla")}
+      </p>
+      <label className="block">
+        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+          {t("verificationDocumentTypes.labelBn")}
+          {!banglaRequired && (
+            <span className="ml-1 font-normal text-gray-400 dark:text-gray-500">
+              ({t("verificationDocumentTypes.optional")})
+            </span>
+          )}
+        </span>
+        <input
+          id={`${idPrefix}-label-bn`}
+          type="text"
+          value={labelBn}
+          onChange={(e) => {
+            setLabelBn(e.target.value);
+            onClearError?.();
+          }}
+          className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+          placeholder={t("verificationDocumentTypes.labelBnPlaceholder")}
+          dir="auto"
+        />
+      </label>
+    </>
+  );
+}
+
+export default function VerificationDocumentTypes() {
+  const { t, i18n } = useTranslation();
+  const apiLang: "en" | "bn" = i18n.resolvedLanguage === "bn" ? "bn" : "en";
+  const banglaRequired = apiLang === "bn";
   const [list, setList] = useState<VerificationDocumentTypeItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -25,8 +100,10 @@ export default function VerificationDocumentTypes() {
   const [editModal, setEditModal] = useState<VerificationDocumentTypeItem | null>(null);
   const [code, setCode] = useState("");
   const [label, setLabel] = useState("");
+  const [labelBn, setLabelBn] = useState("");
   const [displayOrder, setDisplayOrder] = useState(0);
   const [submitting, setSubmitting] = useState(false);
+  const [formLoading, setFormLoading] = useState(false);
   const [editModalError, setEditModalError] = useState<string | null>(null);
   const [togglingId, setTogglingId] = useState<number | null>(null);
 
@@ -34,7 +111,7 @@ export default function VerificationDocumentTypes() {
     setLoading(true);
     setError("");
     try {
-      const res = await verificationDocumentTypesApi.list();
+      const res = await verificationDocumentTypesApi.list({ lang: apiLang });
       const data = res?.data ?? res;
       setList(Array.isArray(data) ? data : []);
     } catch (err: unknown) {
@@ -47,26 +124,55 @@ export default function VerificationDocumentTypes() {
     } finally {
       setLoading(false);
     }
-  }, [t]);
+  }, [t, apiLang]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
+  const loadFormForEdit = useCallback(async (id: number) => {
+    setFormLoading(true);
+    try {
+      const [enRes, bnRes] = await Promise.all([
+        verificationDocumentTypesApi.list({ lang: "en" }),
+        verificationDocumentTypesApi.list({ lang: "bn" }),
+      ]);
+      const enList = Array.isArray(enRes?.data) ? enRes.data : Array.isArray(enRes) ? enRes : [];
+      const bnList = Array.isArray(bnRes?.data) ? bnRes.data : Array.isArray(bnRes) ? bnRes : [];
+      const en = (enList as VerificationDocumentTypeItem[]).find((i) => i.id === id);
+      const bn = (bnList as VerificationDocumentTypeItem[]).find((i) => i.id === id);
+      setLabel(en?.label ?? "");
+      setLabelBn(bn?.labelBn ?? bn?.label ?? "");
+    } catch {
+      setLabel("");
+      setLabelBn("");
+    } finally {
+      setFormLoading(false);
+    }
+  }, []);
+
+  const resetForm = () => {
+    setCode("");
+    setLabel("");
+    setLabelBn("");
+    setDisplayOrder(list.length);
+  };
+
+  const formInvalid = !label.trim() || (banglaRequired && !labelBn.trim());
+
   const handleAdd = async () => {
-    if (!code.trim() || !label.trim()) return;
+    if (!code.trim() || formInvalid) return;
     setSubmitting(true);
     try {
       await verificationDocumentTypesApi.create({
         code: code.trim().toUpperCase().replace(/\s+/g, "_"),
         label: label.trim(),
+        labelBn: labelBn.trim() || undefined,
         isActive: true,
         displayOrder: displayOrder,
       });
       setAddModal(false);
-      setCode("");
-      setLabel("");
-      setDisplayOrder(list.length);
+      resetForm();
       await fetchData();
     } catch (err: unknown) {
       const msg =
@@ -84,17 +190,20 @@ export default function VerificationDocumentTypes() {
     setEditModal(null);
     setEditModalError(null);
     setLabel("");
+    setLabelBn("");
     setDisplayOrder(0);
+    setFormLoading(false);
   };
 
   const handleUpdate = async (e: FormEvent) => {
     e.preventDefault();
-    if (!editModal) return;
+    if (!editModal || formInvalid) return;
     setSubmitting(true);
     setEditModalError(null);
     try {
       await verificationDocumentTypesApi.update(editModal.id, {
         label: label.trim(),
+        labelBn: labelBn.trim() || undefined,
         displayOrder,
       });
       handleCloseEditModal();
@@ -126,7 +235,9 @@ export default function VerificationDocumentTypes() {
     setEditModalError(null);
     setEditModal(item);
     setLabel(item.label);
+    setLabelBn("");
     setDisplayOrder(item.displayOrder);
+    void loadFormForEdit(item.id);
   };
 
   return (
@@ -153,9 +264,7 @@ export default function VerificationDocumentTypes() {
               startIcon={<PlusIcon className="h-4 w-4" />}
               onClick={() => {
                 setAddModal(true);
-                setCode("");
-                setLabel("");
-                setDisplayOrder(list.length);
+                resetForm();
               }}
               disabled={loading}
               className="w-full rounded-xl shadow-sm transition-all duration-200 hover:shadow-md sm:w-auto"
@@ -197,7 +306,7 @@ export default function VerificationDocumentTypes() {
                       <td className="py-3 font-medium text-gray-800 dark:text-white/90">
                         {item.code}
                       </td>
-                      <td className="py-3 text-gray-700 dark:text-gray-300">
+                      <td className="py-3 text-gray-700 dark:text-gray-300" dir="auto">
                         {item.label}
                       </td>
                       <td className="py-3 text-gray-600 dark:text-gray-400">
@@ -254,6 +363,7 @@ export default function VerificationDocumentTypes() {
           isOpen={true}
           onClose={() => !submitting && setAddModal(false)}
           title={t("verificationDocumentTypes.addModalTitle")}
+          className="w-full max-w-lg"
         >
           <div className="space-y-3">
             <label className="block">
@@ -266,16 +376,14 @@ export default function VerificationDocumentTypes() {
                 placeholder={t("verificationDocumentTypes.codePlaceholder")}
               />
             </label>
-            <label className="block">
-              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("verificationDocumentTypes.label")}</span>
-              <input
-                type="text"
-                value={label}
-                onChange={(e) => setLabel(e.target.value)}
-                className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
-                placeholder={t("verificationDocumentTypes.labelPlaceholder")}
-              />
-            </label>
+            <BilingualLabelFields
+              idPrefix="add"
+              label={label}
+              setLabel={setLabel}
+              labelBn={labelBn}
+              setLabelBn={setLabelBn}
+              banglaRequired={banglaRequired}
+            />
             <label className="block">
               <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("verificationDocumentTypes.displayOrder")}</span>
               <input
@@ -296,7 +404,7 @@ export default function VerificationDocumentTypes() {
               </button>
               <button
                 type="button"
-                disabled={submitting || !code.trim() || !label.trim()}
+                disabled={submitting || !code.trim() || formInvalid}
                 onClick={handleAdd}
                 className="rounded bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
               >
@@ -323,56 +431,55 @@ export default function VerificationDocumentTypes() {
 
             <form onSubmit={handleUpdate} className="flex min-h-0 flex-1 flex-col">
               <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-6 py-4">
-                <div className="grid gap-4">
-                  <div>
-                    <Label htmlFor="vdt-edit-code">{t("verificationDocumentTypes.code")}</Label>
-                    <input
-                      id="vdt-edit-code"
-                      type="text"
-                      value={editModal.code}
-                      readOnly
-                      tabIndex={-1}
-                      className={`${inputClass} cursor-not-allowed opacity-80`}
-                      aria-describedby="vdt-edit-code-hint"
-                    />
-                    <p
-                      id="vdt-edit-code-hint"
-                      className="mt-1.5 text-xs text-gray-500 dark:text-gray-400"
-                    >
-                      {t("verificationDocumentTypes.codeReadonly", { code: editModal.code })}
-                    </p>
+                {formLoading ? (
+                  <div className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+                    {t("verificationDocumentTypes.loadingForm")}
                   </div>
-                  <div>
-                    <Label htmlFor="vdt-edit-label">{t("verificationDocumentTypes.label")}</Label>
-                    <input
-                      id="vdt-edit-label"
-                      type="text"
-                      value={label}
-                      onChange={(e) => {
-                        setLabel(e.target.value);
-                        setEditModalError(null);
-                      }}
-                      className={inputClass}
-                      placeholder={t("verificationDocumentTypes.labelPlaceholder")}
-                      autoComplete="off"
-                      required
+                ) : (
+                  <div className="grid gap-4">
+                    <div>
+                      <Label htmlFor="vdt-edit-code">{t("verificationDocumentTypes.code")}</Label>
+                      <input
+                        id="vdt-edit-code"
+                        type="text"
+                        value={editModal.code}
+                        readOnly
+                        tabIndex={-1}
+                        className={`${inputClass} cursor-not-allowed opacity-80`}
+                        aria-describedby="vdt-edit-code-hint"
+                      />
+                      <p
+                        id="vdt-edit-code-hint"
+                        className="mt-1.5 text-xs text-gray-500 dark:text-gray-400"
+                      >
+                        {t("verificationDocumentTypes.codeReadonly", { code: editModal.code })}
+                      </p>
+                    </div>
+                    <BilingualLabelFields
+                      idPrefix="edit"
+                      label={label}
+                      setLabel={setLabel}
+                      labelBn={labelBn}
+                      setLabelBn={setLabelBn}
+                      banglaRequired={banglaRequired}
+                      onClearError={() => setEditModalError(null)}
                     />
+                    <div>
+                      <Label htmlFor="vdt-edit-order">{t("verificationDocumentTypes.displayOrder")}</Label>
+                      <input
+                        id="vdt-edit-order"
+                        type="number"
+                        min={0}
+                        value={displayOrder}
+                        onChange={(e) => {
+                          setDisplayOrder(parseInt(e.target.value, 10) || 0);
+                          setEditModalError(null);
+                        }}
+                        className={inputClass}
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <Label htmlFor="vdt-edit-order">{t("verificationDocumentTypes.displayOrder")}</Label>
-                    <input
-                      id="vdt-edit-order"
-                      type="number"
-                      min={0}
-                      value={displayOrder}
-                      onChange={(e) => {
-                        setDisplayOrder(parseInt(e.target.value, 10) || 0);
-                        setEditModalError(null);
-                      }}
-                      className={inputClass}
-                    />
-                  </div>
-                </div>
+                )}
 
                 {editModalError ? (
                   <p className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
@@ -393,7 +500,7 @@ export default function VerificationDocumentTypes() {
                   </button>
                   <button
                     type="submit"
-                    disabled={submitting || !label.trim()}
+                    disabled={submitting || formInvalid || formLoading}
                     className="rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
                   >
                     {submitting ? t("supervisor.saving") : t("common.actions.saveChanges")}

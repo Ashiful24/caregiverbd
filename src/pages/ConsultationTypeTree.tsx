@@ -71,6 +71,130 @@ function ImagePickPreview({
   );
 }
 
+/** Find a node by id in the tree. */
+function findNodeInTree(roots: ConsultationType[], id: number): ConsultationType | null {
+  for (const node of roots) {
+    if (node.id === id) return node;
+    if (Array.isArray(node.children) && node.children.length > 0) {
+      const found = findNodeInTree(node.children, id);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+function BilingualTypeFields({
+  idPrefix,
+  formName,
+  setFormName,
+  formNameBn,
+  setFormNameBn,
+  formDescription,
+  setFormDescription,
+  formDescriptionBn,
+  setFormDescriptionBn,
+  banglaRequired,
+  namePlaceholderEn,
+  formError,
+  onClearError,
+}: {
+  idPrefix: string;
+  formName: string;
+  setFormName: (v: string) => void;
+  formNameBn: string;
+  setFormNameBn: (v: string) => void;
+  formDescription: string;
+  setFormDescription: (v: string) => void;
+  formDescriptionBn: string;
+  setFormDescriptionBn: (v: string) => void;
+  banglaRequired: boolean;
+  namePlaceholderEn: string;
+  formError?: string;
+  onClearError?: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <p className="text-xs text-gray-500 dark:text-gray-400">
+        {banglaRequired
+          ? t("consultationTypesTree.formIntroBn")
+          : t("consultationTypesTree.formIntroEn")}
+      </p>
+      <p className="text-xs font-semibold uppercase tracking-wide text-brand-600 dark:text-brand-400">
+        {t("consultationTypesTree.sectionEnglish")}
+      </p>
+      <div>
+        <Label htmlFor={`${idPrefix}-name-en`}>{t("consultationTypesTree.nameEn")}</Label>
+        <Input
+          id={`${idPrefix}-name-en`}
+          value={formName}
+          onChange={(e) => {
+            setFormName(e.target.value);
+            onClearError?.();
+          }}
+          placeholder={namePlaceholderEn}
+          error={!!formError}
+          hint={formError}
+        />
+      </div>
+      <div>
+        <Label htmlFor={`${idPrefix}-desc-en`}>{t("consultationTypesTree.descriptionEn")}</Label>
+        <TextArea
+          id={`${idPrefix}-desc-en`}
+          rows={2}
+          value={formDescription}
+          onChange={(value) => {
+            setFormDescription(value);
+            onClearError?.();
+          }}
+          placeholder={t("consultationTypesTree.shortDescriptionPlaceholder")}
+        />
+      </div>
+      <p className="text-xs font-semibold uppercase tracking-wide text-brand-600 dark:text-brand-400">
+        {t("consultationTypesTree.sectionBangla")}
+      </p>
+      <div>
+        <Label htmlFor={`${idPrefix}-name-bn`}>
+          {t("consultationTypesTree.nameBn")}
+          {!banglaRequired && (
+            <span className="ml-1 font-normal text-gray-400 dark:text-gray-500">
+              ({t("consultationTypesTree.optional")})
+            </span>
+          )}
+        </Label>
+        <Input
+          id={`${idPrefix}-name-bn`}
+          value={formNameBn}
+          onChange={(e) => {
+            setFormNameBn(e.target.value);
+            onClearError?.();
+          }}
+          placeholder={t("consultationTypesTree.nameBnPlaceholder")}
+          dir="auto"
+        />
+      </div>
+      <div>
+        <Label htmlFor={`${idPrefix}-desc-bn`}>
+          {t("consultationTypesTree.descriptionBn")}
+          <span className="ml-1 font-normal text-gray-400 dark:text-gray-500">
+            ({t("consultationTypesTree.optional")})
+          </span>
+        </Label>
+        <TextArea
+          id={`${idPrefix}-desc-bn`}
+          rows={2}
+          value={formDescriptionBn}
+          onChange={(value) => {
+            setFormDescriptionBn(value);
+            onClearError?.();
+          }}
+          placeholder={t("consultationTypesTree.descriptionBnPlaceholder")}
+        />
+      </div>
+    </>
+  );
+}
+
 /** Normalize API response to array of root nodes */
 function normalizeTree(
   data: ConsultationType[] | ConsultationType | null | undefined
@@ -235,7 +359,7 @@ function TreeRow({
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="font-semibold text-gray-900 dark:text-white">
+            <span className="font-semibold text-gray-900 dark:text-white" dir="auto">
               {node.name}
             </span>
             {node.code && (
@@ -253,7 +377,7 @@ function TreeRow({
             </span>
           </div>
           {node.description && (
-            <p className="mt-0.5 truncate text-sm text-gray-500 dark:text-gray-400">
+            <p className="mt-0.5 truncate text-sm text-gray-500 dark:text-gray-400" dir="auto">
               {node.description}
             </p>
           )}
@@ -343,7 +467,9 @@ function TreeSkeleton() {
 }
 
 export default function ConsultationTypeTree() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const apiLang: "en" | "bn" = i18n.resolvedLanguage === "bn" ? "bn" : "en";
+  const banglaRequired = apiLang === "bn";
   const [tree, setTree] = useState<ConsultationType[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -352,7 +478,10 @@ export default function ConsultationTypeTree() {
   const [modalMode, setModalMode] = useState<ModalMode>(null);
   const [selectedNode, setSelectedNode] = useState<ConsultationType | null>(null);
   const [formName, setFormName] = useState("");
+  const [formNameBn, setFormNameBn] = useState("");
   const [formDescription, setFormDescription] = useState("");
+  const [formDescriptionBn, setFormDescriptionBn] = useState("");
+  const [formLoading, setFormLoading] = useState(false);
   const [formCode, setFormCode] = useState("");
   const [formEmploymentType, setFormEmploymentType] = useState("");
   const [formParentId, setFormParentId] = useState<number | null>(null);
@@ -379,7 +508,7 @@ export default function ConsultationTypeTree() {
     }
     let aborted = false;
     try {
-      const response = await consultationTypesApi.getAll();
+      const response = await consultationTypesApi.getAll({ lang: apiLang });
       const data = response.data as ConsultationType[] | ConsultationType | null | undefined;
       setTree(normalizeTree(data));
     } catch (err: unknown) {
@@ -396,7 +525,7 @@ export default function ConsultationTypeTree() {
     } finally {
       if (!aborted && !silent) setLoading(false);
     }
-  }, [t]);
+  }, [t, apiLang]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -443,10 +572,41 @@ export default function ConsultationTypeTree() {
 
   const collapseAll = () => setExpandedIds(new Set());
 
+  const loadFormForEdit = useCallback(async (node: ConsultationType) => {
+    setFormLoading(true);
+    try {
+      const [enRes, bnRes] = await Promise.all([
+        consultationTypesApi.getAll({ lang: "en" }),
+        consultationTypesApi.getAll({ lang: "bn" }),
+      ]);
+      const en = findNodeInTree(
+        normalizeTree(enRes.data as ConsultationType[] | ConsultationType | null | undefined),
+        node.id
+      );
+      const bn = findNodeInTree(
+        normalizeTree(bnRes.data as ConsultationType[] | ConsultationType | null | undefined),
+        node.id
+      );
+      setFormName(en?.name ?? node.name);
+      setFormDescription(en?.description ?? "");
+      setFormNameBn(bn?.name ?? "");
+      setFormDescriptionBn(bn?.description ?? "");
+    } catch {
+      setFormName(node.name);
+      setFormDescription(node.description ?? "");
+      setFormNameBn("");
+      setFormDescriptionBn("");
+    } finally {
+      setFormLoading(false);
+    }
+  }, []);
+
   const openEdit = (node: ConsultationType) => {
     setSelectedNode(node);
     setFormName(node.name);
     setFormDescription(node.description ?? "");
+    setFormNameBn("");
+    setFormDescriptionBn("");
     setFormCode(node.code ?? "");
     setFormEmploymentType(node.employmentType ?? "");
     setFormParentId(node.parentId ?? null);
@@ -459,12 +619,15 @@ export default function ConsultationTypeTree() {
     setImageFieldKey((k) => k + 1);
     setFormError("");
     setModalMode("edit");
+    void loadFormForEdit(node);
   };
 
   const openAddChild = (node: ConsultationType) => {
     setSelectedNode(node);
     setFormName("");
+    setFormNameBn("");
     setFormDescription("");
+    setFormDescriptionBn("");
     setFormCode("");
     setFormEmploymentType("INDEPENDENT");
     setFormCommissionPercent("0");
@@ -477,7 +640,9 @@ export default function ConsultationTypeTree() {
   const openAddRoot = () => {
     setSelectedNode(null);
     setFormName("");
+    setFormNameBn("");
     setFormDescription("");
+    setFormDescriptionBn("");
     setFormCode("");
     setFormEmploymentType("INDEPENDENT");
     setFormCommissionPercent("0");
@@ -491,7 +656,10 @@ export default function ConsultationTypeTree() {
     setModalMode(null);
     setSelectedNode(null);
     setFormName("");
+    setFormNameBn("");
     setFormDescription("");
+    setFormDescriptionBn("");
+    setFormLoading(false);
     setFormCode("");
     setFormEmploymentType("");
     setFormParentId(null);
@@ -511,7 +679,12 @@ export default function ConsultationTypeTree() {
   const handleSubmitEdit = async () => {
     if (!selectedNode) return;
     const name = formName.trim();
+    const nameBn = formNameBn.trim();
     if (!name) {
+      setFormError(t("consultationTypesTree.nameRequired"));
+      return;
+    }
+    if (banglaRequired && !nameBn) {
       setFormError(t("consultationTypesTree.nameRequired"));
       return;
     }
@@ -544,7 +717,9 @@ export default function ConsultationTypeTree() {
       }
       const payload: UpdateConsultationTypeRequest = {
         name,
+        nameBn: nameBn || undefined,
         description: formDescription.trim() || undefined,
+        descriptionBn: formDescriptionBn.trim() || undefined,
         code: formCode.trim() || undefined,
         employmentType: formEmploymentType.trim() || undefined,
         parentId: formParentId ?? undefined,
@@ -568,7 +743,12 @@ export default function ConsultationTypeTree() {
   const handleSubmitAddChild = async () => {
     if (!selectedNode) return;
     const name = formName.trim();
+    const nameBn = formNameBn.trim();
     if (!name) {
+      setFormError(t("consultationTypesTree.nameRequired"));
+      return;
+    }
+    if (banglaRequired && !nameBn) {
       setFormError(t("consultationTypesTree.nameRequired"));
       return;
     }
@@ -601,7 +781,9 @@ export default function ConsultationTypeTree() {
       }
       const payload: CreateConsultationTypeRequest = {
         name,
+        nameBn: nameBn || undefined,
         description: formDescription.trim() || undefined,
+        descriptionBn: formDescriptionBn.trim() || undefined,
         code: formCode.trim() || undefined,
         employmentType: formEmploymentType.trim() || undefined,
         parentId: selectedNode.id,
@@ -625,7 +807,12 @@ export default function ConsultationTypeTree() {
 
   const handleSubmitAddRoot = async () => {
     const name = formName.trim();
+    const nameBn = formNameBn.trim();
     if (!name) {
+      setFormError(t("consultationTypesTree.nameRequired"));
+      return;
+    }
+    if (banglaRequired && !nameBn) {
       setFormError(t("consultationTypesTree.nameRequired"));
       return;
     }
@@ -658,7 +845,9 @@ export default function ConsultationTypeTree() {
       }
       const payload: CreateConsultationTypeRequest = {
         name,
+        nameBn: nameBn || undefined,
         description: formDescription.trim() || undefined,
+        descriptionBn: formDescriptionBn.trim() || undefined,
         code: formCode.trim() || undefined,
         employmentType: formEmploymentType.trim() || undefined,
         platformCommissionPercent: commission,
@@ -896,27 +1085,27 @@ export default function ConsultationTypeTree() {
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{t("consultationTypesTree.editType")}</h2>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">ID: {selectedNode?.id}</p>
         <div className="mt-5 space-y-4">
-          <div>
-            <Label htmlFor="edit-name">{t("consultationTypesTree.name")}</Label>
-            <Input
-              id="edit-name"
-              value={formName}
-              onChange={(e) => setFormName(e.target.value)}
-              placeholder={t("consultationTypesTree.typeNamePlaceholder")}
-              error={!!formError}
-              hint={formError}
+          {formLoading ? (
+            <div className="py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+              {t("consultationTypesTree.loadingForm")}
+            </div>
+          ) : (
+            <BilingualTypeFields
+              idPrefix="edit"
+              formName={formName}
+              setFormName={setFormName}
+              formNameBn={formNameBn}
+              setFormNameBn={setFormNameBn}
+              formDescription={formDescription}
+              setFormDescription={setFormDescription}
+              formDescriptionBn={formDescriptionBn}
+              setFormDescriptionBn={setFormDescriptionBn}
+              banglaRequired={banglaRequired}
+              namePlaceholderEn={t("consultationTypesTree.typeNamePlaceholder")}
+              formError={formError}
+              onClearError={() => setFormError("")}
             />
-          </div>
-          <div>
-            <Label htmlFor="edit-desc">{t("consultationTypesTree.descriptionOptional")}</Label>
-            <TextArea
-              id="edit-desc"
-              rows={2}
-              value={formDescription}
-              onChange={setFormDescription}
-              placeholder={t("consultationTypesTree.shortDescriptionPlaceholder")}
-            />
-          </div>
+          )}
           <div>
             <Label htmlFor="edit-code">{t("consultationTypesTree.codeOptional")}</Label>
             <Input
@@ -999,7 +1188,7 @@ export default function ConsultationTypeTree() {
           <Button variant="outline" onClick={closeModal} disabled={submitting}>
             Cancel
           </Button>
-          <Button onClick={handleSubmitEdit} disabled={submitting}>
+          <Button onClick={handleSubmitEdit} disabled={submitting || formLoading}>
             {submitting ? t("consultationTypesTree.saving") : t("consultationTypesTree.save")}
           </Button>
         </div>
@@ -1012,27 +1201,21 @@ export default function ConsultationTypeTree() {
           Parent: {selectedNode?.name} (#{selectedNode?.id})
         </p>
         <div className="mt-5 space-y-4">
-          <div>
-            <Label htmlFor="add-name">{t("consultationTypesTree.name")}</Label>
-            <Input
-              id="add-name"
-              value={formName}
-              onChange={(e) => setFormName(e.target.value)}
-              placeholder={t("consultationTypesTree.newTypeNamePlaceholder")}
-              error={!!formError}
-              hint={formError}
-            />
-          </div>
-          <div>
-            <Label htmlFor="add-desc">{t("consultationTypesTree.descriptionOptional")}</Label>
-            <TextArea
-              id="add-desc"
-              rows={2}
-              value={formDescription}
-              onChange={setFormDescription}
-              placeholder={t("consultationTypesTree.shortDescriptionPlaceholder")}
-            />
-          </div>
+          <BilingualTypeFields
+            idPrefix="add-child"
+            formName={formName}
+            setFormName={setFormName}
+            formNameBn={formNameBn}
+            setFormNameBn={setFormNameBn}
+            formDescription={formDescription}
+            setFormDescription={setFormDescription}
+            formDescriptionBn={formDescriptionBn}
+            setFormDescriptionBn={setFormDescriptionBn}
+            banglaRequired={banglaRequired}
+            namePlaceholderEn={t("consultationTypesTree.newTypeNamePlaceholder")}
+            formError={formError}
+            onClearError={() => setFormError("")}
+          />
           <div>
             <Label htmlFor="add-code">{t("consultationTypesTree.codeOptional")}</Label>
             <Input
@@ -1107,27 +1290,21 @@ export default function ConsultationTypeTree() {
           {t("consultationTypesTree.newTopLevelHelp")}
         </p>
         <div className="mt-5 space-y-4">
-          <div>
-            <Label htmlFor="root-name">{t("consultationTypesTree.name")}</Label>
-            <Input
-              id="root-name"
-              value={formName}
-              onChange={(e) => setFormName(e.target.value)}
-              placeholder={t("consultationTypesTree.typeNamePlaceholder")}
-              error={!!formError}
-              hint={formError}
-            />
-          </div>
-          <div>
-            <Label htmlFor="root-desc">{t("consultationTypesTree.descriptionOptional")}</Label>
-            <TextArea
-              id="root-desc"
-              rows={2}
-              value={formDescription}
-              onChange={setFormDescription}
-              placeholder={t("consultationTypesTree.shortDescriptionPlaceholder")}
-            />
-          </div>
+          <BilingualTypeFields
+            idPrefix="root"
+            formName={formName}
+            setFormName={setFormName}
+            formNameBn={formNameBn}
+            setFormNameBn={setFormNameBn}
+            formDescription={formDescription}
+            setFormDescription={setFormDescription}
+            formDescriptionBn={formDescriptionBn}
+            setFormDescriptionBn={setFormDescriptionBn}
+            banglaRequired={banglaRequired}
+            namePlaceholderEn={t("consultationTypesTree.typeNamePlaceholder")}
+            formError={formError}
+            onClearError={() => setFormError("")}
+          />
           <div>
             <Label htmlFor="root-code">{t("consultationTypesTree.codeOptional")}</Label>
             <Input
