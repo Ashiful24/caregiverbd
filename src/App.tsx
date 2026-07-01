@@ -15,6 +15,7 @@ import ConsultationTypeConfig from "./pages/ConsultationTypeConfig";
 import ServiceRequestList from "./pages/ServiceRequestList";
 import VerificationDocuments from "./pages/VerificationDocuments";
 import VerificationDocumentTypes from "./pages/VerificationDocumentTypes";
+import ServiceChecklistGroups from "./pages/ServiceChecklistGroups";
 import ConsultationTypeLevels from "./pages/ConsultationTypeLevels";
 import SystemConfig from "./pages/SystemConfig";
 import UpgradeRequests from "./pages/UpgradeRequests";
@@ -229,6 +230,14 @@ export default function App() {
             element={
               <ProtectedRoute allowedRoles={["ADMIN"]}>
                 <VerificationDocumentTypes />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/service-checklist-groups"
+            element={
+              <ProtectedRoute allowedRoles={["ADMIN"]}>
+                <ServiceChecklistGroups />
               </ProtectedRoute>
             }
           />

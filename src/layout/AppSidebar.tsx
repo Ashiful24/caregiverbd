@@ -92,6 +92,12 @@ const navSections: NavSection[] = [
         path: "/verification-document-types",
         allowedRoles: ["ADMIN"],
       },
+      {
+        icon: <TaskIcon />,
+        nameKey: "navigation.serviceChecklistGroups",
+        path: "/service-checklist-groups",
+        allowedRoles: ["ADMIN"],
+      },
       { icon: <BoltIcon />, nameKey: "navigation.systemConfig", path: "/system-config", allowedRoles: ["ADMIN"] },
     ],
   },

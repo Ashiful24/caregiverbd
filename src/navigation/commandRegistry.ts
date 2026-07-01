@@ -133,6 +133,14 @@ export const NAV_COMMANDS: NavCommand[] = [
     keywords: ["kyc", "documents"],
   },
   {
+    id: "service-checklist-groups",
+    path: "/service-checklist-groups",
+    titleKey: "navigation.serviceChecklistGroups",
+    group: "configuration",
+    allowedRoles: ["ADMIN"],
+    keywords: ["checklist", "service", "groups"],
+  },
+  {
     id: "verification-documents",
     path: "/verification-documents",
     titleKey: "navigation.verificationDocuments",

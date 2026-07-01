@@ -19,6 +19,7 @@ type Props = {
   visibleMonth: Date;
   events: ScheduleEventRecord[];
   dayInRange: (day: Date) => boolean;
+  readOnly?: boolean;
   onSelectDay: (day: Date) => void;
   onEventClick: (event: ScheduleEventRecord) => void;
 };
@@ -34,6 +35,7 @@ export function ScheduleMonthView({
   visibleMonth,
   events,
   dayInRange,
+  readOnly = false,
   onSelectDay,
   onEventClick,
 }: Props) {
@@ -78,7 +80,8 @@ export function ScheduleMonthView({
             const show = dayEvents.slice(0, 3);
             const more = dayEvents.length - show.length;
 
-            const selectable = dayInRange(day);
+            const inRange = dayInRange(day);
+            const selectable = inRange && !readOnly;
 
             return (
               <div
@@ -98,7 +101,9 @@ export function ScheduleMonthView({
                 } ${
                   selectable
                     ? "cursor-pointer hover:bg-brand-50/40 dark:hover:bg-brand-950/15"
-                    : "cursor-not-allowed border-dashed border-gray-400 bg-gray-200/80 opacity-100 dark:border-gray-500 dark:bg-gray-800/85"
+                    : inRange && readOnly
+                      ? "cursor-not-allowed bg-brand-50/20 dark:bg-brand-950/10"
+                      : "cursor-not-allowed border-dashed border-gray-400 bg-gray-200/80 opacity-100 dark:border-gray-500 dark:bg-gray-800/85"
                 }`}
               >
                 <div className="flex items-center justify-between gap-1">
@@ -118,13 +123,15 @@ export function ScheduleMonthView({
                   {show.map((e) => (
                     <div
                       key={e.id}
-                      role="button"
-                      tabIndex={0}
+                      role={readOnly ? undefined : "button"}
+                      tabIndex={readOnly ? undefined : 0}
                       onClick={(ev) => {
+                        if (readOnly) return;
                         ev.stopPropagation();
                         onEventClick(e);
                       }}
                       onKeyDown={(ev) => {
+                        if (readOnly) return;
                         if (ev.key === "Enter" || ev.key === " ") {
                           ev.preventDefault();
                           ev.stopPropagation();
@@ -132,7 +139,9 @@ export function ScheduleMonthView({
                         }
                       }}
                       title={`${e.title}${e.feeLabel ? ` | ${t("scheduleCalendar.feeLine", { amount: e.feeLabel })}` : ""} (${format(parseEventRange(e).start, "HH:mm")}–${format(parseEventRange(e).end, "HH:mm")})`}
-                      className={`rounded px-1.5 py-0.5 text-[10px] font-medium leading-tight sm:text-xs cursor-pointer ${eventDisplayClasses(e.type, e.pending)}`}
+                      className={`rounded px-1.5 py-0.5 text-[10px] font-medium leading-tight sm:text-xs ${
+                        readOnly ? "cursor-default" : "cursor-pointer"
+                      } ${eventDisplayClasses(e.type, e.pending)}`}
                     >
                       <div className="truncate">
                         <span className={`mr-1 inline-block size-1.5 rounded-full align-middle ${eventTypeDotClass(e.type)}`} />

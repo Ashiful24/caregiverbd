@@ -155,6 +155,8 @@ export interface ConsultationType {
   children?: ConsultationType[];
 }
 
+export type ConsultationTypeLang = "en" | "bn";
+
 export interface ProviderSearchRequest {
   latitude?: number;
   longitude?: number;
@@ -543,7 +545,9 @@ export const authApi = {
 /** Payload for creating a consultation type (admin). */
 export interface CreateConsultationTypeRequest {
   name: string;
+  nameBn?: string;
   description?: string;
+  descriptionBn?: string;
   code?: string;
   employmentType?: string;
   parentId?: number;
@@ -556,7 +560,9 @@ export interface CreateConsultationTypeRequest {
 /** Payload for updating a consultation type (admin). */
 export interface UpdateConsultationTypeRequest {
   name: string;
+  nameBn?: string;
   description?: string;
+  descriptionBn?: string;
   code?: string | null;
   employmentType?: string | null;
   parentId?: number | null;
@@ -620,9 +626,12 @@ export interface ReorderConsultationTypesRequest {
 
 export const consultationTypesApi = {
   /** GET /consultation-types - Hierarchical tree. Optional code returns single-root subtree or 404. */
-  getAll: async (code?: string) => {
-    const params = code?.trim() ? { code: code.trim() } : undefined;
-    return httpService.get<ConsultationType[] | ConsultationType>("/consultation-types", params ? { params } : undefined);
+  getAll: async (params?: { code?: string; lang?: ConsultationTypeLang }) => {
+    const query: Record<string, string> = { lang: params?.lang ?? "en" };
+    if (params?.code?.trim()) query.code = params.code.trim();
+    return httpService.get<ConsultationType[] | ConsultationType>("/consultation-types", {
+      params: query,
+    });
   },
 
   /** POST /admin/consultation-types - Create (root or child). Backend may not exist yet. */
@@ -646,10 +655,11 @@ export const consultationTypesApi = {
   },
 
   // --- Admin: Service category checklists per consultation type ---
-  /** GET /admin/consultation-types/:id/service-category-checklists */
-  getServices: async (consultationTypeId: number) => {
+  /** GET /admin/consultation-types/:id/service-category-checklists?lang=en|bn */
+  getServices: async (consultationTypeId: number, params?: { lang?: ConsultationTypeLang }) => {
     return httpService.get<ServiceCategoryChecklistItem[]>(
-      `/admin/consultation-types/${consultationTypeId}/service-category-checklists`
+      `/admin/consultation-types/${consultationTypeId}/service-category-checklists`,
+      { params: { lang: params?.lang ?? "en" } }
     );
   },
   /** POST /admin/consultation-types/:id/service-category-checklists */
@@ -657,10 +667,13 @@ export const consultationTypesApi = {
     consultationTypeId: number,
     data: {
       name: string;
+      nameBn?: string;
       description?: string | null;
+      descriptionBn?: string | null;
       type?: ServiceCategoryChecklistType;
       isActive?: boolean;
       displayOrder?: number;
+      groupId?: number;
     }
   ) => {
     return httpService.post<ServiceCategoryChecklistItem>(
@@ -674,10 +687,13 @@ export const consultationTypesApi = {
     serviceId: number,
     data: {
       name?: string;
+      nameBn?: string;
       description?: string | null;
+      descriptionBn?: string | null;
       type?: ServiceCategoryChecklistType;
       isActive?: boolean;
       displayOrder?: number;
+      groupId?: number;
     }
   ) => {
     return httpService.patch<ServiceCategoryChecklistItem>(
@@ -736,10 +752,13 @@ export interface ServiceCategoryChecklistItem {
   id: number;
   consultationTypeId?: number;
   name: string;
+  nameBn?: string;
   description?: string | null;
+  descriptionBn?: string | null;
   type?: ServiceCategoryChecklistType;
   isActive: boolean;
   displayOrder: number;
+  groupId?: number | null;
 }
 
 /** Verification requirement item (admin). */
@@ -1139,6 +1158,54 @@ export const adminCancellationApi = {
   },
 };
 
+// ============== Admin: Service Checklist Groups ==============
+
+export interface ServiceChecklistGroupItem {
+  id: number;
+  name: string;
+  nameBn: string;
+  description: string;
+  descriptionBn: string;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface ServiceChecklistGroupPayload {
+  name: string;
+  nameBn: string;
+  description: string;
+  descriptionBn: string;
+}
+
+export type ServiceChecklistGroupLang = "en" | "bn";
+
+export const serviceChecklistGroupsApi = {
+  /** GET /admin/service-checklist-groups — List all service checklist groups. */
+  list: async (params?: { lang?: ServiceChecklistGroupLang }) => {
+    return httpService.get<ServiceChecklistGroupItem[]>("/admin/service-checklist-groups", {
+      params: { lang: params?.lang ?? "en" },
+    });
+  },
+  /** GET /admin/service-checklist-groups/:id — Get a service checklist group by id. */
+  getById: async (id: number, params?: { lang?: ServiceChecklistGroupLang }) => {
+    return httpService.get<ServiceChecklistGroupItem>(`/admin/service-checklist-groups/${id}`, {
+      params: params?.lang ? { lang: params.lang } : undefined,
+    });
+  },
+  /** POST /admin/service-checklist-groups — Create a service checklist group. */
+  create: async (data: ServiceChecklistGroupPayload) => {
+    return httpService.post<ServiceChecklistGroupItem>("/admin/service-checklist-groups", data);
+  },
+  /** PATCH /admin/service-checklist-groups/:id — Update a service checklist group. */
+  update: async (id: number, data: ServiceChecklistGroupPayload) => {
+    return httpService.patch<ServiceChecklistGroupItem>(`/admin/service-checklist-groups/${id}`, data);
+  },
+  /** DELETE /admin/service-checklist-groups/:id — Delete a service checklist group. */
+  delete: async (id: number) => {
+    return httpService.delete<void>(`/admin/service-checklist-groups/${id}`);
+  },
+};
+
 // ============== Admin: Verification Document Types ==============
 
 /** Admin-managed verification document type (add, update, deactivate). */
@@ -1146,26 +1213,37 @@ export interface VerificationDocumentTypeItem {
   id: number;
   code: string;
   label: string;
+  labelBn?: string;
   isActive: boolean;
   displayOrder: number;
   createdAt: string | null;
   updatedAt: string | null;
 }
 
+export type VerificationDocumentTypeLang = "en" | "bn";
+
 export const verificationDocumentTypesApi = {
-  list: async (params?: { activeOnly?: boolean }) => {
+  list: async (params?: { activeOnly?: boolean; lang?: VerificationDocumentTypeLang }) => {
+    const query: Record<string, string> = { lang: params?.lang ?? "en" };
+    if (params?.activeOnly) query.activeOnly = "true";
     return httpService.get<VerificationDocumentTypeItem[]>(
       "/admin/verification-document-types",
-      { params: params as Record<string, string> }
+      { params: query }
     );
   },
-  create: async (data: { code: string; label: string; isActive?: boolean; displayOrder?: number }) => {
+  create: async (data: {
+    code: string;
+    label: string;
+    labelBn?: string;
+    isActive?: boolean;
+    displayOrder?: number;
+  }) => {
     return httpService.post<VerificationDocumentTypeItem>(
       "/admin/verification-document-types",
       data
     );
   },
-  update: async (id: number, data: { label?: string; displayOrder?: number }) => {
+  update: async (id: number, data: { label?: string; labelBn?: string; displayOrder?: number }) => {
     return httpService.patch<VerificationDocumentTypeItem>(
       `/admin/verification-document-types/${id}`,
       data
@@ -1183,9 +1261,12 @@ export const verificationDocumentTypesApi = {
 
 export type ConsultationTypeLevelCategory = "DOCTOR" | "CAREGIVER";
 
+export type ConsultationTypeLevelLang = "en" | "bn";
+
 export interface ConsultationTypeLevel {
   id: number;
   name: string;
+  nameBn?: string;
   levelNumber: number;
   category: ConsultationTypeLevelCategory;
   minSalary: number;
@@ -1194,6 +1275,7 @@ export interface ConsultationTypeLevel {
 
 export type ConsultationTypeLevelPayload = {
   name: string;
+  nameBn: string;
   levelNumber: number;
   category: ConsultationTypeLevelCategory;
   minSalary: number;
@@ -1209,6 +1291,7 @@ function toConsultationTypeLevelPatchBody(
 ): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   if (data.name !== undefined) out.name = data.name;
+  if (data.nameBn !== undefined) out.name_bn = data.nameBn;
   if (data.levelNumber !== undefined) out.level_number = data.levelNumber;
   if (data.category !== undefined) out.category = data.category;
   if (data.minSalary !== undefined) out.min_salary = data.minSalary;
@@ -1217,15 +1300,20 @@ function toConsultationTypeLevelPatchBody(
 }
 
 export const consultationTypeLevelsApi = {
-  /** GET /admin/consultation-type-levels?category=DOCTOR|CAREGIVER */
-  list: async (params: { category: ConsultationTypeLevelCategory }) => {
+  /** GET /admin/consultation-type-levels?category=DOCTOR|CAREGIVER&lang=en|bn */
+  list: async (params: {
+    category: ConsultationTypeLevelCategory;
+    lang?: ConsultationTypeLevelLang;
+  }) => {
     return httpService.get<ConsultationTypeLevel[]>("/admin/consultation-type-levels", {
-      params: { category: params.category },
+      params: { category: params.category, lang: params.lang ?? "en" },
     });
   },
-  /** GET /admin/consultation-type-levels/:id */
-  getById: async (id: number) => {
-    return httpService.get<ConsultationTypeLevel>(`/admin/consultation-type-levels/${id}`);
+  /** GET /admin/consultation-type-levels/:id?lang=en|bn */
+  getById: async (id: number, params?: { lang?: ConsultationTypeLevelLang }) => {
+    return httpService.get<ConsultationTypeLevel>(`/admin/consultation-type-levels/${id}`, {
+      params: params?.lang ? { lang: params.lang } : undefined,
+    });
   },
   /** POST /admin/consultation-type-levels */
   create: async (data: ConsultationTypeLevelPayload) => {
@@ -1729,17 +1817,141 @@ export interface AdminServiceRequestListDto {
   consultationTypeName?: string | null;
   amount: string;
   scheduledAt?: string | null;
+  scheduledDate?: string | null;
+  scheduledTime?: string | null;
   createdAt: string;
   /** Present when this SR belongs to a long-term opportunity (used by GET /service-event-logs/timeline). */
   longTermOpportunityId?: number | null;
 }
 
-/** Response for GET /v1/admin/service-requests. */
+/** Response for GET /v1/admin/service-requests (cursor-paginated). */
 export interface AdminServiceRequestListResponse {
   data: AdminServiceRequestListDto[];
-  total: number;
-  page: number;
   limit: number;
+  nextCursor?: string | null;
+  hasMore?: boolean;
+  /** Present on some legacy/page-based responses. */
+  total?: number;
+  page?: number;
+}
+
+/** Map one row from GET /v1/admin/service-requests (tolerates snake_case). */
+export function normalizeAdminServiceRequestListItem(raw: unknown): AdminServiceRequestListDto {
+  if (!raw || typeof raw !== "object") {
+    return {
+      id: 0,
+      status: "",
+      patientId: 0,
+      consultationTypeId: 0,
+      amount: "",
+      createdAt: "",
+    };
+  }
+  const o = raw as Record<string, unknown>;
+  const id = Number(o.id);
+  const patientId = Number(o.patientId ?? o.patient_id);
+  const consultationTypeId = Number(o.consultationTypeId ?? o.consultation_type_id);
+  const providerIdRaw = o.providerId ?? o.provider_id;
+  const providerIdNum = Number(providerIdRaw);
+  const longTermRaw = o.longTermOpportunityId ?? o.long_term_opportunity_id;
+
+  return {
+    id: Number.isFinite(id) && id > 0 ? id : 0,
+    status: String(o.status ?? "").toUpperCase(),
+    patientId: Number.isFinite(patientId) ? patientId : 0,
+    patientName: strOpt(o.patientName ?? o.patient_name),
+    providerId:
+      providerIdRaw == null || providerIdRaw === ""
+        ? null
+        : Number.isFinite(providerIdNum)
+          ? providerIdNum
+          : null,
+    providerName: strOpt(o.providerName ?? o.provider_name),
+    consultationTypeId: Number.isFinite(consultationTypeId) ? consultationTypeId : 0,
+    consultationTypeName: strOpt(o.consultationTypeName ?? o.consultation_type_name),
+    amount: String(o.amount ?? o.fee ?? ""),
+    scheduledAt: strOpt(o.scheduledAt ?? o.scheduled_at),
+    scheduledDate: strOpt(o.scheduledDate ?? o.scheduled_date),
+    scheduledTime: strOpt(o.scheduledTime ?? o.scheduled_time),
+    createdAt: String(o.createdAt ?? o.created_at ?? ""),
+    longTermOpportunityId: (() => {
+      const n = Number(longTermRaw);
+      return Number.isFinite(n) && n > 0 ? n : null;
+    })(),
+  };
+}
+
+function parsePaginationNumber(value: unknown): number | undefined {
+  if (value == null || value === "") return undefined;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+/** Normalize GET /v1/admin/service-requests list payload (cursor + legacy page shapes). */
+export function normalizeAdminServiceRequestListResponse(
+  data: unknown,
+  requestLimit = 10
+): {
+  items: AdminServiceRequestListDto[];
+  limit: number;
+  nextCursor: string | null;
+  hasMore: boolean;
+  total: number | null;
+} {
+  const unwrapRows = (value: unknown): unknown[] => {
+    if (Array.isArray(value)) return value;
+    if (value && typeof value === "object") {
+      const o = value as Record<string, unknown>;
+      for (const key of [
+        "data",
+        "items",
+        "results",
+        "serviceRequests",
+        "service_requests",
+        "appointments",
+      ] as const) {
+        if (Array.isArray(o[key])) return o[key] as unknown[];
+      }
+      if (o.data && typeof o.data === "object" && !Array.isArray(o.data)) {
+        return unwrapRows(o.data);
+      }
+    }
+    return [];
+  };
+
+  const top =
+    data && typeof data === "object" && !Array.isArray(data)
+      ? (data as Record<string, unknown>)
+      : null;
+
+  const rows = unwrapRows(data);
+  const items = rows.map(normalizeAdminServiceRequestListItem).filter((row) => row.id > 0);
+
+  const limit =
+    parsePaginationNumber(top?.limit ?? top?.pageSize) ?? requestLimit;
+
+  const nextCursorRaw = top?.nextCursor ?? top?.next_cursor;
+  const nextCursor =
+    typeof nextCursorRaw === "string" && nextCursorRaw.trim()
+      ? nextCursorRaw.trim()
+      : null;
+
+  const hasMoreExplicit = top?.hasMore ?? top?.has_more;
+  const hasMore =
+    typeof hasMoreExplicit === "boolean"
+      ? hasMoreExplicit
+      : Boolean(nextCursor);
+
+  const total =
+    parsePaginationNumber(top?.total ?? top?.totalCount ?? top?.total_count) ?? null;
+
+  return {
+    items,
+    limit: limit > 0 ? limit : requestLimit,
+    nextCursor,
+    hasMore,
+    total,
+  };
 }
 
 /**
@@ -1777,6 +1989,7 @@ export interface ServiceRequestEventLogDto {
 export interface ServiceRequestTimelineResponseDto {
   serviceType: string;
   isTerminal: boolean;
+  terminalState?: string | null;
   timeline: ServiceRequestEventLogDto[];
 }
 
@@ -1787,6 +2000,7 @@ export function normalizeServiceRequestTimeline(
   const empty: ServiceRequestTimelineResponseDto = {
     serviceType: "",
     isTerminal: false,
+    terminalState: null,
     timeline: [],
   };
   if (!raw || typeof raw !== "object") return empty;
@@ -1798,9 +2012,14 @@ export function normalizeServiceRequestTimeline(
       ? (root.data as Record<string, unknown>)
       : root;
   const timelineRaw = Array.isArray(body.timeline) ? body.timeline : [];
+  const terminalStateRaw = body.terminalState;
   return {
     serviceType: typeof body.serviceType === "string" ? body.serviceType : "",
     isTerminal: Boolean(body.isTerminal),
+    terminalState:
+      typeof terminalStateRaw === "string" && terminalStateRaw.trim()
+        ? terminalStateRaw.trim()
+        : null,
     timeline: timelineRaw.filter(
       (x): x is ServiceRequestEventLogDto => !!x && typeof x === "object"
     ),
@@ -2649,12 +2868,13 @@ export const patientsApi = {
 
 export const adminServiceRequestsApi = {
   /**
-   * GET /v1/admin/service-requests — List all appointments. Query: page, limit, consultationTypeId, searchDoctor, searchPatient.
+   * GET /v1/admin/service-requests — Cursor-paginated appointments list.
+   * First page: limit (+ optional filters). Next pages: cursor from previous response.
    */
   getList: async (
     params?: {
-      page?: number;
       limit?: number;
+      cursor?: string;
       consultationTypeId?: number;
       searchDoctor?: string;
       searchPatient?: string;
@@ -2662,9 +2882,14 @@ export const adminServiceRequestsApi = {
     config?: { signal?: AbortSignal }
   ) => {
     const query: Record<string, string | number> = {
-      page: params?.page ?? 1,
       limit: params?.limit ?? 10,
     };
+    const cursor = params?.cursor?.trim();
+    if (cursor) {
+      query.cursor = cursor;
+    } else {
+      query.page = 1;
+    }
     if (params?.consultationTypeId != null) query.consultationTypeId = params.consultationTypeId;
     const doc = params?.searchDoctor?.trim();
     if (doc) query.searchDoctor = doc;
@@ -3875,7 +4100,7 @@ export const adminProvidersApi = {
   },
 };
 
-/** Admin: verify certification (approve/reject). PATCH /v1/admin/certifications/:id/verify (api_business_flow §4b) */
+/** Admin: verify certification (approve/reject). PATCH /v1/certifications/:id/verify (api_business_flow §4b) */
 export interface AdminVerifyCertificationRequest {
   status: "APPROVED" | "REJECTED";
   adminComment?: string;
@@ -3884,7 +4109,7 @@ export interface AdminVerifyCertificationRequest {
 export const adminCertificationsApi = {
   verify: async (certificationId: number, data: AdminVerifyCertificationRequest) => {
     return httpService.patch<AdminCertificationDto>(
-      `/admin/certifications/${certificationId}/verify`,
+      `/certifications/${certificationId}/verify`,
       data
     );
   },
