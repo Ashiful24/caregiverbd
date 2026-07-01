@@ -1,14 +1,12 @@
 /**
  * Admin document view / download / print helpers.
- * Documents are served from a separate document storage microservice.
- * Backend only stores the document URL/path; frontend resolves the correct host per path prefix.
+ * Files are served from the file microservice; backend stores path/URL only.
  */
 
 import { getAssetUrl } from "./assetUrl";
 
 /**
- * Build the full document URL from the path/URL returned by the API.
- * Uses getAssetUrl: `/files/...` paths go to VITE_FILE_UPLOAD_URL; other relative paths use VITE_DOCUMENT_BASE_URL.
+ * Build the full document URL from the path/URL returned by the API (`VITE_FILE_SERVICE_URL`).
  */
 export function getDocumentUrl(documentPathOrUrl: string | null | undefined): string {
   return getAssetUrl(documentPathOrUrl ?? "");
@@ -24,8 +22,7 @@ export function viewDocument(documentPathOrUrl: string | null | undefined): void
 }
 
 /**
- * Download document: open in new tab so user can save from browser, or use a link with download attribute.
- * For cross-origin document server, download attribute may not set filename; user can still save from the opened tab.
+ * Download document in a new tab (user can save from the browser).
  */
 export function downloadDocument(
   documentPathOrUrl: string | null | undefined,
@@ -33,6 +30,11 @@ export function downloadDocument(
 ): void {
   const url = getDocumentUrl(documentPathOrUrl);
   if (!url) return;
+  // Same-origin relative /files/... — open in new tab (reliable for PDFs through nginx proxy).
+  if (url.startsWith("/")) {
+    window.open(url, "_blank", "noopener,noreferrer");
+    return;
+  }
   const a = document.createElement("a");
   a.href = url;
   a.target = "_blank";

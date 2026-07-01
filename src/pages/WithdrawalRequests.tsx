@@ -27,8 +27,6 @@ import { formatDate, formatStatusLabel, toBangladeshISODateOptional } from "../u
 
 const LIMIT_OPTIONS = [10, 20, 50];
 const MAX_PROOF_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
-const FILE_UPLOAD_PUBLIC_BASE =
-  (import.meta.env.VITE_FILE_UPLOAD_URL as string | undefined)?.replace(/\/$/, "") || "";
 type WithdrawalStatusTab = "all" | WithdrawalRequestStatus;
 const STATUS_TABS: WithdrawalStatusTab[] = [
   "all",
@@ -56,13 +54,7 @@ function resolveProofDownloadUrl(detail: WithdrawalRequestDetail | null): string
   if (!detail) return "";
   const normalize = (value: unknown): string => {
     if (typeof value !== "string" || !value.trim()) return "";
-    const raw = value.trim();
-    if (raw.startsWith("http://") || raw.startsWith("https://")) return raw;
-    // Proof files come from uploader service; keep /files/... on upload host.
-    if (raw.startsWith("/files/") && FILE_UPLOAD_PUBLIC_BASE) {
-      return `${FILE_UPLOAD_PUBLIC_BASE}${raw}`;
-    }
-    return getAssetUrl(raw);
+    return getAssetUrl(value.trim());
   };
 
   const raw = (detail as Record<string, unknown>).proofUrl;

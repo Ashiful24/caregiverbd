@@ -1,9 +1,13 @@
 # Hope frontend — development (Docker Compose)
 #
-# Prerequisites: copy env template → .env (VITE_*, APP_PORT). Default UI: http://localhost:8085
+# Prerequisites: .env with APP_PORT, VITE_API_BASE_URL, VITE_FILE_SERVICE_URL (nginx proxies /files to this).
 #
-# Run (detached, rebuild):
+# Run (detached, rebuild — required after .env changes):
 #   docker compose -f docker-compose.dev.yml up -d --build
+#
+# Verify file proxy in container logs:
+#   docker compose -f docker-compose.dev.yml logs | findstr FILE_SERVICE
+# Browser should request /files/... on the same host:port as the UI (not localhost:3085).
 #
 # Down (stop and remove containers):
 #   docker compose -f docker-compose.dev.yml down
@@ -23,6 +27,9 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8080/v1}
+        # Empty = same-origin /files; nginx proxies at runtime (see FILE_SERVICE_UPSTREAM)
+        VITE_FILE_SERVICE_URL: ""
+        VITE_FILE_SERVICE_API_KEY: ${VITE_FILE_SERVICE_API_KEY:-}
         VITE_FIREBASE_API_KEY: ${VITE_FIREBASE_API_KEY:-}
         VITE_FIREBASE_AUTH_DOMAIN: ${VITE_FIREBASE_AUTH_DOMAIN:-}
         VITE_FIREBASE_PROJECT_ID: ${VITE_FIREBASE_PROJECT_ID:-}

@@ -1,6 +1,6 @@
 # Hope frontend — production (Docker Compose)
 #
-# Prerequisites: .env with VITE_* and APP_PORT. Default UI: http://localhost:8086
+# Prerequisites: .env with APP_PORT, VITE_API_BASE_URL, VITE_FILE_SERVICE_URL.
 #
 # Run (detached, rebuild):
 #   docker compose -f docker-compose.prod.yml up -d --build
@@ -23,6 +23,8 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8082/v1}
+        VITE_FILE_SERVICE_URL: ""
+        VITE_FILE_SERVICE_API_KEY: ${VITE_FILE_SERVICE_API_KEY:-}
         VITE_FIREBASE_API_KEY: ${VITE_FIREBASE_API_KEY:-}
         VITE_FIREBASE_AUTH_DOMAIN: ${VITE_FIREBASE_AUTH_DOMAIN:-}
         VITE_FIREBASE_PROJECT_ID: ${VITE_FIREBASE_PROJECT_ID:-}
