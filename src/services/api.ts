@@ -5,6 +5,7 @@
  */
 
 import httpService from "./httpService";
+import { getFileServiceApiKey, getFileServiceUploadUrl } from "../config/fileService";
 
 // ============== Auth & Login ==============
 
@@ -573,28 +574,19 @@ export interface UpdateConsultationTypeRequest {
   imageUrl?: string;
 }
 
-/** Multipart upload to external file service. Override with `VITE_FILE_UPLOAD_URL` (no trailing slash). */
-const FILE_UPLOAD_BASE_URL =
-  (import.meta.env.VITE_FILE_UPLOAD_URL as string | undefined)?.replace(/\/$/, "") ||
-  "http://116.68.207.105:3085";
-
-/** Required by the file service (401 if missing/wrong). Override via `VITE_FILE_UPLOAD_API_KEY`. */
-const FILE_UPLOAD_API_KEY =
-  (import.meta.env.VITE_FILE_UPLOAD_API_KEY as string | undefined)?.trim() ||
-  "hope-project-key-123";
-
 /**
  * POST /files/upload — returns parsed JSON (or raw text if not JSON).
+ * Base URL and API key: `VITE_FILE_SERVICE_URL`, `VITE_FILE_SERVICE_API_KEY`.
  * Sends only `x-api-key` (required). Do not send `Authorization: Bearer` here: this service
  * treats Authorization as the project API key and rejects JWTs with "Invalid API key".
  */
 export async function uploadFileToStorage(file: File): Promise<unknown> {
-  const url = `${FILE_UPLOAD_BASE_URL}/files/upload`;
+  const url = getFileServiceUploadUrl();
   const formData = new FormData();
   formData.append("file", file);
   const headers: Record<string, string> = {
     accept: "*/*",
-    "x-api-key": FILE_UPLOAD_API_KEY,
+    "x-api-key": getFileServiceApiKey(),
   };
   const res = await fetch(url, { method: "POST", headers, body: formData });
   const text = await res.text();

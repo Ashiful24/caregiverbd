@@ -1,14 +1,12 @@
 /**
  * Admin document view / download / print helpers.
- * Documents are served from a separate document storage microservice.
- * Backend only stores the document URL/path; frontend resolves the correct host per path prefix.
+ * Files are served from the file microservice; backend stores path/URL only.
  */
 
 import { getAssetUrl } from "./assetUrl";
 
 /**
- * Build the full document URL from the path/URL returned by the API.
- * Uses getAssetUrl: `/files/...` paths go to VITE_FILE_UPLOAD_URL; other relative paths use VITE_DOCUMENT_BASE_URL.
+ * Build the full document URL from the path/URL returned by the API (`VITE_FILE_SERVICE_URL`).
  */
 export function getDocumentUrl(documentPathOrUrl: string | null | undefined): string {
   return getAssetUrl(documentPathOrUrl ?? "");
