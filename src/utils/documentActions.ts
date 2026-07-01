@@ -22,8 +22,7 @@ export function viewDocument(documentPathOrUrl: string | null | undefined): void
 }
 
 /**
- * Download document: open in new tab so user can save from browser, or use a link with download attribute.
- * For cross-origin document server, download attribute may not set filename; user can still save from the opened tab.
+ * Download document in a new tab (user can save from the browser).
  */
 export function downloadDocument(
   documentPathOrUrl: string | null | undefined,
@@ -31,6 +30,11 @@ export function downloadDocument(
 ): void {
   const url = getDocumentUrl(documentPathOrUrl);
   if (!url) return;
+  // Same-origin relative /files/... — open in new tab (reliable for PDFs through nginx proxy).
+  if (url.startsWith("/")) {
+    window.open(url, "_blank", "noopener,noreferrer");
+    return;
+  }
   const a = document.createElement("a");
   a.href = url;
   a.target = "_blank";
