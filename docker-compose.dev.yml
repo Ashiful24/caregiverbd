@@ -1,3 +1,19 @@
+# Hope frontend — development (Docker Compose)
+#
+# Prerequisites: copy env template → .env (VITE_*, APP_PORT). Default UI: http://localhost:8085
+#
+# Run (detached, rebuild):
+#   docker compose -f docker-compose.dev.yml up -d --build
+#
+# Down (stop and remove containers):
+#   docker compose -f docker-compose.dev.yml down
+#
+# Down (remove containers + volumes):
+#   docker compose -f docker-compose.dev.yml down -v
+#
+# Logs:
+#   docker compose -f docker-compose.dev.yml logs -f
+
 name: ontor-frontend-dev
 
 services:
