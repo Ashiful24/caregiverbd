@@ -1,5 +1,20 @@
-name: ontor-frontend-stage
+# Hope frontend — staging (Docker Compose)
+#
+# Prerequisites: .env with VITE_* and APP_PORT. Default UI: http://localhost:8085
+#
+# Run (detached, rebuild):
+#   docker compose -f docker-compose.stage.yml up -d --build
+#
+# Down (stop and remove containers):
+#   docker compose -f docker-compose.stage.yml down
+#
+# Down (remove containers + volumes):
+#   docker compose -f docker-compose.stage.yml down -v
+#
+# Logs:
+#   docker compose -f docker-compose.stage.yml logs -f
 
+name: ontor-frontend-stage
 services:
   stage-frontend-ontor:
     build:

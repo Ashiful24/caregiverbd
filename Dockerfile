@@ -1,3 +1,18 @@
+# Hope frontend — multi-stage image (Node build → nginx serve)
+#
+# Built via compose (recommended):
+#   docker compose -f docker-compose.dev.yml up -d --build
+#   docker compose -f docker-compose.stage.yml up -d --build
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Down (use the matching compose file):
+#   docker compose -f docker-compose.dev.yml down
+#   docker compose -f docker-compose.stage.yml down
+#   docker compose -f docker-compose.prod.yml down
+#
+# Standalone build (image only, no compose):
+#   docker build -t hope-frontend .
+#
 # ============== Stage 1: Build ==============
 FROM node:20-alpine AS builder
 
