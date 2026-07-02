@@ -1,6 +1,11 @@
 # Hope frontend — staging (Docker Compose)
 #
-# Prerequisites: .env with APP_PORT, VITE_API_BASE_URL, VITE_FILE_SERVICE_URL.
+# Prerequisites:
+#   - .env with APP_PORT, VITE_API_BASE_URL, VITE_FILE_SERVICE_URL.
+#   - Shared network must exist (created by hope-backend/docker-compose.db.yml):
+#       cd ../hope-backend && docker compose --env-file .env.stage -f docker-compose.db.yml up -d stage-db-ontor
+#   - file_uploader stage container running on the same network so the proxy target resolves:
+#       cd ../file_uploader && docker compose --env-file .env.stage -f docker-compose.stage.yml up -d --build
 #
 # Run (detached, rebuild):
 #   docker compose -f docker-compose.stage.yml up -d --build
@@ -36,6 +41,10 @@ services:
       - "${APP_PORT:-8085}:80"
     env_file:
       - .env
+    environment:
+      # Overrides .env — nginx proxies /files/ to the file_uploader container directly
+      # over the shared network instead of round-tripping through a public IP.
+      - VITE_FILE_SERVICE_URL=http://stage-app-file-uploader:3005
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:80/health"]
       interval: 30s
@@ -43,3 +52,11 @@ services:
       start_period: 10s
       retries: 3
     restart: unless-stopped
+    networks:
+      - auth-network-staging
+
+# Shared network created by hope-backend/docker-compose.db.yml — must be running before this file.
+networks:
+  auth-network-staging:
+    external: true
+    name: ontor-auth-network-staging
