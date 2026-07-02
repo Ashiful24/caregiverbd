@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
 import PageBreadcrumb from "../components/common/PageBreadCrumb";
@@ -61,6 +61,14 @@ function unwrapListPayload(res: unknown): ProviderCancelReviewListResponse {
   return payload as ProviderCancelReviewListResponse;
 }
 
+function rowsForStatusTab(
+  data: ProviderCancelReviewListItem[],
+  statusTab: ProviderCancelReviewStatus
+): ProviderCancelReviewListItem[] {
+  if (statusTab === "ALL") return data;
+  return data.filter((row) => row.reviewStatus === statusTab);
+}
+
 function tabButtonClass(active: boolean): string {
   return `rounded-lg border px-3 py-1.5 text-sm font-medium transition ${
     active
@@ -91,6 +99,7 @@ export default function ProviderCancelRequests() {
 
   const [providers, setProviders] = useState<ProviderListItem[]>([]);
   const [patients, setPatients] = useState<PatientListItem[]>([]);
+  const requestIdRef = useRef(0);
 
   useEffect(() => {
     (async () => {
@@ -123,7 +132,7 @@ export default function ProviderCancelRequests() {
 
   const baseQuery = useMemo(
     () => ({
-      status: statusTab === "ALL" ? undefined : statusTab,
+      status: statusTab,
       providerId: providerIdParsed,
       patientId: patientIdParsed,
       includeSummary,
@@ -132,13 +141,18 @@ export default function ProviderCancelRequests() {
     [includeSummary, includeTotal, patientIdParsed, providerIdParsed, statusTab]
   );
 
-  // Reset to page 1 when any filter changes
+  // Reset to page 1 and clear stale rows when any filter changes
   useEffect(() => {
     setCurrentPage(1);
+    setRows([]);
+    setSummary(null);
+    setTotal(undefined);
+    setError("");
   }, [statusTab, providerIdParsed, patientIdParsed, limit, includeSummary, includeTotal]);
 
   const fetchPage = useCallback(
     async (page: number, signal?: AbortSignal) => {
+      const requestId = ++requestIdRef.current;
       setLoading(true);
       setError("");
       try {
@@ -146,14 +160,18 @@ export default function ProviderCancelRequests() {
           { ...baseQuery, page, limit },
           { signal }
         );
+        if (requestId !== requestIdRef.current) return;
+
         const body = unwrapListPayload(res);
-        setRows(Array.isArray(body.data) ? body.data : []);
+        const raw = Array.isArray(body.data) ? body.data : [];
+        setRows(rowsForStatusTab(raw, statusTab));
         setSummary(body.summary ?? null);
         setHasNext(!!body.hasNext);
         setHasPrev(page > 1);
         setTotal(body.total);
       } catch (err: unknown) {
         if (err instanceof Error && err.name === "AbortError") return;
+        if (requestId !== requestIdRef.current) return;
         const message =
           err && typeof err === "object" && "message" in err
             ? String((err as { message: string }).message)
@@ -165,10 +183,12 @@ export default function ProviderCancelRequests() {
         setHasPrev(false);
         setTotal(undefined);
       } finally {
-        setLoading(false);
+        if (requestId === requestIdRef.current) {
+          setLoading(false);
+        }
       }
     },
-    [baseQuery, limit, t]
+    [baseQuery, limit, statusTab, t]
   );
 
   useEffect(() => {
