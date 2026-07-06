@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Clock, Settings2 } from "lucide-react";
+import { Clock, FileText, Settings2 } from "lucide-react";
 import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import PageMeta from "../components/common/PageMeta";
 import { SystemSettingsPanel } from "../components/admin-settings/SystemSettingsPanel";
 import { SchedulerJobsPanel } from "../components/admin-settings/SchedulerJobsPanel";
+import { ConsultationPolicyPanel } from "../components/admin-settings/ConsultationPolicyPanel";
 
-type SettingsTab = "system" | "scheduler";
+type SettingsTab = "system" | "scheduler" | "consultationPolicy";
 
 export default function SystemConfig() {
   const { t } = useTranslation();
@@ -15,6 +16,7 @@ export default function SystemConfig() {
   const tabs: { id: SettingsTab; label: string; icon: typeof Settings2 }[] = [
     { id: "system", label: t("systemConfig.tabSystem"), icon: Settings2 },
     { id: "scheduler", label: t("systemConfig.tabScheduler"), icon: Clock },
+    { id: "consultationPolicy", label: t("systemConfig.tabConsultationPolicy"), icon: FileText },
   ];
 
   return (
@@ -61,7 +63,13 @@ export default function SystemConfig() {
         </header>
 
         <div className="p-5 lg:p-8">
-          {tab === "system" ? <SystemSettingsPanel /> : <SchedulerJobsPanel />}
+          {tab === "system" ? (
+            <SystemSettingsPanel />
+          ) : tab === "scheduler" ? (
+            <SchedulerJobsPanel />
+          ) : (
+            <ConsultationPolicyPanel />
+          )}
         </div>
       </div>
     </>
