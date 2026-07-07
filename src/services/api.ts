@@ -787,7 +787,7 @@ export const adminSystemConfigApi = {
 
 export type CancellationPolicyServiceCategory = "DOCTOR" | "CAREGIVER";
 export type CancellationPolicyServiceType = "SHORT_TERM" | "LONG_TERM";
-export type CancellationPolicyFeeType = "PERCENT" | "FIXED";
+export type CancellationPolicyFeeType = "PERCENT" | "FLAT" | "USAGE_BASED" | "NONE";
 
 export interface CancellationPolicyItem {
   id: number;
@@ -797,6 +797,7 @@ export interface CancellationPolicyItem {
   feeValue: string;
   metadata?: Record<string, unknown> | null;
   isActive: boolean;
+  stage?: string | null;
   title?: string | null;
   name?: string | null;
   description?: string | null;

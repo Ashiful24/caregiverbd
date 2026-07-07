@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Pencil, RefreshCw } from "lucide-react";
+import { Pencil } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -20,7 +20,6 @@ import {
 import { formatDateTime, formatStatusLabel } from "../../utils/format";
 import {
   SettingsAlert,
-  SettingsToolbar,
   StatChip,
   PanelLoading,
   PanelEmpty,
@@ -38,8 +37,105 @@ type PolicyFormState = {
   feeType: string;
   feeValue: string;
   isActive: boolean;
-  metadataJson: string;
+  windowMin: string;
+  exceptions: string[];
 };
+
+const CANCELLATION_EXCEPTIONS = ["HOPE_FAULT"] as const;
+const EDITABLE_FEE_TYPES = ["PERCENT", "FLAT", "NONE"] as const;
+
+function getPolicyStage(item: CancellationPolicyItem): string {
+  return String(item.stage ?? "").toUpperCase();
+}
+
+function isPreServiceStage(item: CancellationPolicyItem): boolean {
+  return getPolicyStage(item) === "PRE_SERVICE";
+}
+
+function isInProgressStage(item: CancellationPolicyItem): boolean {
+  return getPolicyStage(item) === "IN_PROGRESS";
+}
+
+function isPrePaymentStage(item: CancellationPolicyItem): boolean {
+  return getPolicyStage(item) === "PRE_PAYMENT";
+}
+
+function hasExceptionsMetadata(item: CancellationPolicyItem): boolean {
+  return isPreServiceStage(item) || isInProgressStage(item);
+}
+
+function editableFeeTypesForStage(item: CancellationPolicyItem): readonly string[] {
+  if (isPrePaymentStage(item)) return ["NONE"];
+  return EDITABLE_FEE_TYPES;
+}
+
+function readWindowMin(metadata: Record<string, unknown> | null | undefined): string {
+  const m = metadata ?? {};
+  const v = m.window_minutes ?? m.windowMin ?? m.windowMinutes ?? m.window_min;
+  if (v == null || v === "") return "";
+  return String(v);
+}
+
+function readExceptions(metadata: Record<string, unknown> | null | undefined): string[] {
+  const raw = metadata?.exceptions;
+  if (!Array.isArray(raw)) return [];
+  return raw.map((e) => String(e).toUpperCase()).filter(Boolean);
+}
+
+function readAdminFee(metadata: Record<string, unknown> | null | undefined): string {
+  const v = metadata?.admin_fee ?? metadata?.adminFee;
+  if (v == null || v === "") return "";
+  return String(v);
+}
+
+function feeValueForType(feeType: string): string {
+  const type = feeType.toUpperCase();
+  if (type === "NONE") return "0.00";
+  return "";
+}
+
+function buildSavePayload(
+  row: CancellationPolicyItem,
+  form: PolicyFormState
+): { payload: { feeType: string; feeValue: string; isActive: boolean; metadata?: Record<string, unknown> }; errorKey?: string } {
+  const stage = getPolicyStage(row);
+  const feeType = form.feeType.toUpperCase();
+  const allowedTypes = editableFeeTypesForStage(row);
+
+  if (!allowedTypes.includes(feeType)) {
+    return { payload: { feeType, feeValue: "", isActive: form.isActive }, errorKey: "systemConfig.consultationPolicy.feeTypeNotAllowed" };
+  }
+
+  const payload: {
+    feeType: string;
+    feeValue: string;
+    isActive: boolean;
+    metadata?: Record<string, unknown>;
+  } = {
+    feeType,
+    feeValue: feeType === "NONE" ? "0.00" : form.feeValue.trim(),
+    isActive: form.isActive,
+  };
+
+  if (stage === "PRE_SERVICE") {
+    const windowMinutes = Number(form.windowMin);
+    if (!Number.isFinite(windowMinutes) || windowMinutes < 0) {
+      return { payload, errorKey: "systemConfig.consultationPolicy.windowMinRequired" };
+    }
+    payload.metadata = {
+      window_minutes: windowMinutes,
+      exceptions: form.exceptions,
+    };
+  } else if (stage === "IN_PROGRESS") {
+    payload.metadata = { exceptions: form.exceptions };
+  } else if (stage === "PRE_PAYMENT") {
+    payload.metadata = {};
+  } else if (feeType === "NONE") {
+    payload.metadata = {};
+  }
+
+  return { payload };
+}
 
 function unwrapPolicies(res: unknown): CancellationPolicyItem[] {
   const body = (res as { data?: unknown })?.data ?? res;
@@ -53,38 +149,62 @@ function unwrapPolicies(res: unknown): CancellationPolicyItem[] {
   return [];
 }
 
-function policyLabel(item: CancellationPolicyItem): string {
-  return (
-    item.policyKey?.trim() ||
-    item.title?.trim() ||
-    item.name?.trim() ||
-    item.description?.trim() ||
-    `#${item.id}`
-  );
+function policyStageLabel(item: CancellationPolicyItem): string {
+  const stage = item.stage?.trim();
+  return stage ? formatStatusLabel(stage) : "—";
 }
 
 function formatPolicyFee(item: CancellationPolicyItem): string {
   const type = String(item.feeType ?? "").toUpperCase();
   const value = item.feeValue ?? "";
-  if (type === "PERCENT") return `${value}%`;
-  if (type === "FIXED") return value;
+  const adminFee = readAdminFee(item.metadata);
+  if (type === "NONE") return "—";
+  if (type === "PERCENT") return value ? `${value}%` : "—";
+  if (type === "FLAT") return value ? `৳${value}` : "—";
+  if (type === "USAGE_BASED") {
+    const base = value && value !== "0" && value !== "0.00" ? value : null;
+    const parts = [base, adminFee ? `+৳${adminFee} admin` : null].filter(Boolean);
+    return parts.length > 0 ? parts.join(" ") : "—";
+  }
   return value ? `${type} ${value}` : "—";
 }
 
+function feeTypeI18nKey(type: string): string {
+  switch (type.toUpperCase()) {
+    case "PERCENT":
+      return "systemConfig.consultationPolicy.feePercent";
+    case "FLAT":
+      return "systemConfig.consultationPolicy.feeFlat";
+    case "USAGE_BASED":
+      return "systemConfig.consultationPolicy.feeUsageBased";
+    case "NONE":
+      return "systemConfig.consultationPolicy.feeNone";
+    default:
+      return "systemConfig.consultationPolicy.feeType";
+  }
+}
+
 function formFromItem(item: CancellationPolicyItem): PolicyFormState {
+  const allowed = editableFeeTypesForStage(item);
+  const rawFeeType = String(item.feeType ?? "PERCENT").toUpperCase();
+  const feeType = allowed.includes(rawFeeType) ? rawFeeType : allowed[0];
   return {
-    feeType: String(item.feeType ?? "PERCENT").toUpperCase(),
-    feeValue: item.feeValue ?? "",
+    feeType,
+    feeValue: feeType === "NONE" ? "0.00" : item.feeValue ?? "",
     isActive: item.isActive !== false,
-    metadataJson: JSON.stringify(item.metadata ?? {}, null, 2),
+    windowMin: isPreServiceStage(item) ? readWindowMin(item.metadata) : "",
+    exceptions: hasExceptionsMetadata(item) ? readExceptions(item.metadata) : [],
   };
 }
 
-function subTabClass(active: boolean): string {
-  return `rounded-lg border px-3 py-1.5 text-sm font-medium transition ${
+const toggleGroupClass =
+  "inline-flex rounded-lg border border-gray-200 bg-gray-100 p-0.5 dark:border-gray-700 dark:bg-gray-800/80";
+
+function toggleBtnClass(active: boolean): string {
+  return `rounded-md px-3 py-1.5 text-sm font-medium transition ${
     active
-      ? "border-brand-500 bg-brand-50 text-brand-700 dark:border-brand-500 dark:bg-brand-900/30 dark:text-brand-300"
-      : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+      ? "bg-white text-brand-700 shadow-sm dark:bg-gray-900 dark:text-brand-300"
+      : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
   }`;
 }
 
@@ -94,7 +214,7 @@ const tdClass = "px-3 py-3 text-sm align-top";
 
 export function ConsultationPolicyPanel() {
   const { t } = useTranslation();
-  const [categoryTab, setCategoryTab] = useState<CategoryTab>("DOCTOR");
+  const [categoryTab, setCategoryTab] = useState<CategoryTab>("CAREGIVER");
   const [serviceTypeTab, setServiceTypeTab] = useState<ServiceTypeTab>("SHORT_TERM");
   const [list, setList] = useState<CancellationPolicyItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -151,36 +271,46 @@ export function ConsultationPolicyPanel() {
     setForm(null);
   };
 
+  const handleFeeTypeChange = (newFeeType: string) => {
+    if (!form) return;
+    const nextType = newFeeType.toUpperCase();
+    setForm({
+      ...form,
+      feeType: nextType,
+      feeValue: feeValueForType(nextType),
+    });
+  };
+
+  const toggleException = (code: string) => {
+    if (!form) return;
+    const upper = code.toUpperCase();
+    const has = form.exceptions.includes(upper);
+    setForm({
+      ...form,
+      exceptions: has
+        ? form.exceptions.filter((e) => e !== upper)
+        : [...form.exceptions, upper],
+    });
+  };
+
   const handleSave = async () => {
     if (!editing || !form) return;
-    let metadata: Record<string, unknown> = {};
-    try {
-      const parsed = JSON.parse(form.metadataJson || "{}");
-      if (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)) {
-        metadata = parsed as Record<string, unknown>;
-      } else {
-        setError(t("systemConfig.consultationPolicy.invalidMetadata"));
-        return;
-      }
-    } catch {
-      setError(t("systemConfig.consultationPolicy.invalidMetadata"));
+
+    if (form.feeType !== "NONE" && !form.feeValue.trim()) {
+      setError(t("systemConfig.consultationPolicy.feeValueRequired"));
       return;
     }
 
-    if (!form.feeValue.trim()) {
-      setError(t("systemConfig.consultationPolicy.feeValueRequired"));
+    const { payload, errorKey } = buildSavePayload(editing, form);
+    if (errorKey) {
+      setError(t(errorKey));
       return;
     }
 
     setSubmitting(true);
     setError("");
     try {
-      await adminCancellationPoliciesApi.update(editing.id, {
-        feeType: form.feeType,
-        feeValue: form.feeValue.trim(),
-        metadata,
-        isActive: form.isActive,
-      });
+      await adminCancellationPoliciesApi.update(editing.id, payload);
       setSuccess(t("systemConfig.consultationPolicy.saveSuccess"));
       closeEdit();
       await fetchData();
@@ -203,34 +333,38 @@ export function ConsultationPolicyPanel() {
         message={t("systemConfig.consultationPolicy.noticeMessage")}
       />
 
-      <div className="mb-4 flex flex-wrap gap-2">
-        {(["DOCTOR", "CAREGIVER"] as const).map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            onClick={() => setCategoryTab(tab)}
-            className={subTabClass(categoryTab === tab)}
-          >
-            {tab === "DOCTOR"
-              ? t("systemConfig.consultationPolicy.tabDoctor")
-              : t("systemConfig.consultationPolicy.tabCaregiver")}
-          </button>
-        ))}
-      </div>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div className={toggleGroupClass} role="group" aria-label={t("systemConfig.consultationPolicy.categoryToggle")}>
+          {(["CAREGIVER", "DOCTOR"] as const).map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setCategoryTab(tab)}
+              className={toggleBtnClass(categoryTab === tab)}
+              aria-pressed={categoryTab === tab}
+            >
+              {tab === "DOCTOR"
+                ? t("systemConfig.consultationPolicy.tabDoctor")
+                : t("systemConfig.consultationPolicy.tabCaregiver")}
+            </button>
+          ))}
+        </div>
 
-      <div className="mb-6 flex flex-wrap gap-2">
-        {(["SHORT_TERM", "LONG_TERM"] as const).map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            onClick={() => setServiceTypeTab(tab)}
-            className={subTabClass(serviceTypeTab === tab)}
-          >
-            {tab === "SHORT_TERM"
-              ? t("systemConfig.consultationPolicy.shortTerm")
-              : t("systemConfig.consultationPolicy.longTerm")}
-          </button>
-        ))}
+        <div className={toggleGroupClass} role="group" aria-label={t("systemConfig.consultationPolicy.serviceTypeToggle")}>
+          {(["SHORT_TERM", "LONG_TERM"] as const).map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setServiceTypeTab(tab)}
+              className={toggleBtnClass(serviceTypeTab === tab)}
+              aria-pressed={serviceTypeTab === tab}
+            >
+              {tab === "SHORT_TERM"
+                ? t("systemConfig.consultationPolicy.shortTerm")
+                : t("systemConfig.consultationPolicy.longTerm")}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-3">
@@ -246,13 +380,6 @@ export function ConsultationPolicyPanel() {
           tone={stats.inactive > 0 ? "warning" : "neutral"}
         />
       </div>
-
-      <SettingsToolbar>
-        <button type="button" onClick={() => void fetchData()} className={btnSecondary()}>
-          <RefreshCw className="h-4 w-4" />
-          {t("systemConfig.consultationPolicy.refresh")}
-        </button>
-      </SettingsToolbar>
 
       {success ? (
         <SettingsAlert
@@ -303,27 +430,15 @@ export function ConsultationPolicyPanel() {
                 <TableRow key={item.id}>
                   <TableCell className={tdClass}>
                     <div className="font-medium text-gray-800 dark:text-white/90">
-                      {policyLabel(item)}
+                      {policyStageLabel(item)}
                     </div>
-                    {item.description && item.description !== policyLabel(item) ? (
-                      <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                        {item.description}
-                      </p>
-                    ) : null}
-                    {item.hoursBeforeService != null ? (
-                      <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                        {t("systemConfig.consultationPolicy.hoursBefore", {
-                          hours: item.hoursBeforeService,
-                        })}
-                      </p>
-                    ) : null}
                   </TableCell>
                   <TableCell className={`${tdClass} whitespace-nowrap`}>
                     <span className="font-medium text-gray-800 dark:text-white/90">
                       {formatPolicyFee(item)}
                     </span>
                     <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {formatStatusLabel(String(item.feeType ?? ""))}
+                      {t(feeTypeI18nKey(String(item.feeType ?? "")))}
                     </p>
                   </TableCell>
                   <TableCell className={tdClass}>
@@ -354,36 +469,76 @@ export function ConsultationPolicyPanel() {
       )}
 
       <Modal isOpen={editing !== null} onClose={closeEdit} className="max-w-lg">
-        {editing && form ? (
+        {editing && form ? (() => {
+          const editableFeeTypes = editableFeeTypesForStage(editing);
+          const currentFeeType = String(editing.feeType ?? "").toUpperCase();
+          const showUnsupportedFeeType =
+            currentFeeType === "USAGE_BASED" && !editableFeeTypes.includes(currentFeeType);
+
+          return (
           <div className="p-6">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              {t("systemConfig.consultationPolicy.editTitle", { name: policyLabel(editing) })}
+              {t("systemConfig.consultationPolicy.editTitle", { name: policyStageLabel(editing) })}
             </h3>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              {t("systemConfig.consultationPolicy.editHint")}
+              {isPrePaymentStage(editing)
+                ? t("systemConfig.consultationPolicy.editHintPrePayment")
+                : t("systemConfig.consultationPolicy.editHint")}
             </p>
+
+            {showUnsupportedFeeType ? (
+              <p className="mt-3 text-sm text-amber-600 dark:text-amber-400">
+                {t("systemConfig.consultationPolicy.usageBasedReadOnly")}
+              </p>
+            ) : null}
 
             <div className="mt-5 space-y-4">
               <div>
                 <label className={labelClass}>{t("systemConfig.consultationPolicy.feeType")}</label>
                 <ThemedSelect
                   value={form.feeType}
-                  onChange={(e) => setForm({ ...form, feeType: e.target.value })}
+                  onChange={(e) => handleFeeTypeChange(e.target.value)}
                   className="mt-1"
                 >
-                  <option value="PERCENT">{t("systemConfig.consultationPolicy.feePercent")}</option>
-                  <option value="FIXED">{t("systemConfig.consultationPolicy.feeFixed")}</option>
+                  {showUnsupportedFeeType ? (
+                    <option value="USAGE_BASED" disabled>
+                      {t(feeTypeI18nKey("USAGE_BASED"))} ({t("systemConfig.consultationPolicy.notEditable")})
+                    </option>
+                  ) : null}
+                  {editableFeeTypes.map((type) => (
+                    <option key={type} value={type}>
+                      {t(feeTypeI18nKey(type))}
+                    </option>
+                  ))}
                 </ThemedSelect>
+                {form.feeType !== currentFeeType ? (
+                  <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                    {t("systemConfig.consultationPolicy.feeTypeChangeHint")}
+                  </p>
+                ) : null}
               </div>
 
               <div>
-                <label className={labelClass}>{t("systemConfig.consultationPolicy.feeValue")}</label>
+                <label className={labelClass}>
+                  {form.feeType === "PERCENT"
+                    ? t("systemConfig.consultationPolicy.feeValuePercent")
+                    : form.feeType === "FLAT"
+                      ? t("systemConfig.consultationPolicy.feeValueFlat")
+                      : t("systemConfig.consultationPolicy.feeValue")}
+                </label>
                 <input
                   type="text"
-                  value={form.feeValue}
+                  value={form.feeType === "NONE" ? "0.00" : form.feeValue}
                   onChange={(e) => setForm({ ...form, feeValue: e.target.value })}
                   className={`${inputClass} mt-1`}
-                  placeholder={form.feeType === "PERCENT" ? "50.00" : "100.00"}
+                  disabled={form.feeType === "NONE"}
+                  placeholder={
+                    form.feeType === "PERCENT"
+                      ? "80.00"
+                      : form.feeType === "FLAT"
+                        ? "500.00"
+                        : "0.00"
+                  }
                 />
               </div>
 
@@ -397,16 +552,74 @@ export function ConsultationPolicyPanel() {
                 {t("systemConfig.consultationPolicy.policyActive")}
               </label>
 
-              <div>
-                <label className={labelClass}>{t("systemConfig.consultationPolicy.metadataJson")}</label>
-                <textarea
-                  value={form.metadataJson}
-                  onChange={(e) => setForm({ ...form, metadataJson: e.target.value })}
-                  rows={5}
-                  className={`${inputClass} mt-1 font-mono text-xs`}
-                  spellCheck={false}
-                />
-              </div>
+              {isPreServiceStage(editing) ? (
+                <>
+                  <div>
+                    <label className={labelClass}>
+                      {t("systemConfig.consultationPolicy.windowMin")}
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      step={1}
+                      value={form.windowMin}
+                      onChange={(e) => setForm({ ...form, windowMin: e.target.value })}
+                      className={`${inputClass} mt-1`}
+                      placeholder="120"
+                    />
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      {t("systemConfig.consultationPolicy.windowMinHint")}
+                    </p>
+                  </div>
+                  <div>
+                    <span className={labelClass}>{t("systemConfig.consultationPolicy.exceptions")}</span>
+                    <div className="mt-2 space-y-2">
+                      {CANCELLATION_EXCEPTIONS.map((code) => (
+                        <label
+                          key={code}
+                          className="flex cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-300"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={form.exceptions.includes(code)}
+                            onChange={() => toggleException(code)}
+                            className="rounded border-gray-300 dark:border-gray-600"
+                          />
+                          {t(`systemConfig.consultationPolicy.exception_${code}`)}
+                        </label>
+                      ))}
+                    </div>
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      {t("systemConfig.consultationPolicy.exceptionsHint")}
+                    </p>
+                  </div>
+                </>
+              ) : null}
+
+              {isInProgressStage(editing) ? (
+                <div>
+                  <span className={labelClass}>{t("systemConfig.consultationPolicy.exceptions")}</span>
+                  <div className="mt-2 space-y-2">
+                    {CANCELLATION_EXCEPTIONS.map((code) => (
+                      <label
+                        key={code}
+                        className="flex cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-300"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={form.exceptions.includes(code)}
+                          onChange={() => toggleException(code)}
+                          className="rounded border-gray-300 dark:border-gray-600"
+                        />
+                        {t(`systemConfig.consultationPolicy.exception_${code}`)}
+                      </label>
+                    ))}
+                  </div>
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    {t("systemConfig.consultationPolicy.exceptionsHint")}
+                  </p>
+                </div>
+              ) : null}
             </div>
 
             <div className="mt-6 flex justify-end gap-2">
@@ -418,7 +631,8 @@ export function ConsultationPolicyPanel() {
               </button>
             </div>
           </div>
-        ) : null}
+          );
+        })() : null}
       </Modal>
     </>
   );
