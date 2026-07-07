@@ -783,6 +783,60 @@ export const adminSystemConfigApi = {
   },
 };
 
+// ============== Admin: Cancellation policies (consultation policy) ==============
+
+export type CancellationPolicyServiceCategory = "DOCTOR" | "CAREGIVER";
+export type CancellationPolicyServiceType = "SHORT_TERM" | "LONG_TERM";
+export type CancellationPolicyFeeType = "PERCENT" | "FLAT" | "USAGE_BASED" | "NONE";
+
+export interface CancellationPolicyItem {
+  id: number;
+  serviceCategory?: CancellationPolicyServiceCategory | string;
+  policyServiceType?: CancellationPolicyServiceType | string;
+  feeType: CancellationPolicyFeeType | string;
+  feeValue: string;
+  metadata?: Record<string, unknown> | null;
+  isActive: boolean;
+  stage?: string | null;
+  title?: string | null;
+  name?: string | null;
+  description?: string | null;
+  policyKey?: string | null;
+  hoursBeforeService?: number | null;
+  sortOrder?: number | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface UpdateCancellationPolicyPayload {
+  feeType?: CancellationPolicyFeeType | string;
+  feeValue?: string;
+  metadata?: Record<string, unknown>;
+  isActive?: boolean;
+}
+
+export const adminCancellationPoliciesApi = {
+  /** GET /admin/cancellation-policies — list by category and service type. */
+  list: async (params: {
+    serviceCategory: CancellationPolicyServiceCategory;
+    policyServiceType: CancellationPolicyServiceType;
+  }) => {
+    return httpService.get<CancellationPolicyItem[] | { data?: CancellationPolicyItem[] }>(
+      "/admin/cancellation-policies",
+      {
+        params: {
+          serviceCategory: params.serviceCategory,
+          policyServiceType: params.policyServiceType,
+        },
+      }
+    );
+  },
+  /** PATCH /admin/cancellation-policies/:id */
+  update: async (id: number, data: UpdateCancellationPolicyPayload) => {
+    return httpService.patch<CancellationPolicyItem>(`/admin/cancellation-policies/${id}`, data);
+  },
+};
+
 // ============== Admin: Scheduler jobs ==============
 
 export interface SchedulerJobItem {
