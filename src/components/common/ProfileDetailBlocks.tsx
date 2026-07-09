@@ -15,6 +15,7 @@ import { UserCircleIcon, EyeIcon, DownloadIcon } from "../../icons";
 import { Calendar } from "../ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import Checkbox from "../form/input/Checkbox";
+import { BillingTab } from "../provider-billing";
 import {
   providersApi,
   adminCertificationsApi,
@@ -30,7 +31,6 @@ import type {
   AdminDocumentDto,
   AdminServiceRequestStatus,
   BeneficiaryDetailDto,
-  BillingRateHistoryResponseDto,
   PatientFullDetailsDto,
   ProviderWalletFundingHistoryResponseDto,
   ProviderFullDetailsDto,
@@ -726,11 +726,7 @@ export function ProviderFullDetailsView({
   const [salarySaving, setSalarySaving] = useState(false);
   const [salaryAmount, setSalaryAmount] = useState("");
   const [salaryFrequency, setSalaryFrequency] = useState<"MONTHLY" | "WEEKLY">("MONTHLY");
-  const [billingRateHistory, setBillingRateHistory] = useState<BillingRateHistoryResponseDto | null>(null);
-  const [billingRateLoading, setBillingRateLoading] = useState(false);
-  const [billingRateSaving, setBillingRateSaving] = useState(false);
-  const [billingRateAmount, setBillingRateAmount] = useState("");
-  const [billingRateType, setBillingRateType] = useState<"CONSULTATION" | "HOURLY">("CONSULTATION");
+  const [providerDetailsTab, setProviderDetailsTab] = useState<"overview" | "billing">("overview");
   const [manualCreditAmount, setManualCreditAmount] = useState("");
   const [manualCreditReason, setManualCreditReason] = useState("");
   const [manualCreditReference, setManualCreditReference] = useState("");
@@ -1045,26 +1041,6 @@ export function ProviderFullDetailsView({
     };
   }, [provider.id]);
 
-  useEffect(() => {
-    if (!provider.id) return;
-    const ac = new AbortController();
-    let aborted = false;
-    setBillingRateLoading(true);
-    adminProvidersApi
-      .getProviderBillingRateHistory(provider.id, { signal: ac.signal })
-      .then((res) => {
-        const d = res?.data ?? res;
-        if (!aborted && d) setBillingRateHistory(d as BillingRateHistoryResponseDto);
-      })
-      .finally(() => {
-        if (!aborted) setBillingRateLoading(false);
-      });
-    return () => {
-      aborted = true;
-      ac.abort();
-    };
-  }, [provider.id]);
-
   const handleVerifyDocument = async (docId: number, status: "APPROVED" | "REJECTED") => {
     setVerifyingDocId(docId);
     try {
@@ -1093,23 +1069,6 @@ export function ProviderFullDetailsView({
       setCertsError("Failed to set salary.");
     } finally {
       setSalarySaving(false);
-    }
-  };
-
-  const handleSetBillingRate = async () => {
-    const amount = Number(billingRateAmount);
-    if (!provider.id || Number.isNaN(amount) || amount < 0) return;
-    setBillingRateSaving(true);
-    try {
-      await adminProvidersApi.setProviderBillingRate(provider.id, { amount, type: billingRateType });
-      setBillingRateAmount("");
-      const res = await adminProvidersApi.getProviderBillingRateHistory(provider.id);
-      const d = res?.data ?? res;
-      if (d) setBillingRateHistory(d as BillingRateHistoryResponseDto);
-    } catch {
-      setCertsError("Failed to set billing rate.");
-    } finally {
-      setBillingRateSaving(false);
     }
   };
 
@@ -2036,7 +1995,39 @@ export function ProviderFullDetailsView({
         variant="provider"
       />
 
-      <div className={`w-full min-w-0 grid grid-cols-1 gap-4 lg:grid-cols-2 sm:col-span-2 ${isProviderPending ? "relative opacity-60 pointer-events-none" : ""}`}>
+      <div className="w-full min-w-0 sm:col-span-2">
+        <div className="mb-4 inline-flex rounded-lg border border-gray-200 bg-gray-100 p-0.5 dark:border-gray-700 dark:bg-gray-800/80">
+          <button
+            type="button"
+            onClick={() => setProviderDetailsTab("overview")}
+            className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
+              providerDetailsTab === "overview"
+                ? "bg-white text-brand-700 shadow-sm dark:bg-gray-900 dark:text-brand-300"
+                : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
+            }`}
+          >
+            {t("providers.tabOverview")}
+          </button>
+          <button
+            type="button"
+            onClick={() => setProviderDetailsTab("billing")}
+            className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
+              providerDetailsTab === "billing"
+                ? "bg-white text-brand-700 shadow-sm dark:bg-gray-900 dark:text-brand-300"
+                : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
+            }`}
+          >
+            {t("providers.tabBilling")}
+          </button>
+        </div>
+
+        {providerDetailsTab === "billing" ? (
+          <DetailBlock title={t("providerBilling.title")}>
+            <BillingTab providerId={provider.id} />
+          </DetailBlock>
+        ) : (
+      <>
+      <div className={`w-full min-w-0 grid grid-cols-1 gap-4 lg:grid-cols-2 ${isProviderPending ? "relative opacity-60 pointer-events-none" : ""}`}>
         <DetailBlock title={t("providers.wallet")}>
           {isProviderPending && (
             <p className="mb-2 text-xs text-amber-600 dark:text-amber-400">
@@ -2305,63 +2296,9 @@ export function ProviderFullDetailsView({
             </>
           )}
         </DetailBlock>
-        <DetailBlock title={t("providers.billingRateAdmin")}>
-          <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
-            {t("providers.billingRateHelp")}
-          </p>
-          {billingRateLoading ? (
-            <p className="text-gray-500 dark:text-gray-400">{t("systemConfig.loading")}</p>
-          ) : (
-            <>
-              {billingRateHistory?.currentRate && (
-                <p className="mb-2 text-sm text-gray-700 dark:text-gray-300">
-                  {t("providers.currentRate", {
-                    amount: billingRateHistory.currentRate.amount,
-                    type: billingRateHistory.currentRate.type,
-                    date: formatDate(billingRateHistory.currentRate.validFrom),
-                  })}
-                </p>
-              )}
-              <div className="flex flex-wrap items-end gap-2">
-                <input
-                  type="number"
-                  min={0}
-                  step={0.01}
-                  value={billingRateAmount}
-                  onChange={(e) => setBillingRateAmount(e.target.value)}
-                  placeholder={t("providers.amount")}
-                  className="w-28 rounded border border-gray-300 bg-white px-2 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
-                />
-                <select
-                  value={billingRateType}
-                  onChange={(e) => setBillingRateType(e.target.value as "CONSULTATION" | "HOURLY")}
-                  className="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
-                >
-                  <option value="CONSULTATION">{t("providers.consultation")}</option>
-                  <option value="HOURLY">{t("providers.hourly")}</option>
-                </select>
-                <button
-                  type="button"
-                  disabled={billingRateSaving || !billingRateAmount.trim()}
-                  onClick={handleSetBillingRate}
-                  className="rounded bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 dark:bg-brand-700 dark:hover:bg-brand-800"
-                >
-                  {billingRateSaving ? t("supervisor.saving") : t("providers.setRate")}
-                </button>
-              </div>
-              {(billingRateHistory?.history?.length ?? 0) > 0 && (
-                <div className="mt-3 max-h-32 overflow-auto">
-                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("providers.history")}</p>
-                  <ul className="mt-1 list-inside list-disc text-xs text-gray-600 dark:text-gray-400">
-                    {(billingRateHistory?.history ?? []).slice(0, 10).map((r, i) => (
-                      <li key={i}>{r.amount} ({r.type}) from {formatDate(r.validFrom)}{r.validTo ? ` to ${formatDate(r.validTo)}` : ` ${t("providers.currentMarker")}`}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </>
-          )}
-        </DetailBlock>
+      </div>
+      </>
+        )}
       </div>
 
     </div>
