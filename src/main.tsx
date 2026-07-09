@@ -9,6 +9,7 @@ import App from "./App.tsx";
 import { AppWrapper } from "./components/common/PageMeta.tsx";
 import { ThemeProvider } from "./context/ThemeContext.tsx";
 import { AuthProvider } from "./context/AuthContext.tsx";
+import { AppQueryProvider } from "./providers/AppQueryProvider.tsx";
 
 // Suppress all console output so logs are always ignored
 const noop = () => {};
@@ -25,11 +26,13 @@ if (typeof console !== "undefined") {
 createRoot(document.getElementById("root")!).render(
   <ThemeProvider>
     <AuthProvider>
-      <AppWrapper>
-        <Router>
-          <App />
-        </Router>
-      </AppWrapper>
+      <AppQueryProvider>
+        <AppWrapper>
+          <Router>
+            <App />
+          </Router>
+        </AppWrapper>
+      </AppQueryProvider>
     </AuthProvider>
   </ThemeProvider>,
 );
