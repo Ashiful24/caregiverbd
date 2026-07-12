@@ -1698,13 +1698,14 @@ export function ProviderFullDetailsView({
                     <th className="py-2 pr-2 font-medium text-gray-500 dark:text-gray-400">{t("providers.certNumber")}</th>
                     <th className="py-2 pr-2 font-medium text-gray-500 dark:text-gray-400">{t("users.status")}</th>
                     <th className="py-2 pr-2 font-medium text-gray-500 dark:text-gray-400">{t("providers.approvedBy")}</th>
-                    <th className="py-2 pr-2 font-medium text-gray-500 dark:text-gray-400">{t("providers.seeDocument")}</th>
+                    <th className="py-2 pr-2 font-medium text-gray-500 dark:text-gray-400">{t("providers.document")}</th>
                     <th className="w-10 py-2 font-medium text-gray-500 dark:text-gray-400" aria-label={t("providers.showMore")} />
                   </tr>
                 </thead>
                 <tbody>
                   {certifications.map((cert) => {
                     const isExpanded = expandedCertId === cert.id;
+                    const certDocPath = cert.documentUrl ?? cert.filePath ?? cert.path;
                     return (
                       <React.Fragment key={cert.id}>
                         <tr className="border-b border-gray-100 dark:border-gray-800">
@@ -1720,18 +1721,42 @@ export function ProviderFullDetailsView({
                           </td>
                           <td className="py-1.5 pr-2 text-gray-700 dark:text-gray-300">{cert.approvedByName ?? "—"}</td>
                           <td className="py-1.5 pr-2">
-                            {cert.documentUrl ? (
-                              <a
-                                href={getAssetUrl(cert.documentUrl)}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-brand-600 hover:underline dark:text-brand-400"
+                            <span className="flex flex-wrap items-center gap-1">
+                              <button
+                                type="button"
+                                disabled={!certDocPath}
+                                onClick={() => viewDocument(certDocPath)}
+                                title={t("common.actions.view")}
+                                className="rounded border border-gray-300 bg-white p-1.5 text-gray-600 hover:bg-gray-50 hover:text-gray-800 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
                               >
-                                {t("providers.seeDocument")}
-                              </a>
-                            ) : (
-                              <span className="text-gray-400 dark:text-gray-500">—</span>
-                            )}
+                                <EyeIcon className="h-4 w-4" />
+                              </button>
+                              <button
+                                type="button"
+                                disabled={!certDocPath}
+                                onClick={() =>
+                                  downloadDocument(
+                                    certDocPath,
+                                    `${cert.certificationTypeCode}_${cert.id}.pdf`
+                                  )
+                                }
+                                title={t("upgradeRequests.download")}
+                                className="rounded border border-gray-300 bg-white p-1.5 text-gray-600 hover:bg-gray-50 hover:text-gray-800 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+                              >
+                                <DownloadIcon className="h-4 w-4" />
+                              </button>
+                              <button
+                                type="button"
+                                disabled={!certDocPath}
+                                onClick={() => printDocument(certDocPath)}
+                                title={t("upgradeRequests.print")}
+                                className="rounded border border-gray-300 bg-white p-1.5 text-gray-600 hover:bg-gray-50 hover:text-gray-800 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+                              >
+                                <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                  <path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z" />
+                                </svg>
+                              </button>
+                            </span>
                           </td>
                           <td className="py-1.5">
                             <button

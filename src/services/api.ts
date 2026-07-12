@@ -2215,6 +2215,9 @@ export interface AdminCertificationDto {
   createdAt: string;
   /** URL or path to view the uploaded document for this certificate. */
   documentUrl?: string | null;
+  /** Alternate path fields some API responses may include. */
+  filePath?: string | null;
+  path?: string | null;
 }
 
 /** One consultation-type checklist service with offered flag (provider profile). */
