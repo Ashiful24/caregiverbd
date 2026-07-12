@@ -735,6 +735,44 @@ export const consultationTypesApi = {
       `/admin/consultation-types/${consultationTypeId}/verification-requirements/${reqId}`
     );
   },
+
+  // --- Admin: Certification requirements per consultation type ---
+  /** GET /admin/consultation-types/:id/certification-requirements */
+  getCertificationRequirements: async (consultationTypeId: number) => {
+    return httpService.get<ConsultationTypeCertificationRequirementItem[]>(
+      `/admin/consultation-types/${consultationTypeId}/certification-requirements`
+    );
+  },
+  /** POST /admin/consultation-types/:id/certification-requirements */
+  createCertificationRequirement: async (
+    consultationTypeId: number,
+    data: { certificationTypeId: number; isRequired?: boolean }
+  ) => {
+    return httpService.post<ConsultationTypeCertificationRequirementItem>(
+      `/admin/consultation-types/${consultationTypeId}/certification-requirements`,
+      data
+    );
+  },
+  /** PATCH /admin/consultation-types/:id/certification-requirements/:reqId */
+  updateCertificationRequirement: async (
+    consultationTypeId: number,
+    reqId: number,
+    data: { isRequired?: boolean }
+  ) => {
+    return httpService.patch<ConsultationTypeCertificationRequirementItem>(
+      `/admin/consultation-types/${consultationTypeId}/certification-requirements/${reqId}`,
+      data
+    );
+  },
+  /** DELETE /admin/consultation-types/:id/certification-requirements/:reqId */
+  deleteCertificationRequirement: async (
+    consultationTypeId: number,
+    reqId: number
+  ) => {
+    return httpService.delete(
+      `/admin/consultation-types/${consultationTypeId}/certification-requirements/${reqId}`
+    );
+  },
 };
 
 /** Service category checklist row (admin; per consultation type). */
@@ -760,6 +798,14 @@ export interface ConsultationTypeVerificationRequirementItem {
   documentType: string;
   isRequired: boolean;
   displayOrder: number;
+}
+
+/** Certification requirement item (admin). */
+export interface ConsultationTypeCertificationRequirementItem {
+  id: number;
+  consultationTypeId: number;
+  certificationTypeId: number;
+  isRequired: boolean;
 }
 
 // ============== Admin: System Configuration ==============
@@ -1300,6 +1346,58 @@ export const verificationDocumentTypesApi = {
       `/admin/verification-document-types/${id}/active`,
       { isActive }
     );
+  },
+};
+
+// ============== Admin: Certification Types ==============
+
+/** Admin-managed certification type (add, update, deactivate). */
+export interface CertificationTypeItem {
+  id: number;
+  code: string;
+  name: string;
+  nameBn?: string;
+  description?: string | null;
+  descriptionBn?: string | null;
+  isActive: boolean;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export type CertificationTypeLang = "en" | "bn";
+
+export const certificationTypesApi = {
+  list: async (params?: { activeOnly?: boolean; lang?: CertificationTypeLang }) => {
+    const query: Record<string, string> = { lang: params?.lang ?? "en" };
+    if (params?.activeOnly) query.activeOnly = "true";
+    return httpService.get<CertificationTypeItem[]>("/admin/certification-types", {
+      params: query,
+    });
+  },
+  create: async (data: {
+    code: string;
+    name: string;
+    nameBn?: string;
+    description?: string;
+    descriptionBn?: string;
+  }) => {
+    return httpService.post<CertificationTypeItem>("/admin/certification-types", data);
+  },
+  update: async (
+    id: number,
+    data: {
+      name?: string;
+      nameBn?: string;
+      description?: string | null;
+      descriptionBn?: string | null;
+    }
+  ) => {
+    return httpService.patch<CertificationTypeItem>(`/admin/certification-types/${id}`, data);
+  },
+  setActive: async (id: number, isActive: boolean) => {
+    return httpService.patch<CertificationTypeItem>(`/admin/certification-types/${id}/active`, {
+      isActive,
+    });
   },
 };
 

@@ -133,6 +133,14 @@ export const NAV_COMMANDS: NavCommand[] = [
     keywords: ["kyc", "documents"],
   },
   {
+    id: "certification-types",
+    path: "/certification-types",
+    titleKey: "navigation.certificationTypes",
+    group: "configuration",
+    allowedRoles: ["ADMIN"],
+    keywords: ["certification", "credentials", "bmdc"],
+  },
+  {
     id: "service-checklist-groups",
     path: "/service-checklist-groups",
     titleKey: "navigation.serviceChecklistGroups",
