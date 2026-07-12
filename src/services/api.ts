@@ -3828,6 +3828,9 @@ export interface FinancialReportTotalsDto {
   totalProviderEarningsAllocated: string;
   totalCommission: string;
   totalTax: string;
+  /** VAT collected on service fees (may mirror totalTax). */
+  totalVat?: string;
+  totalSupervisorCommission?: string;
   totalAit: string;
   totalWithdrawals: string;
   netPlatformEarnings: string;

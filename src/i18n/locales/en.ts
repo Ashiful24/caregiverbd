@@ -1381,6 +1381,8 @@ const en = {
         allProviders: "All providers",
         allPatients: "All patients",
         searchByName: "Search by name…",
+        seeMore: "See more",
+        noMatches: "No matches.",
         allTypes: "All types",
         allMethods: "All methods",
         allServices: "All services",
@@ -1417,10 +1419,16 @@ const en = {
         aitWithheld: "AIT withheld",
         aitWithheldTt:
           "Advance Income Tax held from providers and set aside for tax (AIT). Not the same as platform commission or VAT.",
+        vat: "VAT",
+        vatTt:
+          "Value Added Tax collected on service fees in the selected period (VAT_GL).",
+        supervisorCommission: "Supervisor commission",
+        supervisorCommissionTt:
+          "Commission credited to assigned supervisors from the post-VAT pool when services complete.",
         platformEarnings: "Platform earnings",
         platformEarningsTt:
-          "Commission plus tax the platform earned in this period (AIT is separate — it is withheld from providers).",
-        earningsHint: "{{commission}} commission · {{tax}} tax",
+          "Net platform earnings in this period (commission and related platform revenue; VAT and supervisor commission are shown separately).",
+        earningsHint: "{{commission}} commission",
         withdrawals: "Withdrawals",
         withdrawalsTt:
           "Money paid out of the platform when providers withdrew to their bank or cash route.",

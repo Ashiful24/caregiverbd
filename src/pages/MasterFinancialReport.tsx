@@ -4,7 +4,7 @@ import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import PageMeta from "../components/common/PageMeta";
 import { DetailModal } from "../components/common/DetailModal";
 import { InfoTooltip } from "../components/common/InfoTooltip";
-import { SearchableSelect } from "../components/form/SearchableSelect";
+import { PaginatedSearchableSelect } from "../components/form/PaginatedSearchableSelect";
 import Badge from "../components/ui/badge/Badge";
 import {
   Table,
@@ -26,6 +26,8 @@ import {
   type FinancialTxStatus,
   type ProviderListItem,
   type PatientListItem,
+  type AdminProviderListResponse,
+  type PatientsListResponse,
 } from "../services/api";
 import {
   bangladeshCalendarRangeToApiParams,
@@ -42,6 +44,8 @@ import {
   DEFAULT_LIMIT,
   MAX_RANGE_DAYS,
 } from "./financial/shared";
+
+const PARTY_PAGE_SIZE = 10;
 
 // ────────────────────────────────────────────────────────────────────────────
 // Page
@@ -178,39 +182,64 @@ export default function MasterFinancialReport() {
     [loadReport],
   );
 
-  // ── Provider list (for filter dropdown) ───────────────────────────────────
-  const [providers, setProviders] = useState<ProviderListItem[]>([]);
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await providersApi.getList({ page: 1, limit: 500 });
-        const list =
-          (res?.data as { providers?: ProviderListItem[] })?.providers ??
-          (res as { providers?: ProviderListItem[] })?.providers ??
-          [];
-        setProviders(Array.isArray(list) ? list : []);
-      } catch {
-        setProviders([]);
-      }
-    })();
-  }, []);
+  // ── Provider / patient pickers (paginated + server search) ────────────────
+  const fetchProviderPage = useCallback(
+    async (
+      params: { page: number; limit: number; search?: string },
+      signal?: AbortSignal
+    ) => {
+      const res = await providersApi.getList(
+        { page: params.page, limit: params.limit, search: params.search },
+        { signal }
+      );
+      const data = (res?.data ?? res) as AdminProviderListResponse;
+      const list = Array.isArray(data?.providers) ? data.providers : [];
+      return {
+        items: list.map((p: ProviderListItem) => {
+          const name =
+            p.providerName ||
+            p.fullName ||
+            [p.firstName, p.lastName].filter(Boolean).join(" ") ||
+            t(`${M}.detail.providerFallback`, { id: p.id });
+          return {
+            value: p.id,
+            label: name,
+            hint: p.email ?? undefined,
+          };
+        }),
+        total: data?.total ?? list.length,
+      };
+    },
+    [t, M]
+  );
 
-  // ── Patient list (for filter dropdown) ────────────────────────────────────
-  const [patients, setPatients] = useState<PatientListItem[]>([]);
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await patientsApi.getList({ page: 1, limit: 500 });
-        const list =
-          (res?.data as { patients?: PatientListItem[] })?.patients ??
-          (res as { patients?: PatientListItem[] })?.patients ??
-          [];
-        setPatients(Array.isArray(list) ? list : []);
-      } catch {
-        setPatients([]);
-      }
-    })();
-  }, []);
+  const fetchPatientPage = useCallback(
+    async (
+      params: { page: number; limit: number; search?: string },
+      signal?: AbortSignal
+    ) => {
+      const res = await patientsApi.getList(
+        { page: params.page, limit: params.limit, search: params.search },
+        { signal }
+      );
+      const data = (res?.data ?? res) as PatientsListResponse;
+      const list = Array.isArray(data?.patients) ? data.patients : [];
+      return {
+        items: list.map((p: PatientListItem) => {
+          const name =
+            [p.firstName, p.lastName].filter(Boolean).join(" ") ||
+            t(`${M}.detail.patientFallback`, { id: p.id });
+          return {
+            value: p.id,
+            label: name,
+            hint: p.email ?? p.username ?? undefined,
+          };
+        }),
+        total: data?.total ?? list.length,
+      };
+    },
+    [t, M]
+  );
 
   // ── Detail modal ──────────────────────────────────────────────────────────
   const [detailOpen, setDetailOpen] = useState(false);
@@ -346,25 +375,19 @@ export default function MasterFinancialReport() {
                 {t(`${M}.filters.provider`)}
                 <InfoTooltip text={t(`${M}.filters.ttProvider`)} />
               </span>
-              <SearchableSelect<number>
+              <PaginatedSearchableSelect<number>
                 value={providerId === "" ? null : providerId}
                 onChange={(v) => setProviderId(v == null ? "" : v)}
+                fetchPage={fetchProviderPage}
+                pageSize={PARTY_PAGE_SIZE}
                 placeholder={t(`${M}.filters.allProviders`)}
                 clearLabel={t(`${M}.filters.allProviders`)}
                 searchPlaceholder={t(`${M}.filters.searchByName`)}
+                seeMoreLabel={t(`${M}.filters.seeMore`)}
+                loadingLabel={t("systemConfig.loading")}
+                loadingMoreLabel={t("common.actions.loadingMore")}
+                noMatchesLabel={t(`${M}.filters.noMatches`)}
                 className="min-h-[42px]"
-                options={providers.map((p) => {
-                  const name =
-                    p.providerName ||
-                    p.fullName ||
-                    [p.firstName, p.lastName].filter(Boolean).join(" ") ||
-                    t(`${M}.detail.providerFallback`, { id: p.id });
-                  return {
-                    value: p.id,
-                    label: name,
-                    hint: p.email ?? undefined,
-                  };
-                })}
               />
             </label>
             <label className="flex min-w-0 flex-col gap-1 sm:col-span-2 lg:col-span-4">
@@ -372,23 +395,19 @@ export default function MasterFinancialReport() {
                 {t(`${M}.filters.patient`)}
                 <InfoTooltip text={t(`${M}.filters.ttPatient`)} />
               </span>
-              <SearchableSelect<number>
+              <PaginatedSearchableSelect<number>
                 value={patientId === "" ? null : patientId}
                 onChange={(v) => setPatientId(v == null ? "" : v)}
+                fetchPage={fetchPatientPage}
+                pageSize={PARTY_PAGE_SIZE}
                 placeholder={t(`${M}.filters.allPatients`)}
                 clearLabel={t(`${M}.filters.allPatients`)}
                 searchPlaceholder={t(`${M}.filters.searchByName`)}
+                seeMoreLabel={t(`${M}.filters.seeMore`)}
+                loadingLabel={t("systemConfig.loading")}
+                loadingMoreLabel={t("common.actions.loadingMore")}
+                noMatchesLabel={t(`${M}.filters.noMatches`)}
                 className="min-h-[42px]"
-                options={patients.map((p) => {
-                  const name =
-                    [p.firstName, p.lastName].filter(Boolean).join(" ") ||
-                    t(`${M}.detail.patientFallback`, { id: p.id });
-                  return {
-                    value: p.id,
-                    label: name,
-                    hint: p.email ?? p.username ?? undefined,
-                  };
-                })}
               />
             </label>
             <label className="flex min-w-0 flex-col gap-1 sm:col-span-1 lg:col-span-3">
@@ -478,7 +497,7 @@ export default function MasterFinancialReport() {
 
         {/* ─────────────────────────── SUMMARY KPIs ─────────────────────────────── */}
         {totals ? (
-          <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
             <KpiCard
               label={t(`${M}.kpi.totalInflow`)}
               value={fmtBDT(totals.totalInflow)}
@@ -503,11 +522,22 @@ export default function MasterFinancialReport() {
               tooltip={t(`${M}.kpi.aitWithheldTt`)}
             />
             <KpiCard
+              label={t(`${M}.kpi.vat`)}
+              value={fmtBDT(totals.totalVat ?? totals.totalTax ?? "0")}
+              tone="neutral"
+              tooltip={t(`${M}.kpi.vatTt`)}
+            />
+            <KpiCard
+              label={t(`${M}.kpi.supervisorCommission`)}
+              value={fmtBDT(totals.totalSupervisorCommission ?? "0")}
+              tone="neutral"
+              tooltip={t(`${M}.kpi.supervisorCommissionTt`)}
+            />
+            <KpiCard
               label={t(`${M}.kpi.platformEarnings`)}
               value={fmtBDT(totals.netPlatformEarnings)}
               hint={t(`${M}.kpi.earningsHint`, {
                 commission: fmtBDT(totals.totalCommission),
-                tax: fmtBDT(totals.totalTax),
               })}
               tone="positive"
               tooltip={t(`${M}.kpi.platformEarningsTt`)}
