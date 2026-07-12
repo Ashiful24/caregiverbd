@@ -1385,6 +1385,8 @@ const bn = {
         allProviders: "সব প্রোভাইডার",
         allPatients: "সব রোগী",
         searchByName: "নামে খুঁজুন…",
+        seeMore: "আরও দেখুন",
+        noMatches: "কোনো মিল নেই।",
         allTypes: "সব ধরণ",
         allMethods: "সব পদ্ধতি",
         allServices: "সব সেবা",
@@ -1420,10 +1422,16 @@ const bn = {
         aitWithheld: "AIT কর্তন",
         aitWithheldTt:
           "প্রোভাইডার উপার্জন থেকে আগাম আয়কর (AIT) কাটা—প্ল্যাটফর্ম কমিশন বা ভ্যাট নয়।",
+        vat: "ভ্যাট",
+        vatTt:
+          "নির্বাচিত সময়ে সেবা ফিতে আদায়কৃত ভ্যাট (VAT_GL)।",
+        supervisorCommission: "সুপারভাইজার কমিশন",
+        supervisorCommissionTt:
+          "সেবা সম্পন্ন হলে নিয়োজিত সুপারভাইজারদের ভ্যাট-পরবর্তী পুল থেকে ক্রেডিটকৃত কমিশন।",
         platformEarnings: "প্ল্যাটফর্ম আয়",
         platformEarningsTt:
-          "এই সময়ে প্ল্যাটফর্মের কমিশন ও ট্যাক্স (AIT আলাদা—সেটা প্রোভাইডার থেকে কাটা)।",
-        earningsHint: "{{commission}} কমিশন · {{tax}} ট্যাক্স",
+          "এই সময়ে নেট প্ল্যাটফর্ম আয় (কমিশন ও সম্পর্কিত রাজস্ব; ভ্যাট ও সুপারভাইজার কমিশন আলাদা কার্ডে)।",
+        earningsHint: "{{commission}} কমিশন",
         withdrawals: "উইথড্রয়াল",
         withdrawalsTt:
           "প্রোভাইডার উইথড্রয়ালে প্ল্যাটফর্ম থেকে বের হওয়া টাকা।",
