@@ -15,6 +15,7 @@ import ConsultationTypeConfig from "./pages/ConsultationTypeConfig";
 import ServiceRequestList from "./pages/ServiceRequestList";
 import VerificationDocuments from "./pages/VerificationDocuments";
 import VerificationDocumentTypes from "./pages/VerificationDocumentTypes";
+import CertificationTypes from "./pages/CertificationTypes";
 import ServiceChecklistGroups from "./pages/ServiceChecklistGroups";
 import ConsultationTypeLevels from "./pages/ConsultationTypeLevels";
 import SystemConfig from "./pages/SystemConfig";
@@ -230,6 +231,14 @@ export default function App() {
             element={
               <ProtectedRoute allowedRoles={["ADMIN"]}>
                 <VerificationDocumentTypes />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/certification-types"
+            element={
+              <ProtectedRoute allowedRoles={["ADMIN"]}>
+                <CertificationTypes />
               </ProtectedRoute>
             }
           />
