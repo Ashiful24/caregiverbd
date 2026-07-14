@@ -10,12 +10,15 @@ import { Modal } from "../components/ui/modal";
 import {
   consultationTypesApi,
   verificationDocumentTypesApi,
+  certificationTypesApi,
   serviceChecklistGroupsApi,
   type ServiceCategoryChecklistItem,
   type ServiceCategoryChecklistType,
   type ServiceChecklistGroupItem,
   type ConsultationTypeVerificationRequirementItem,
+  type ConsultationTypeCertificationRequirementItem,
   type VerificationDocumentTypeItem,
+  type CertificationTypeItem,
 } from "../services/api";
 import { PencilIcon, PlusIcon, TrashBinIcon } from "../icons";
 
@@ -46,6 +49,9 @@ export default function ConsultationTypeConfig() {
   const [requirements, setRequirements] = useState<
     ConsultationTypeVerificationRequirementItem[]
   >([]);
+  const [certRequirements, setCertRequirements] = useState<
+    ConsultationTypeCertificationRequirementItem[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -55,6 +61,11 @@ export default function ConsultationTypeConfig() {
   const [reqModal, setReqModal] = useState<
     | { mode: "add" }
     | { mode: "edit"; item: ConsultationTypeVerificationRequirementItem }
+    | null
+  >(null);
+  const [certModal, setCertModal] = useState<
+    | { mode: "add" }
+    | { mode: "edit"; item: ConsultationTypeCertificationRequirementItem }
     | null
   >(null);
   const [serviceName, setServiceName] = useState("");
@@ -69,12 +80,18 @@ export default function ConsultationTypeConfig() {
   const [serviceIsActive, setServiceIsActive] = useState(true);
   const [serviceDisplayOrder, setServiceDisplayOrder] = useState(0);
   const [documentTypes, setDocumentTypes] = useState<VerificationDocumentTypeItem[]>([]);
+  const [certificationTypes, setCertificationTypes] = useState<CertificationTypeItem[]>([]);
   const [reqDocumentType, setReqDocumentType] = useState("");
+  const [certTypeId, setCertTypeId] = useState<number | "">("");
   const [reqIsRequired, setReqIsRequired] = useState(true);
+  const [certIsRequired, setCertIsRequired] = useState(true);
   const [reqDisplayOrder, setReqDisplayOrder] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<
-    { type: "service"; id: number } | { type: "requirement"; id: number } | null
+    | { type: "service"; id: number }
+    | { type: "requirement"; id: number }
+    | { type: "certification"; id: number }
+    | null
   >(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
 
@@ -83,15 +100,25 @@ export default function ConsultationTypeConfig() {
     setLoading(true);
     setError("");
     try {
-      const [treeRes, servicesRes, reqsRes, docTypesRes] = await Promise.all([
+      const [treeRes, servicesRes, reqsRes, certReqsRes, docTypesRes, certTypesRes] =
+        await Promise.all([
         consultationTypesApi.getAll({ lang: apiLang }),
         consultationTypesApi.getServices(typeId, { lang: apiLang }),
         consultationTypesApi.getVerificationRequirements(typeId),
+        consultationTypesApi.getCertificationRequirements(typeId),
         verificationDocumentTypesApi.list({ activeOnly: true, lang: apiLang }),
+        certificationTypesApi.list({ activeOnly: true, lang: apiLang }),
       ]);
       const docTypes = Array.isArray(docTypesRes?.data) ? docTypesRes.data : Array.isArray(docTypesRes) ? docTypesRes : [];
+      const certTypes = Array.isArray(certTypesRes?.data)
+        ? certTypesRes.data
+        : Array.isArray(certTypesRes)
+          ? certTypesRes
+          : [];
       setDocumentTypes(docTypes);
+      setCertificationTypes(certTypes);
       if (docTypes.length > 0 && !reqDocumentType) setReqDocumentType(docTypes[0].code);
+      if (certTypes.length > 0 && certTypeId === "") setCertTypeId(certTypes[0].id);
       const tree = Array.isArray(treeRes.data) ? treeRes.data : [treeRes.data];
       const findName = (nodes: typeof tree): string => {
         for (const n of nodes) {
@@ -108,6 +135,8 @@ export default function ConsultationTypeConfig() {
       setServices(Array.isArray(servicesRaw) ? servicesRaw : []);
       const reqsRaw = reqsRes?.data ?? reqsRes;
       setRequirements(Array.isArray(reqsRaw) ? reqsRaw : []);
+      const certReqsRaw = certReqsRes?.data ?? certReqsRes;
+      setCertRequirements(Array.isArray(certReqsRaw) ? certReqsRaw : []);
     } catch (err: unknown) {
       const message =
         err && typeof err === "object" && "message" in err
@@ -246,8 +275,10 @@ export default function ConsultationTypeConfig() {
     try {
       if (pendingDelete.type === "service") {
         await consultationTypesApi.deleteService(typeId, pendingDelete.id);
-      } else {
+      } else if (pendingDelete.type === "requirement") {
         await consultationTypesApi.deleteVerificationRequirement(typeId, pendingDelete.id);
+      } else {
+        await consultationTypesApi.deleteCertificationRequirement(typeId, pendingDelete.id);
       }
       setPendingDelete(null);
       await fetchData();
@@ -255,7 +286,9 @@ export default function ConsultationTypeConfig() {
       setError(
         pendingDelete.type === "service"
           ? t("consultationConfig.failedDeleteService")
-          : t("consultationConfig.failedDeleteRequirement")
+          : pendingDelete.type === "requirement"
+            ? t("consultationConfig.failedDeleteRequirement")
+            : t("consultationConfig.failedDeleteCertification")
       );
       setPendingDelete(null);
     } finally {
@@ -292,6 +325,37 @@ export default function ConsultationTypeConfig() {
         { isRequired: reqIsRequired, displayOrder: reqDisplayOrder }
       );
       setReqModal(null);
+      await fetchData();
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleAddCert = async () => {
+    if (!isValidId || certTypeId === "") return;
+    setSubmitting(true);
+    try {
+      await consultationTypesApi.createCertificationRequirement(typeId, {
+        certificationTypeId: certTypeId,
+        isRequired: certIsRequired,
+      });
+      setCertModal(null);
+      setCertTypeId(certificationTypes[0]?.id ?? "");
+      setCertIsRequired(true);
+      await fetchData();
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleEditCert = async () => {
+    if (!certModal || certModal.mode !== "edit") return;
+    setSubmitting(true);
+    try {
+      await consultationTypesApi.updateCertificationRequirement(typeId, certModal.item.id, {
+        isRequired: certIsRequired,
+      });
+      setCertModal(null);
       await fetchData();
     } finally {
       setSubmitting(false);
@@ -433,6 +497,7 @@ export default function ConsultationTypeConfig() {
               </Button>
             </div>
 
+            <div className="space-y-8">
             {/* Verification requirements */}
             <div className="rounded-xl border border-gray-200 bg-gray-50/50 p-4 dark:border-gray-800 dark:bg-gray-800/30">
               <h4 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
@@ -501,6 +566,79 @@ export default function ConsultationTypeConfig() {
               >
                 {t("consultationConfig.addRequirement")}
               </Button>
+            </div>
+
+            {/* Certification requirements */}
+            <div className="rounded-xl border border-gray-200 bg-gray-50/50 p-4 dark:border-gray-800 dark:bg-gray-800/30">
+              <h4 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                {t("consultationConfig.certificationRequirements")}
+              </h4>
+              <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
+                {t("consultationConfig.certificationHelp")}
+              </p>
+              <ul className="space-y-2">
+                {certRequirements
+                  .sort((a, b) => a.id - b.id)
+                  .map((r) => {
+                    const typeItem = certificationTypes.find((ct) => ct.id === r.certificationTypeId);
+                    const typeLabel = typeItem?.name ?? `#${r.certificationTypeId}`;
+                    return (
+                      <li
+                        key={r.id}
+                        className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-800/50"
+                      >
+                        <span className="font-medium text-gray-800 dark:text-white/90">
+                          {typeLabel}
+                          {typeItem?.code ? (
+                            <span className="ml-1.5 text-xs text-gray-500 dark:text-gray-400">
+                              ({typeItem.code})
+                            </span>
+                          ) : null}
+                          {r.isRequired && (
+                            <span className="ml-1.5 rounded bg-amber-100 px-1 text-xs text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+                              {t("consultationConfig.required")}
+                            </span>
+                          )}
+                        </span>
+                        <div className="flex gap-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCertModal({ mode: "edit", item: r });
+                              setCertTypeId(r.certificationTypeId);
+                              setCertIsRequired(r.isRequired);
+                            }}
+                            className="rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+                          >
+                            <PencilIcon className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setPendingDelete({ type: "certification", id: r.id })}
+                            className="rounded p-1 text-gray-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+                          >
+                            <TrashBinIcon className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </li>
+                    );
+                  })}
+              </ul>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-3"
+                startIcon={<PlusIcon className="h-4 w-4" />}
+                onClick={() => {
+                  setCertModal({ mode: "add" });
+                  setCertTypeId(certificationTypes[0]?.id ?? "");
+                  setCertIsRequired(true);
+                }}
+                disabled={certificationTypes.length === 0}
+              >
+                {t("consultationConfig.addCertificationRequirement")}
+              </Button>
+            </div>
             </div>
           </div>
         )}
@@ -716,7 +854,9 @@ export default function ConsultationTypeConfig() {
           <p className="text-sm text-gray-600 dark:text-gray-400">
             {pendingDelete?.type === "requirement"
               ? t("consultationConfig.removeVerificationConfirm")
-              : t("consultationConfig.removeChecklistConfirm")}
+              : pendingDelete?.type === "certification"
+                ? t("consultationConfig.removeCertificationConfirm")
+                : t("consultationConfig.removeChecklistConfirm")}
           </p>
           <div className="flex justify-end gap-2">
             <button
@@ -796,6 +936,67 @@ export default function ConsultationTypeConfig() {
                 type="button"
                 disabled={submitting}
                 onClick={reqModal.mode === "add" ? handleAddReq : handleEditReq}
+                className="rounded bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+              >
+                {submitting ? t("supervisor.saving") : t("common.actions.save")}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Certification requirement add/edit modal */}
+      {certModal && (
+        <Modal
+          isOpen={true}
+          onClose={() => !submitting && setCertModal(null)}
+          title={
+            certModal.mode === "add"
+              ? t("consultationConfig.addCertificationRequirement")
+              : t("consultationConfig.editCertificationRequirement")
+          }
+          className="w-full max-w-lg"
+        >
+          <div className="space-y-3">
+            <label className="block">
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                {t("consultationConfig.certificationType")}
+              </span>
+              <select
+                value={certTypeId}
+                onChange={(e) => setCertTypeId(e.target.value ? parseInt(e.target.value, 10) : "")}
+                disabled={certModal.mode === "edit"}
+                className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 disabled:opacity-70"
+              >
+                {certificationTypes.map((ct) => (
+                  <option key={ct.id} value={ct.id}>
+                    {ct.name} ({ct.code})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex items-center gap-2">
+              <Checkbox
+                checked={certIsRequired}
+                onChange={setCertIsRequired}
+                className="h-4 w-4"
+              />
+              <span className="text-sm text-gray-700 dark:text-gray-300">
+                {t("consultationConfig.required")}
+              </span>
+            </label>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => !submitting && setCertModal(null)}
+                className="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+              >
+                {t("common.actions.cancel")}
+              </button>
+              <button
+                type="button"
+                disabled={submitting || certTypeId === ""}
+                onClick={certModal.mode === "add" ? handleAddCert : handleEditCert}
                 className="rounded bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
               >
                 {submitting ? t("supervisor.saving") : t("common.actions.save")}

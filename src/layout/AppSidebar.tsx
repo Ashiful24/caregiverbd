@@ -93,6 +93,12 @@ const navSections: NavSection[] = [
         allowedRoles: ["ADMIN"],
       },
       {
+        icon: <PageIcon />,
+        nameKey: "navigation.certificationTypes",
+        path: "/certification-types",
+        allowedRoles: ["ADMIN"],
+      },
+      {
         icon: <TaskIcon />,
         nameKey: "navigation.serviceChecklistGroups",
         path: "/service-checklist-groups",
