@@ -44,7 +44,7 @@ services:
     environment:
       # Overrides .env — nginx proxies /files/ to the file_uploader container directly
       # over the shared network instead of round-tripping through a public IP.
-      - VITE_FILE_SERVICE_URL=http://stage-app-file-uploader:3005
+      # - VITE_FILE_SERVICE_URL=http://stage-app-file-uploader:3005
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:80/health"]
       interval: 30s
