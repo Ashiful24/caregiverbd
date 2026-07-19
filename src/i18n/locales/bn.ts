@@ -769,6 +769,12 @@ const bn = {
     certScrapingScrapedPhoto: "কাউন্সিল",
     certScrapingProviderName: "প্রোভাইডার নাম",
     certScrapingScrapedName: "কাউন্সিল নাম",
+    certScrapingFaceDecision: "ডিসিশন",
+    certScrapingFaceScore: "স্কোর",
+    certScrapingFaceMatched: "ম্যাচড",
+    certScrapingFaceThreshold: "থ্রেশহোল্ড",
+    certScrapingFaceReviewThreshold: "রিভিউ থ্রেশহোল্ড",
+    certScrapingFaceReason: "কারণ",
     userDocuments: "ইউজার ডকুমেন্টস",
     userDocumentsHelp:
       "এই ইউজারের আপলোড করা সব ডকুমেন্ট। পৃথক ডকুমেন্ট যাচাই করতে Approve/Reject ব্যবহার করুন।",

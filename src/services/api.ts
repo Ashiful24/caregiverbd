@@ -4307,6 +4307,17 @@ export interface BnmcScrapingMetadataDto {
   registration?: BnmcScrapingRegistrationRowDto | null;
 }
 
+/** Face-match engine result stored on scraping_certifications.face_matched_meta. */
+export interface FaceMatchedMetaDto {
+  score: number | null;
+  reason: string | null;
+  matched: boolean | null;
+  decision: string | null;
+  threshold: number | null;
+  reviewThreshold: number | null;
+  metadata?: Record<string, unknown> | null;
+}
+
 /** One row from GET .../scraping items (scraping_certifications). */
 export interface ScrapingCertificationRecordDto {
   id: number;
@@ -4318,6 +4329,7 @@ export interface ScrapingCertificationRecordDto {
   photoUrl?: string | null;
   nameMatched?: number | null;
   faceMatched?: boolean | null;
+  faceMatchedMeta?: FaceMatchedMetaDto | Record<string, unknown> | null;
   metadata?: BnmcScrapingMetadataDto | Record<string, unknown> | null;
   createdAt?: string | null;
   updatedAt?: string | null;
@@ -4364,8 +4376,10 @@ export interface CertificationScrapingPreviewDto {
   registrationNumber: string;
   /** 0..100 name similarity score; null when unavailable. */
   nameMatched: number | null;
-  /** 0..100 face match score (boolean true→100 / false→0); null when unavailable. */
+  /** 0..100 face match score; prefers faceMatchedMeta.score when present. */
   faceMatched: number | null;
+  /** Structured face-match engine result (score, decision, thresholds, …). */
+  faceMatchedMeta: FaceMatchedMetaDto | null;
   registrations: CertificationScrapingRegistrationDto[];
 }
 
@@ -4394,19 +4408,79 @@ function toMatchPercent(...vals: unknown[]): number | null {
     if (v == null) continue;
     if (typeof v === "boolean") return v ? 100 : 0;
     if (typeof v === "number" && Number.isFinite(v)) {
-      return Math.max(0, Math.min(100, Math.round(v <= 1 && v > 0 ? v * 100 : v)));
+      return Math.max(0, Math.min(100, Math.round(v <= 1 && v >= 0 ? v * 100 : v)));
     }
     if (typeof v === "string" && v.trim()) {
       const lower = v.trim().toLowerCase();
-      if (lower === "true" || lower === "matched" || lower === "yes") return 100;
+      if (lower === "true" || lower === "matched" || lower === "yes" || lower === "match") {
+        return 100;
+      }
       if (lower === "false" || lower === "unmatched" || lower === "no") return 0;
       const n = Number(v);
       if (Number.isFinite(n)) {
-        return Math.max(0, Math.min(100, Math.round(n <= 1 && n > 0 ? n * 100 : n)));
+        return Math.max(0, Math.min(100, Math.round(n <= 1 && n >= 0 ? n * 100 : n)));
       }
     }
   }
   return null;
+}
+
+function toNullableNumber(v: unknown): number | null {
+  if (v == null || v === "") return null;
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function toNullableBool(v: unknown): boolean | null {
+  if (v == null) return null;
+  if (typeof v === "boolean") return v;
+  if (typeof v === "string") {
+    const lower = v.trim().toLowerCase();
+    if (lower === "true" || lower === "1" || lower === "yes") return true;
+    if (lower === "false" || lower === "0" || lower === "no") return false;
+  }
+  return null;
+}
+
+/** Normalize faceMatchedMeta from API (camelCase / snake_case). */
+export function normalizeFaceMatchedMeta(raw: unknown): FaceMatchedMetaDto | null {
+  const o = asRecord(raw);
+  if (!o) return null;
+  const score = toNullableNumber(o.score);
+  const threshold = toNullableNumber(o.threshold);
+  const reviewThreshold = toNullableNumber(o.reviewThreshold ?? o.review_threshold);
+  const matched = toNullableBool(o.matched);
+  const decision = pickStr(o.decision) || null;
+  const reasonRaw = o.reason;
+  const reason =
+    reasonRaw == null || String(reasonRaw).trim() === ""
+      ? null
+      : String(reasonRaw).trim();
+  const nestedMeta = asRecord(o.metadata);
+
+  // Empty object with nothing useful → treat as absent
+  if (
+    score == null &&
+    threshold == null &&
+    reviewThreshold == null &&
+    matched == null &&
+    !decision &&
+    !reason &&
+    !nestedMeta
+  ) {
+    return null;
+  }
+
+  return {
+    score,
+    reason,
+    matched,
+    decision,
+    threshold,
+    reviewThreshold,
+    metadata: nestedMeta,
+  };
 }
 
 /** Unwrap list + provider context from GET .../scraping. */
@@ -4537,6 +4611,13 @@ export function previewFromScrapingRecord(
     ];
   }
 
+  const faceMatchedMeta = normalizeFaceMatchedMeta(
+    record.faceMatchedMeta ??
+      (record as { face_matched_meta?: unknown }).face_matched_meta ??
+      meta.faceMatchedMeta ??
+      meta.face_matched_meta
+  );
+
   return {
     recordId: record.id ?? null,
     providerFullName: pickStr(providerCtx?.providerFullName),
@@ -4557,12 +4638,15 @@ export function previewFromScrapingRecord(
     ),
     nameMatched: toMatchPercent(record.nameMatched, meta.nameMatched, meta.name_matched),
     faceMatched: toMatchPercent(
+      faceMatchedMeta?.score,
       record.faceMatched,
+      faceMatchedMeta?.matched,
       meta.faceMatched,
       meta.face_matched,
       meta.faceMatchScore,
       meta.face_match_score
     ),
+    faceMatchedMeta,
     registrations,
   };
 }

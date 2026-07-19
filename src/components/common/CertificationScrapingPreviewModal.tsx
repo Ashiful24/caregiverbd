@@ -6,6 +6,7 @@ import {
   unwrapScrapingEnvelope,
   previewFromScrapingRecord,
   type CertificationScrapingPreviewDto,
+  type FaceMatchedMetaDto,
   type ScrapingCertificationRecordDto,
 } from "../../services/api";
 import { getAssetUrl } from "../../utils/assetUrl";
@@ -121,6 +122,96 @@ function PhotoThumb({
   );
 }
 
+function formatScore01(score: number | null): string {
+  if (score == null || !Number.isFinite(score)) return "—";
+  return score.toFixed(score >= 0.01 || score === 0 ? 2 : 3);
+}
+
+function decisionBadgeClass(decision: string | null, matched: boolean | null): string {
+  const d = (decision ?? "").toLowerCase();
+  if (matched === true || d === "match") {
+    return "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200";
+  }
+  if (d === "review" || d === "manual_review") {
+    return "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200";
+  }
+  if (matched === false || d === "no_match" || d === "mismatch") {
+    return "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200";
+  }
+  return "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200";
+}
+
+function FaceMatchMetaDetails({ meta }: { meta: FaceMatchedMetaDto }) {
+  const { t } = useTranslation();
+  const decisionLabel = meta.decision?.trim()
+    ? meta.decision
+    : meta.matched === true
+      ? "match"
+      : meta.matched === false
+        ? "no_match"
+        : "—";
+
+  return (
+    <div className="rounded border border-gray-200 bg-gray-50 px-2.5 py-2 text-xs text-gray-700">
+      <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
+        <span className="font-semibold text-gray-600">
+          {t("providers.certScrapingFaceDecision")}:
+        </span>
+        <span
+          className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${decisionBadgeClass(
+            meta.decision,
+            meta.matched
+          )}`}
+        >
+          {decisionLabel}
+        </span>
+      </div>
+      <dl className="grid grid-cols-2 gap-x-2 gap-y-1">
+        <div>
+          <dt className="text-[10px] uppercase tracking-wide text-gray-500">
+            {t("providers.certScrapingFaceScore")}
+          </dt>
+          <dd className="font-semibold tabular-nums">{formatScore01(meta.score)}</dd>
+        </div>
+        <div>
+          <dt className="text-[10px] uppercase tracking-wide text-gray-500">
+            {t("providers.certScrapingFaceMatched")}
+          </dt>
+          <dd className="font-semibold">
+            {meta.matched == null
+              ? "—"
+              : meta.matched
+                ? t("upgradeRequests.yes")
+                : t("upgradeRequests.no")}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-[10px] uppercase tracking-wide text-gray-500">
+            {t("providers.certScrapingFaceThreshold")}
+          </dt>
+          <dd className="font-semibold tabular-nums">{formatScore01(meta.threshold)}</dd>
+        </div>
+        <div>
+          <dt className="text-[10px] uppercase tracking-wide text-gray-500">
+            {t("providers.certScrapingFaceReviewThreshold")}
+          </dt>
+          <dd className="font-semibold tabular-nums">
+            {formatScore01(meta.reviewThreshold)}
+          </dd>
+        </div>
+      </dl>
+      {meta.reason ? (
+        <p className="mt-1.5 text-[11px] text-gray-600">
+          <span className="font-semibold text-gray-500">
+            {t("providers.certScrapingFaceReason")}:{" "}
+          </span>
+          {meta.reason}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 export function CertificationScrapingPreviewModal({ isOpen, providerId, onClose }: Props) {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
@@ -229,7 +320,7 @@ export function CertificationScrapingPreviewModal({ isOpen, providerId, onClose 
                   </span>
                 </div>
 
-                <div className="flex w-full shrink-0 flex-col gap-3 sm:w-[260px]">
+                <div className="flex w-full shrink-0 flex-col gap-3 sm:w-[280px]">
                   <div className="space-y-2">
                     <MatchProgressBar
                       label={t("providers.certScrapingFaceMatch")}
@@ -248,6 +339,9 @@ export function CertificationScrapingPreviewModal({ isOpen, providerId, onClose 
                         emptyLabel={t("providers.certScrapingNoPhoto")}
                       />
                     </div>
+                    {preview.faceMatchedMeta ? (
+                      <FaceMatchMetaDetails meta={preview.faceMatchedMeta} />
+                    ) : null}
                   </div>
 
                   <div className="space-y-2">

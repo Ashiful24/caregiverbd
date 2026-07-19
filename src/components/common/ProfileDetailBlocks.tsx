@@ -1824,13 +1824,16 @@ export function ProviderFullDetailsView({
                                       </button>
                                     </>
                                   )}
-                                  <button
-                                    type="button"
-                                    onClick={() => setScrapingPreviewOpen(true)}
-                                    className="rounded bg-brand-600 px-2 py-1 text-xs font-medium text-white hover:bg-brand-700 dark:bg-brand-600 dark:hover:bg-brand-500"
-                                  >
-                                    {t("providers.certScrapingPreview")}
-                                  </button>
+                                  {String(cert.certificationTypeCode ?? "").toUpperCase() ===
+                                    "BNMC" && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setScrapingPreviewOpen(true)}
+                                      className="rounded bg-brand-600 px-2 py-1 text-xs font-medium text-white hover:bg-brand-700 dark:bg-brand-600 dark:hover:bg-brand-500"
+                                    >
+                                      {t("providers.certScrapingPreview")}
+                                    </button>
+                                  )}
                                 </span>
                               </div>
                             </td>

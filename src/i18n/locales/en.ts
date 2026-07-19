@@ -768,6 +768,12 @@ const en = {
     certScrapingScrapedPhoto: "Council",
     certScrapingProviderName: "Provider name",
     certScrapingScrapedName: "Council name",
+    certScrapingFaceDecision: "Decision",
+    certScrapingFaceScore: "Score",
+    certScrapingFaceMatched: "Matched",
+    certScrapingFaceThreshold: "Threshold",
+    certScrapingFaceReviewThreshold: "Review threshold",
+    certScrapingFaceReason: "Reason",
     userDocuments: "User documents",
     userDocumentsHelp:
       "All documents uploaded by this user. Use Approve/Reject to verify individual documents.",
