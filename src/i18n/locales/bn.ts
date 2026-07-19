@@ -765,6 +765,10 @@ const bn = {
     certScrapingFaceMatch: "ফেস ম্যাচ",
     certScrapingNameMatch: "নেম ম্যাচ",
     certScrapingMatchPending: "N/A",
+    certScrapingProviderPhoto: "প্রোভাইডার",
+    certScrapingScrapedPhoto: "কাউন্সিল",
+    certScrapingProviderName: "প্রোভাইডার নাম",
+    certScrapingScrapedName: "কাউন্সিল নাম",
     userDocuments: "ইউজার ডকুমেন্টস",
     userDocumentsHelp:
       "এই ইউজারের আপলোড করা সব ডকুমেন্ট। পৃথক ডকুমেন্ট যাচাই করতে Approve/Reject ব্যবহার করুন।",

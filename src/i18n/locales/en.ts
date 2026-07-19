@@ -764,6 +764,10 @@ const en = {
     certScrapingFaceMatch: "Face match",
     certScrapingNameMatch: "Name match",
     certScrapingMatchPending: "N/A",
+    certScrapingProviderPhoto: "Provider",
+    certScrapingScrapedPhoto: "Council",
+    certScrapingProviderName: "Provider name",
+    certScrapingScrapedName: "Council name",
     userDocuments: "User documents",
     userDocumentsHelp:
       "All documents uploaded by this user. Use Approve/Reject to verify individual documents.",

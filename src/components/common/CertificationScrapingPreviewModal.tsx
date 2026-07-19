@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Modal } from "../ui/modal";
 import {
   adminCertificationsApi,
-  normalizeCertificationScrapingList,
+  unwrapScrapingEnvelope,
   previewFromScrapingRecord,
   type CertificationScrapingPreviewDto,
   type ScrapingCertificationRecordDto,
@@ -23,7 +23,18 @@ function dash(value: string | null | undefined): string {
   return s || "—";
 }
 
-function resolveMediaSrc(url: string | null | undefined): string | null {
+/** Hope file-service / absolute URLs (provider profile picture). */
+function resolveProfileSrc(url: string | null | undefined): string | null {
+  if (!url?.trim()) return null;
+  const raw = url.trim();
+  if (raw.startsWith("data:") || raw.startsWith("http://") || raw.startsWith("https://")) {
+    return raw;
+  }
+  return getAssetUrl(raw) || raw;
+}
+
+/** BNMC scraped photo (may be absolute or site-relative). */
+function resolveScrapedSrc(url: string | null | undefined): string | null {
   if (!url?.trim()) return null;
   const raw = url.trim();
   if (raw.startsWith("data:") || raw.startsWith("http://") || raw.startsWith("https://")) {
@@ -57,7 +68,7 @@ function MatchProgressBar({
   const hasValue = percent != null;
   const value = hasValue ? percent : 0;
   return (
-    <div className="w-full min-w-[140px] max-w-[220px]">
+    <div className="w-full">
       <div className="mb-1 flex items-center justify-between gap-2 text-xs font-semibold text-gray-700">
         <span>{label}</span>
         <span className="tabular-nums text-gray-600">
@@ -81,13 +92,43 @@ function MatchProgressBar({
   );
 }
 
+function PhotoThumb({
+  src,
+  label,
+  emptyLabel,
+}: {
+  src: string | null;
+  label: string;
+  emptyLabel: string;
+}) {
+  return (
+    <div className="flex min-w-0 flex-1 flex-col items-center gap-1">
+      <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+        {label}
+      </span>
+      {src ? (
+        <img
+          src={src}
+          alt=""
+          className="h-[88px] w-[72px] border border-gray-300 object-cover"
+        />
+      ) : (
+        <div className="flex h-[88px] w-[72px] items-center justify-center border border-dashed border-gray-300 bg-gray-50 text-[10px] text-gray-400">
+          {emptyLabel}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function CertificationScrapingPreviewModal({ isOpen, providerId, onClose }: Props) {
   const { t } = useTranslation();
-  const printRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [records, setRecords] = useState<ScrapingCertificationRecordDto[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [providerFullName, setProviderFullName] = useState("");
+  const [profilePicture, setProfilePicture] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isOpen || !providerId) return;
@@ -96,19 +137,23 @@ export function CertificationScrapingPreviewModal({ isOpen, providerId, onClose 
     setError(null);
     setRecords([]);
     setSelectedId(null);
+    setProviderFullName("");
+    setProfilePicture(null);
 
     void adminCertificationsApi
       .getProviderScraping(providerId)
       .then((res) => {
         if (ac.signal.aborted) return;
         const raw = (res as { data?: unknown }).data ?? res;
-        const list = normalizeCertificationScrapingList(raw);
-        if (list.length === 0) {
+        const envelope = unwrapScrapingEnvelope(raw);
+        if (envelope.items.length === 0) {
           setError(t("providers.certScrapingEmpty"));
           return;
         }
-        setRecords(list);
-        setSelectedId(list[0]?.id ?? null);
+        setProviderFullName(envelope.providerFullName);
+        setProfilePicture(envelope.profilePicture);
+        setRecords(envelope.items);
+        setSelectedId(envelope.items[0]?.id ?? null);
       })
       .catch((err: unknown) => {
         if (ac.signal.aborted) return;
@@ -129,37 +174,12 @@ export function CertificationScrapingPreviewModal({ isOpen, providerId, onClose 
     if (records.length === 0) return null;
     const record =
       (selectedId != null ? records.find((r) => r.id === selectedId) : null) ?? records[0];
-    return previewFromScrapingRecord(record);
-  }, [records, selectedId]);
+    return previewFromScrapingRecord(record, { providerFullName, profilePicture });
+  }, [records, selectedId, providerFullName, profilePicture]);
 
-  const handlePrint = useCallback(() => {
-    const node = printRef.current;
-    if (!node) return;
-    const win = window.open("", "_blank", "noopener,noreferrer,width=1024,height=768");
-    if (!win) return;
-    win.document.write(`<!DOCTYPE html><html><head><title>${t(
-      "providers.certScrapingTitle"
-    )}</title>
-<style>
-  body { font-family: Arial, Helvetica, sans-serif; margin: 24px; color: #111; }
-  img { max-width: 100%; }
-  table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 12px; }
-  th { background: #1b7a3d; color: #fff; padding: 8px 6px; text-align: left; }
-  td { border: 1px solid #d1d5db; padding: 8px 6px; vertical-align: top; }
-</style></head><body>${node.innerHTML}</body></html>`);
-    win.document.close();
-    win.focus();
-    setTimeout(() => {
-      try {
-        win.print();
-      } catch {
-        /* user can Ctrl+P */
-      }
-    }, 300);
-  }, [t]);
-
-  const photoSrc = resolveMediaSrc(preview?.photoUrl);
-  const qrSrc = resolveMediaSrc(preview?.qrCodeUrl);
+  const profileSrc = resolveProfileSrc(preview?.profilePicture);
+  const scrapedPhotoSrc = resolveScrapedSrc(preview?.photoUrl);
+  const qrSrc = resolveScrapedSrc(preview?.qrCodeUrl);
 
   return (
     <Modal
@@ -201,68 +221,67 @@ export function CertificationScrapingPreviewModal({ isOpen, providerId, onClose 
               {error}
             </p>
           ) : preview ? (
-            <div ref={printRef} className="bnmc-preview text-gray-900">
-              <div className="flex flex-wrap items-center gap-4">
-                <div className="flex h-[72px] w-[72px] shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-[#1b7a3d] bg-[#e8f5ec]">
-                  <svg viewBox="0 0 64 64" className="h-14 w-14" aria-hidden>
-                    <circle cx="32" cy="32" r="30" fill="#1b7a3d" />
-                    <circle cx="32" cy="32" r="22" fill="#fff" />
-                    <path
-                      d="M32 14c-6 8-10 14-10 20a10 10 0 0020 0c0-6-4-12-10-20z"
-                      fill="#1b7a3d"
+            <div className="bnmc-preview text-gray-900">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
+                <div className="min-w-0 flex-1 bg-[#cfe8f7] px-3 py-2.5 text-center text-sm font-bold uppercase tracking-wide text-[#1a4a7a] sm:self-stretch sm:text-base">
+                  <span className="inline-flex h-full items-center justify-center">
+                    {t("providers.certScrapingTitle")}
+                  </span>
+                </div>
+
+                <div className="flex w-full shrink-0 flex-col gap-3 sm:w-[260px]">
+                  <div className="space-y-2">
+                    <MatchProgressBar
+                      label={t("providers.certScrapingFaceMatch")}
+                      percent={preview.faceMatched}
+                      pendingLabel={t("providers.certScrapingMatchPending")}
                     />
-                    <text
-                      x="32"
-                      y="58"
-                      textAnchor="middle"
-                      fontSize="6"
-                      fill="#fff"
-                      fontFamily="Arial"
-                    >
-                      BNMC
-                    </text>
-                  </svg>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-xl font-bold leading-tight text-[#1b7a3d] sm:text-2xl md:text-3xl">
-                    {dash(preview.councilName)}
-                  </p>
-                </div>
-              </div>
+                    <div className="flex items-start justify-center gap-3">
+                      <PhotoThumb
+                        src={profileSrc}
+                        label={t("providers.certScrapingProviderPhoto")}
+                        emptyLabel={t("providers.certScrapingNoPhoto")}
+                      />
+                      <PhotoThumb
+                        src={scrapedPhotoSrc}
+                        label={t("providers.certScrapingScrapedPhoto")}
+                        emptyLabel={t("providers.certScrapingNoPhoto")}
+                      />
+                    </div>
+                  </div>
 
-              <p className="mt-2 text-center text-sm text-gray-700">
-                <a
-                  href={`https://${preview.councilUrl.replace(/^https?:\/\//, "")}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-gray-700 hover:underline"
-                >
-                  {preview.councilUrl}
-                </a>
-              </p>
-
-              <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
-                <div className="min-w-0 flex-1 bg-[#cfe8f7] px-3 py-2.5 text-center text-sm font-bold uppercase tracking-wide text-[#1a4a7a] sm:text-base">
-                  {t("providers.certScrapingTitle")}
-                </div>
-                <div className="flex w-full shrink-0 flex-col gap-2.5 sm:w-[220px]">
-                  <MatchProgressBar
-                    label={t("providers.certScrapingFaceMatch")}
-                    percent={preview.faceMatched}
-                    pendingLabel={t("providers.certScrapingMatchPending")}
-                  />
-                  <MatchProgressBar
-                    label={t("providers.certScrapingNameMatch")}
-                    percent={preview.nameMatched}
-                    pendingLabel={t("providers.certScrapingMatchPending")}
-                  />
+                  <div className="space-y-2">
+                    <MatchProgressBar
+                      label={t("providers.certScrapingNameMatch")}
+                      percent={preview.nameMatched}
+                      pendingLabel={t("providers.certScrapingMatchPending")}
+                    />
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="rounded border border-gray-200 bg-gray-50 px-2 py-1.5">
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+                          {t("providers.certScrapingProviderName")}
+                        </p>
+                        <p className="mt-0.5 font-semibold text-gray-900" dir="auto">
+                          {dash(preview.providerFullName)}
+                        </p>
+                      </div>
+                      <div className="rounded border border-gray-200 bg-gray-50 px-2 py-1.5">
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+                          {t("providers.certScrapingScrapedName")}
+                        </p>
+                        <p className="mt-0.5 font-semibold uppercase text-gray-900" dir="auto">
+                          {dash(preview.name)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
               <div className="mt-4 flex flex-col gap-4 border border-gray-300 p-4 sm:flex-row sm:items-start">
-                {photoSrc ? (
+                {scrapedPhotoSrc ? (
                   <img
-                    src={photoSrc}
+                    src={scrapedPhotoSrc}
                     alt=""
                     className="h-[140px] w-[120px] shrink-0 border-2 border-[#1b7a3d] object-cover"
                   />
@@ -374,51 +393,23 @@ export function CertificationScrapingPreviewModal({ isOpen, providerId, onClose 
           ) : null}
         </div>
 
-        {preview && !loading && !error ? (
-          <div className="flex shrink-0 flex-wrap gap-2 border-t border-gray-200 bg-gray-50 px-4 py-3 sm:px-6">
-            <button
-              type="button"
-              onClick={handlePrint}
-              className="rounded bg-[#1b7a3d] px-4 py-2 text-sm font-semibold text-white hover:bg-[#166533]"
-            >
-              {t("providers.certScrapingDownloadPdf")}
-            </button>
-            <button
-              type="button"
-              onClick={handlePrint}
-              className="inline-flex items-center gap-1.5 rounded bg-[#2563eb] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1d4ed8]"
-            >
-              <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden>
-                <path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z" />
-              </svg>
-              {t("upgradeRequests.print")}
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="ml-auto rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            >
-              {t("common.actions.close")}
-            </button>
-          </div>
-        ) : (
-          <div className="flex shrink-0 justify-end border-t border-gray-200 bg-gray-50 px-4 py-3 sm:px-6">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            >
-              {t("common.actions.close")}
-            </button>
-          </div>
-        )}
+        <div className="flex shrink-0 justify-end border-t border-gray-200 bg-gray-50 px-4 py-3 sm:px-6">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            {t("common.actions.close")}
+          </button>
+        </div>
       </div>
     </Modal>
   );
 }
 
 function pickOptionLabel(r: ScrapingCertificationRecordDto): string {
-  const meta = r.metadata && typeof r.metadata === "object" ? (r.metadata as Record<string, unknown>) : {};
+  const meta =
+    r.metadata && typeof r.metadata === "object" ? (r.metadata as Record<string, unknown>) : {};
   const name = String(meta.name ?? r.name ?? "").trim();
   const reg = String(r.registrationNumber ?? meta.regNumber ?? "").trim();
   const program = String(r.programName ?? meta.programName ?? "").trim();

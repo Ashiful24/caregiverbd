@@ -4266,10 +4266,10 @@ export const adminCertificationsApi = {
 
 /**
    * GET /v1/certifications/provider/:providerId/scraping
-   * Returns BNMC `scraping_certifications` rows (admin/supervisor). Full scrape lives in `metadata`.
+   * Returns provider context + BNMC `scraping_certifications` rows (admin/supervisor).
    */
   getProviderScraping: async (providerId: number) => {
-    return httpService.get<ScrapingCertificationRecordDto[]>(
+    return httpService.get<ScrapingCertificationsByProviderDto>(
       `/certifications/provider/${encodeURIComponent(String(providerId))}/scraping`
     );
   },
@@ -4307,7 +4307,7 @@ export interface BnmcScrapingMetadataDto {
   registration?: BnmcScrapingRegistrationRowDto | null;
 }
 
-/** One row from GET .../scraping (scraping_certifications). */
+/** One row from GET .../scraping items (scraping_certifications). */
 export interface ScrapingCertificationRecordDto {
   id: number;
   providerId: number;
@@ -4321,6 +4321,14 @@ export interface ScrapingCertificationRecordDto {
   metadata?: BnmcScrapingMetadataDto | Record<string, unknown> | null;
   createdAt?: string | null;
   updatedAt?: string | null;
+}
+
+/** GET /certifications/provider/:id/scraping envelope. */
+export interface ScrapingCertificationsByProviderDto {
+  providerId: number;
+  providerFullName?: string | null;
+  profilePicture?: string | null;
+  items: ScrapingCertificationRecordDto[];
 }
 
 /** One registration row for BNMC-style preview UI. */
@@ -4338,14 +4346,18 @@ export interface CertificationScrapingRegistrationDto {
 /** Normalized BNMC online registration verification payload for UI. */
 export interface CertificationScrapingPreviewDto {
   recordId: number | null;
-  councilName: string;
-  councilUrl: string;
+  /** Provider account full name (response.providerFullName). */
+  providerFullName: string;
+  /** Provider profile photo (response.profilePicture). */
+  profilePicture: string | null;
+  /** Scraped council name (metadata.name). */
   name: string;
   fatherName: string;
   motherName: string;
   address: string;
   workingPlace: string;
   position: string;
+  /** Scraped council photo. */
   photoUrl: string | null;
   qrCodeUrl: string | null;
   programName: string;
@@ -4397,16 +4409,50 @@ function toMatchPercent(...vals: unknown[]): number | null {
   return null;
 }
 
-function unwrapScrapingList(raw: unknown): ScrapingCertificationRecordDto[] {
-  if (Array.isArray(raw)) return raw as ScrapingCertificationRecordDto[];
-  const root = asRecord(raw);
-  if (!root) return [];
-  const nested = root.data ?? root.items ?? root.results;
-  if (Array.isArray(nested)) return nested as ScrapingCertificationRecordDto[];
-  if (asRecord(nested) || root.metadata || root.registrationNumber || root.id) {
-    return [root as unknown as ScrapingCertificationRecordDto];
+/** Unwrap list + provider context from GET .../scraping. */
+export function unwrapScrapingEnvelope(raw: unknown): {
+  providerFullName: string;
+  profilePicture: string | null;
+  items: ScrapingCertificationRecordDto[];
+} {
+  if (Array.isArray(raw)) {
+    return {
+      providerFullName: "",
+      profilePicture: null,
+      items: raw as ScrapingCertificationRecordDto[],
+    };
   }
-  return [];
+  const root = asRecord(raw);
+  if (!root) {
+    return { providerFullName: "", profilePicture: null, items: [] };
+  }
+  const nested =
+    root.data && typeof root.data === "object" && !Array.isArray(root.data)
+      ? (root.data as Record<string, unknown>)
+      : root;
+  const itemsRaw = nested.items ?? nested.results ?? (Array.isArray(nested.data) ? nested.data : null);
+  const items = Array.isArray(itemsRaw)
+    ? (itemsRaw as ScrapingCertificationRecordDto[])
+    : Array.isArray(raw)
+      ? (raw as ScrapingCertificationRecordDto[])
+      : nested.metadata || nested.registrationNumber || nested.id
+        ? [nested as unknown as ScrapingCertificationRecordDto]
+        : [];
+  return {
+    providerFullName: pickStr(
+      nested.providerFullName,
+      nested.provider_full_name,
+      root.providerFullName,
+      root.provider_full_name
+    ),
+    profilePicture: pickUrl(
+      nested.profilePicture,
+      nested.profile_picture,
+      root.profilePicture,
+      root.profile_picture
+    ),
+    items,
+  };
 }
 
 function mapRegistrationRow(r: Record<string, unknown>): CertificationScrapingRegistrationDto {
@@ -4456,11 +4502,12 @@ function mapRegistrationRow(r: Record<string, unknown>): CertificationScrapingRe
 }
 
 /**
- * Build preview DTO from one scraping_certifications row.
+ * Build preview DTO from one scraping_certifications row + provider context.
  * Prefer `metadata` (full BNMC scrape); fall back to top-level columns.
  */
 export function previewFromScrapingRecord(
-  record: ScrapingCertificationRecordDto
+  record: ScrapingCertificationRecordDto,
+  providerCtx?: { providerFullName?: string; profilePicture?: string | null }
 ): CertificationScrapingPreviewDto {
   const meta = asRecord(record.metadata) ?? {};
   const regsRaw = meta.registrations;
@@ -4492,8 +4539,8 @@ export function previewFromScrapingRecord(
 
   return {
     recordId: record.id ?? null,
-    councilName: "Bangladesh Nursing and Midwifery Council",
-    councilUrl: "www.bnmc.gov.bd",
+    providerFullName: pickStr(providerCtx?.providerFullName),
+    profilePicture: pickUrl(providerCtx?.profilePicture),
     name: pickStr(meta.name, record.name),
     fatherName: pickStr(meta.fatherName, meta.father_name),
     motherName: pickStr(meta.motherName, meta.mother_name),
@@ -4521,22 +4568,22 @@ export function previewFromScrapingRecord(
 }
 
 /**
- * Normalize GET .../scraping response (list of scraping rows) into preview UI model.
- * Uses the latest row (API orders by createdAt desc).
+ * Normalize GET .../scraping response into preview UI model.
+ * Uses the latest item (API orders by createdAt desc).
  */
 export function normalizeCertificationScrapingResponse(
   raw: unknown
 ): CertificationScrapingPreviewDto | null {
-  const list = unwrapScrapingList(raw);
-  if (list.length === 0) return null;
-  return previewFromScrapingRecord(list[0]);
+  const envelope = unwrapScrapingEnvelope(raw);
+  if (envelope.items.length === 0) return null;
+  return previewFromScrapingRecord(envelope.items[0], envelope);
 }
 
 /** All scraping rows unwrapped for multi-record UIs. */
 export function normalizeCertificationScrapingList(
   raw: unknown
 ): ScrapingCertificationRecordDto[] {
-  return unwrapScrapingList(raw);
+  return unwrapScrapingEnvelope(raw).items;
 }
 
 // ============== User API (legacy / profile) ==============
