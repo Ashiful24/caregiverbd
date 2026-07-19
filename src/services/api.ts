@@ -4263,7 +4263,281 @@ export const adminCertificationsApi = {
       data
     );
   },
+
+/**
+   * GET /v1/certifications/provider/:providerId/scraping
+   * Returns BNMC `scraping_certifications` rows (admin/supervisor). Full scrape lives in `metadata`.
+   */
+  getProviderScraping: async (providerId: number) => {
+    return httpService.get<ScrapingCertificationRecordDto[]>(
+      `/certifications/provider/${encodeURIComponent(String(providerId))}/scraping`
+    );
+  },
 };
+
+/** One registration/course row inside BNMC scrape metadata. */
+export interface BnmcScrapingRegistrationRowDto {
+  registrationNo?: string | null;
+  courseName?: string | null;
+  institution?: string | null;
+  examPassingDate?: string | null;
+  dateOfRegistration?: string | null;
+  dateOfRenewOrIssue?: string | null;
+  renewUpto?: string | null;
+  status?: string | null;
+}
+
+/**
+ * Full BNMC scrape payload stored on scraping_certifications.metadata
+ * (see hope-backend BnmcVerificationResult).
+ */
+export interface BnmcScrapingMetadataDto {
+  found?: boolean;
+  regNumber?: string | null;
+  programId?: number | null;
+  programName?: string | null;
+  name?: string | null;
+  fatherName?: string | null;
+  motherName?: string | null;
+  address?: string | null;
+  workingPlace?: string | null;
+  position?: string | null;
+  photoUrl?: string | null;
+  registrations?: BnmcScrapingRegistrationRowDto[] | null;
+  registration?: BnmcScrapingRegistrationRowDto | null;
+}
+
+/** One row from GET .../scraping (scraping_certifications). */
+export interface ScrapingCertificationRecordDto {
+  id: number;
+  providerId: number;
+  registrationNumber: string;
+  programId: number;
+  programName?: string | null;
+  name?: string | null;
+  photoUrl?: string | null;
+  nameMatched?: number | null;
+  faceMatched?: boolean | null;
+  metadata?: BnmcScrapingMetadataDto | Record<string, unknown> | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+/** One registration row for BNMC-style preview UI. */
+export interface CertificationScrapingRegistrationDto {
+  registrationNo: string;
+  courseName: string;
+  institution: string;
+  licensingExamPassingDate: string;
+  dateOfRegistration: string;
+  dateOfRenewIssue: string;
+  renewUpto: string;
+  status: string;
+}
+
+/** Normalized BNMC online registration verification payload for UI. */
+export interface CertificationScrapingPreviewDto {
+  recordId: number | null;
+  councilName: string;
+  councilUrl: string;
+  name: string;
+  fatherName: string;
+  motherName: string;
+  address: string;
+  workingPlace: string;
+  position: string;
+  photoUrl: string | null;
+  qrCodeUrl: string | null;
+  programName: string;
+  registrationNumber: string;
+  /** 0..100 name similarity score; null when unavailable. */
+  nameMatched: number | null;
+  /** 0..100 face match score (boolean true→100 / false→0); null when unavailable. */
+  faceMatched: number | null;
+  registrations: CertificationScrapingRegistrationDto[];
+}
+
+function pickStr(...vals: unknown[]): string {
+  for (const v of vals) {
+    if (v == null) continue;
+    const s = String(v).trim();
+    if (s) return s;
+  }
+  return "";
+}
+
+function pickUrl(...vals: unknown[]): string | null {
+  const s = pickStr(...vals);
+  return s || null;
+}
+
+function asRecord(v: unknown): Record<string, unknown> | null {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return null;
+  return v as Record<string, unknown>;
+}
+
+/** Coerce match fields to 0..100 percent, or null when missing. */
+function toMatchPercent(...vals: unknown[]): number | null {
+  for (const v of vals) {
+    if (v == null) continue;
+    if (typeof v === "boolean") return v ? 100 : 0;
+    if (typeof v === "number" && Number.isFinite(v)) {
+      return Math.max(0, Math.min(100, Math.round(v <= 1 && v > 0 ? v * 100 : v)));
+    }
+    if (typeof v === "string" && v.trim()) {
+      const lower = v.trim().toLowerCase();
+      if (lower === "true" || lower === "matched" || lower === "yes") return 100;
+      if (lower === "false" || lower === "unmatched" || lower === "no") return 0;
+      const n = Number(v);
+      if (Number.isFinite(n)) {
+        return Math.max(0, Math.min(100, Math.round(n <= 1 && n > 0 ? n * 100 : n)));
+      }
+    }
+  }
+  return null;
+}
+
+function unwrapScrapingList(raw: unknown): ScrapingCertificationRecordDto[] {
+  if (Array.isArray(raw)) return raw as ScrapingCertificationRecordDto[];
+  const root = asRecord(raw);
+  if (!root) return [];
+  const nested = root.data ?? root.items ?? root.results;
+  if (Array.isArray(nested)) return nested as ScrapingCertificationRecordDto[];
+  if (asRecord(nested) || root.metadata || root.registrationNumber || root.id) {
+    return [root as unknown as ScrapingCertificationRecordDto];
+  }
+  return [];
+}
+
+function mapRegistrationRow(r: Record<string, unknown>): CertificationScrapingRegistrationDto {
+  return {
+    registrationNo: pickStr(
+      r.registrationNo,
+      r.registration_no,
+      r.registrationNumber,
+      r.regNo,
+      r.reg_no
+    ),
+    courseName: pickStr(r.courseName, r.course_name, r.course),
+    institution: pickStr(
+      r.institution,
+      r.institutionCollege,
+      r.institution_college,
+      r.college,
+      r.collegeName,
+      r.college_name
+    ),
+    licensingExamPassingDate: pickStr(
+      r.examPassingDate,
+      r.exam_passing_date,
+      r.licensingExamPassingDate,
+      r.licensing_exam_passing_date,
+      r.licensingExamDate
+    ),
+    dateOfRegistration: pickStr(
+      r.dateOfRegistration,
+      r.date_of_registration,
+      r.registrationDate,
+      r.registration_date
+    ),
+    dateOfRenewIssue: pickStr(
+      r.dateOfRenewOrIssue,
+      r.date_of_renew_or_issue,
+      r.dateOfRenewIssue,
+      r.date_of_renew_issue,
+      r.dateOfRenew,
+      r.date_of_renew,
+      r.renewIssueDate,
+      r.issueDate
+    ),
+    renewUpto: pickStr(r.renewUpto, r.renew_upto, r.renewUntil, r.renew_until, r.validUpto),
+    status: pickStr(r.status, r.registrationStatus, r.registration_status),
+  };
+}
+
+/**
+ * Build preview DTO from one scraping_certifications row.
+ * Prefer `metadata` (full BNMC scrape); fall back to top-level columns.
+ */
+export function previewFromScrapingRecord(
+  record: ScrapingCertificationRecordDto
+): CertificationScrapingPreviewDto {
+  const meta = asRecord(record.metadata) ?? {};
+  const regsRaw = meta.registrations;
+  const regsList = Array.isArray(regsRaw)
+    ? regsRaw
+    : meta.registration
+      ? [meta.registration]
+      : [];
+
+  let registrations = regsList
+    .map((r) => asRecord(r))
+    .filter((r): r is Record<string, unknown> => r != null)
+    .map(mapRegistrationRow);
+
+  if (registrations.length === 0 && record.registrationNumber) {
+    registrations = [
+      {
+        registrationNo: pickStr(record.registrationNumber),
+        courseName: pickStr(record.programName, meta.programName),
+        institution: "",
+        licensingExamPassingDate: "",
+        dateOfRegistration: "",
+        dateOfRenewIssue: "",
+        renewUpto: "",
+        status: "",
+      },
+    ];
+  }
+
+  return {
+    recordId: record.id ?? null,
+    councilName: "Bangladesh Nursing and Midwifery Council",
+    councilUrl: "www.bnmc.gov.bd",
+    name: pickStr(meta.name, record.name),
+    fatherName: pickStr(meta.fatherName, meta.father_name),
+    motherName: pickStr(meta.motherName, meta.mother_name),
+    address: pickStr(meta.address),
+    workingPlace: pickStr(meta.workingPlace, meta.working_place),
+    position: pickStr(meta.position),
+    photoUrl: pickUrl(meta.photoUrl, meta.photo_url, record.photoUrl),
+    qrCodeUrl: pickUrl(meta.qrCodeUrl, meta.qr_code_url, meta.qrCode, meta.qr),
+    programName: pickStr(meta.programName, meta.program_name, record.programName),
+    registrationNumber: pickStr(
+      meta.regNumber,
+      meta.reg_number,
+      record.registrationNumber
+    ),
+    nameMatched: toMatchPercent(record.nameMatched, meta.nameMatched, meta.name_matched),
+    faceMatched: toMatchPercent(
+      record.faceMatched,
+      meta.faceMatched,
+      meta.face_matched,
+      meta.faceMatchScore,
+      meta.face_match_score
+    ),
+    registrations,
+  };
+}
+
+/**
+ * Normalize GET .../scraping response (list of scraping rows) into preview UI model.
+ * Uses the latest row (API orders by createdAt desc).
+ */
+export function normalizeCertificationScrapingResponse(
+  raw: unknown
+): CertificationScrapingPreviewDto | null {
+  const list = unwrapScrapingList(raw);
+  if (list.length === 0) return null;
+  return previewFromScrapingRecord(list[0]);
+}
+
+/** All scraping rows unwrapped for multi-record UIs. */
+export function normalizeCertificationScrapingList(
+  raw: unknown
+): ScrapingCertificationRecordDto[] {
+  return unwrapScrapingList(raw);
+}
 
 // ============== User API (legacy / profile) ==============
 
