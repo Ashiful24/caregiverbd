@@ -16,6 +16,7 @@ import { Calendar } from "../ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import Checkbox from "../form/input/Checkbox";
 import { BillingTab } from "../provider-billing";
+import { CertificationScrapingPreviewModal } from "./CertificationScrapingPreviewModal";
 import {
   providersApi,
   adminCertificationsApi,
@@ -717,6 +718,7 @@ export function ProviderFullDetailsView({
   const [certsError, setCertsError] = useState<string | null>(null);
   const [verifyingId, setVerifyingId] = useState<number | null>(null);
   const [expandedCertId, setExpandedCertId] = useState<number | null>(null);
+  const [scrapingPreviewOpen, setScrapingPreviewOpen] = useState(false);
   const [userDocuments, setUserDocuments] = useState<AdminDocumentDto[]>([]);
   const [userDocsLoading, setUserDocsLoading] = useState(false);
   const [userDocsError, setUserDocsError] = useState<string | null>(null);
@@ -1801,26 +1803,38 @@ export function ProviderFullDetailsView({
                                   <span className="font-medium text-gray-500 dark:text-gray-400">{t("providers.adminComment")}: </span>
                                   <span className="text-gray-700 dark:text-gray-300">{cert.adminComment ?? "—"}</span>
                                 </div>
-                                {cert.status === "PENDING" && (
-                                  <span className="flex flex-wrap gap-1">
+                                <span className="flex flex-wrap gap-1">
+                                  {cert.status === "PENDING" && (
+                                    <>
+                                      <button
+                                        type="button"
+                                        disabled={verifyingId === cert.id}
+                                        onClick={() => handleVerifyCertification(cert.id, "APPROVED")}
+                                        className="rounded bg-green-600 px-2 py-1 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50 dark:bg-green-700 dark:hover:bg-green-800"
+                                      >
+                                        {verifyingId === cert.id ? "…" : t("upgradeRequests.approve")}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        disabled={verifyingId === cert.id}
+                                        onClick={() => handleVerifyCertification(cert.id, "REJECTED")}
+                                        className="rounded bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-50 dark:bg-red-700 dark:hover:bg-red-800"
+                                      >
+                                        {t("upgradeRequests.reject")}
+                                      </button>
+                                    </>
+                                  )}
+                                  {String(cert.certificationTypeCode ?? "").toUpperCase() ===
+                                    "BNMC" && (
                                     <button
                                       type="button"
-                                      disabled={verifyingId === cert.id}
-                                      onClick={() => handleVerifyCertification(cert.id, "APPROVED")}
-                                      className="rounded bg-green-600 px-2 py-1 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50 dark:bg-green-700 dark:hover:bg-green-800"
+                                      onClick={() => setScrapingPreviewOpen(true)}
+                                      className="rounded bg-brand-600 px-2 py-1 text-xs font-medium text-white hover:bg-brand-700 dark:bg-brand-600 dark:hover:bg-brand-500"
                                     >
-                                      {verifyingId === cert.id ? "…" : t("upgradeRequests.approve")}
+                                      {t("providers.certScrapingPreview")}
                                     </button>
-                                    <button
-                                      type="button"
-                                      disabled={verifyingId === cert.id}
-                                      onClick={() => handleVerifyCertification(cert.id, "REJECTED")}
-                                      className="rounded bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-50 dark:bg-red-700 dark:hover:bg-red-800"
-                                    >
-                                      {t("upgradeRequests.reject")}
-                                    </button>
-                                  </span>
-                                )}
+                                  )}
+                                </span>
                               </div>
                             </td>
                           </tr>
@@ -2326,6 +2340,13 @@ export function ProviderFullDetailsView({
         )}
       </div>
 
+      {scrapingPreviewOpen && provider.id ? (
+        <CertificationScrapingPreviewModal
+          isOpen={scrapingPreviewOpen}
+          providerId={provider.id}
+          onClose={() => setScrapingPreviewOpen(false)}
+        />
+      ) : null}
     </div>
   );
 }
