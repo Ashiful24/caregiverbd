@@ -28,9 +28,7 @@ import {
 import {
   adminLongTermOpportunitiesApi,
   normalizeProvidersAllResponse,
-  normalizeServiceRequestFeeEstimate,
   providersApi,
-  serviceRequestsApi,
   type ProviderListItem,
 } from "../../services/api";
 import { buildEventsFromScheduleDetails } from "../../utils/longTermScheduleEvents";
@@ -260,9 +258,6 @@ export function ScheduleCalendar({
   const [selectedShiftHours, setSelectedShiftHours] = useState<ScheduleShiftHours>(() =>
     resolveDefaultShiftHours(defaultShiftDurationHours)
   );
-  const [feeEstimateAmount, setFeeEstimateAmount] = useState<number | null>(null);
-  const [feeEstimateLoading, setFeeEstimateLoading] = useState(false);
-  const [feeEstimateError, setFeeEstimateError] = useState<string | null>(null);
   const isScheduleModalOpen = modalDraft != null;
 
   const requestStart = useMemo(
@@ -346,18 +341,6 @@ export function ScheduleCalendar({
     return { start, end };
   }, [modalDraft]);
 
-  const selectedNurse = nurses.find((n) => n.id === selectedNurseId) ?? null;
-
-  const resolvedConsultationTypeId = useMemo(() => {
-    const fromProvider = selectedNurse?.consultationTypeId;
-    if (fromProvider != null && fromProvider > 0) return fromProvider;
-    if (requestConsultationTypeId != null && requestConsultationTypeId > 0) {
-      return requestConsultationTypeId;
-    }
-    return null;
-  }, [selectedNurse?.consultationTypeId, requestConsultationTypeId]);
-
-  const selectedServiceFee = feeEstimateAmount ?? 0;
   const totalServiceAmount = parseMoney(baseServiceAmount) + locallyAddedAmount;
 
   const computedEndPreview = useMemo(() => {
@@ -375,13 +358,7 @@ export function ScheduleCalendar({
     return true;
   }, [computedRange, requestStart, requestEnd, selectedShiftHours]);
 
-  const canSaveEvent =
-    Boolean(selectedNurseId) &&
-    rangeValidForSave &&
-    !savingEvent &&
-    !feeEstimateLoading &&
-    feeEstimateAmount != null &&
-    !feeEstimateError;
+  const canSaveEvent = Boolean(selectedNurseId) && rangeValidForSave && !savingEvent;
 
   useEffect(() => {
     if (!isScheduleModalOpen) {
@@ -473,74 +450,10 @@ export function ScheduleCalendar({
     return () => clearTimeout(timer);
   }, [isScheduleModalOpen, nurseSearchInput]);
 
-  useEffect(() => {
-    if (!isScheduleModalOpen || !selectedNurseId) {
-      setFeeEstimateAmount(null);
-      setFeeEstimateError(null);
-      setFeeEstimateLoading(false);
-      return;
-    }
-
-    if (!resolvedConsultationTypeId) {
-      setFeeEstimateAmount(null);
-      setFeeEstimateError(t("scheduleCalendar.errMissingConsultationType"));
-      setFeeEstimateLoading(false);
-      return;
-    }
-
-    const ac = new AbortController();
-    setFeeEstimateLoading(true);
-    setFeeEstimateError(null);
-
-    void serviceRequestsApi
-      .getShortTermFeeEstimate(
-        {
-          providerId: selectedNurseId,
-          shiftDuration: selectedShiftHours,
-          consultationTypeId: resolvedConsultationTypeId,
-        },
-        { signal: ac.signal }
-      )
-      .then((res) => {
-        const normalized = normalizeServiceRequestFeeEstimate(res.data);
-        if (!normalized?.subTotal) {
-          setFeeEstimateAmount(null);
-          setFeeEstimateError(t("scheduleCalendar.feeEstimateFailed"));
-          return;
-        }
-        const fee = parseMoney(normalized.subTotal);
-        setFeeEstimateAmount(Number.isFinite(fee) ? fee : null);
-        if (!Number.isFinite(fee)) {
-          setFeeEstimateError(t("scheduleCalendar.feeEstimateFailed"));
-        }
-      })
-      .catch((err: unknown) => {
-        if (err instanceof Error && err.name === "AbortError") return;
-        setFeeEstimateAmount(null);
-        setFeeEstimateError(
-          extractApiErrorMessage(err) ?? t("scheduleCalendar.feeEstimateFailed")
-        );
-      })
-      .finally(() => {
-        if (!ac.signal.aborted) setFeeEstimateLoading(false);
-      });
-
-    return () => ac.abort();
-  }, [
-    isScheduleModalOpen,
-    selectedNurseId,
-    selectedShiftHours,
-    resolvedConsultationTypeId,
-    t,
-  ]);
-
   const closeModal = () => {
     setModalDraft(null);
     setSelectedNurseId(null);
     setSelectedShiftHours(resolveDefaultShiftHours(defaultShiftDurationHours));
-    setFeeEstimateAmount(null);
-    setFeeEstimateError(null);
-    setFeeEstimateLoading(false);
     setFormError(null);
     setNurses([]);
     setNursesPage(1);
@@ -638,8 +551,6 @@ export function ScheduleCalendar({
     const start = addHours(startOfDay(day), defaultStartHour);
     setFormError(null);
     setSelectedShiftHours(shift);
-    setFeeEstimateAmount(null);
-    setFeeEstimateError(null);
     setModalDraft(
       applyShiftToModalDraft(
         {
@@ -660,8 +571,6 @@ export function ScheduleCalendar({
     const start = addHours(startOfDay(day), defaultStartHour);
     setFormError(null);
     setSelectedShiftHours(shift);
-    setFeeEstimateAmount(null);
-    setFeeEstimateError(null);
     setModalDraft(
       applyShiftToModalDraft(
         {
@@ -779,12 +688,7 @@ export function ScheduleCalendar({
       setFormError(t("scheduleCalendar.errSelectNurse"));
       return;
     }
-    if (feeEstimateLoading || feeEstimateAmount == null) {
-      setFormError(t("scheduleCalendar.errFeeEstimateRequired"));
-      return;
-    }
     const nurseId = String(nurse.id);
-    const eventAmount = feeEstimateAmount;
     if (eventOverlapsNurse(displayEvents, nurseId, start, end)) {
       setFormError(t("scheduleCalendar.errOverlap"));
       return;
@@ -799,16 +703,12 @@ export function ScheduleCalendar({
         nurseId,
         nurseName: providerLabel(nurse),
         title: providerLabel(nurse),
-        feeLabel: eventAmount > 0 ? formatMoney(eventAmount) : undefined,
         start: start.toISOString(),
         end: end.toISOString(),
         type: "visit",
         pending: true,
       };
       setPendingEvents((prev) => [...prev, newEvent]);
-      if (eventAmount > 0) {
-        setLocallyAddedAmount((prev) => prev + eventAmount);
-      }
       closeModal();
     } catch (err: unknown) {
       setFormError(extractApiErrorMessage(err) ?? t("scheduleCalendar.errCreate"));
@@ -988,20 +888,6 @@ export function ScheduleCalendar({
             </h3>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
               {t("scheduleCalendar.scheduleVisitHelp")}
-            </p>
-            <p className="mt-2 text-sm font-medium text-brand-700 dark:text-brand-400">
-              {!selectedNurse
-                ? t("scheduleCalendar.selectProviderForTotal")
-                : feeEstimateLoading
-                  ? t("scheduleCalendar.feeEstimateLoading")
-                  : feeEstimateError
-                    ? feeEstimateError
-                    : feeEstimateAmount != null
-                      ? t("scheduleCalendar.subTotalLine", {
-                          hours: String(selectedShiftHours),
-                          total: formatMoney(selectedServiceFee),
-                        })
-                      : t("scheduleCalendar.selectProviderForTotal")}
             </p>
 
             <div className="mt-5 space-y-4">
