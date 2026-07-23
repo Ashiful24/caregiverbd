@@ -19,6 +19,7 @@ import {
   formatConfigKeyFallback,
   groupSystemConfigs,
   isBooleanConfigKey,
+  isMetersConfigKey,
   isPercentConfigKey,
   type ConfigGroupId,
 } from "./configFieldHelpers";
@@ -97,15 +98,24 @@ export function SystemSettingsPanel() {
     setValue(item.value);
     setDescription(item.description ?? "");
     setSuccess("");
+    setError("");
   };
 
   const handleSave = async () => {
     if (!editing) return;
+    const trimmed = value.trim();
+    if (isMetersConfigKey(editing.key)) {
+      const n = Number(trimmed);
+      if (!Number.isFinite(n) || !Number.isInteger(n) || n < 1) {
+        setError(t("systemConfig.invalidMeters"));
+        return;
+      }
+    }
     setSubmitting(true);
     setError("");
     try {
       await adminSystemConfigApi.update(editing.key, {
-        value: value.trim(),
+        value: trimmed,
         description: description.trim() || null,
       });
       setEditing(null);
@@ -133,6 +143,13 @@ export function SystemSettingsPanel() {
     }
     if (isPercentConfigKey(item.key)) {
       return <span className="font-semibold tabular-nums">{item.value}%</span>;
+    }
+    if (isMetersConfigKey(item.key)) {
+      return (
+        <span className="font-semibold tabular-nums">
+          {item.value} {t("systemConfig.metersUnit")}
+        </span>
+      );
     }
     return <span className="font-mono text-sm tabular-nums">{item.value}</span>;
   };
@@ -324,6 +341,23 @@ export function SystemSettingsPanel() {
                       <option value="true">{t("systemConfig.booleanOn")}</option>
                       <option value="false">{t("systemConfig.booleanOff")}</option>
                     </ThemedSelect>
+                  );
+                }
+                if (isMetersConfigKey(editing.key)) {
+                  return (
+                    <div className="mt-1 flex items-center gap-2">
+                      <input
+                        type="number"
+                        min={1}
+                        step={1}
+                        value={value}
+                        onChange={(e) => setValue(e.target.value)}
+                        className={`${inputClass} flex-1`}
+                      />
+                      <span className="shrink-0 text-sm text-gray-500 dark:text-gray-400">
+                        {t("systemConfig.metersUnit")}
+                      </span>
+                    </div>
                   );
                 }
                 return (
