@@ -1178,6 +1178,8 @@ const en = {
     searchPlaceholder: "Search by key, value, or description…",
     booleanOn: "On",
     booleanOff: "Off",
+    metersUnit: "m",
+    invalidMeters: "Enter a whole number of meters (at least 1).",
     groups: {
       features: "Features & connectivity",
       financial: "Fees, tax & commission",
@@ -1216,6 +1218,7 @@ const en = {
       SERVICE_AIT_PERCENT: "Provider AIT withholding (%)",
       COMMISSION_INCLUSIVE: "Commission included in provider fee",
       TAX_INCLUSIVE: "Tax included in gross fee",
+      ARRIVAL_MAX_DISTANCE_METERS: "Arrival max distance (meters)",
     },
     scheduler: {
       noticeTitle: "Background jobs — no API restart",

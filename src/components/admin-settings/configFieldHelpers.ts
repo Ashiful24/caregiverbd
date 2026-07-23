@@ -15,12 +15,20 @@ const PERCENT_KEYS = new Set([
   "SERVICE_AIT_PERCENT",
 ]);
 
+const METERS_KEYS = new Set([
+  "ARRIVAL_MAX_DISTANCE_METERS",
+]);
+
 export function isBooleanConfigKey(key: string): boolean {
   return BOOLEAN_KEYS.has(key) || key.endsWith("_ENABLED");
 }
 
 export function isPercentConfigKey(key: string): boolean {
   return PERCENT_KEYS.has(key) || key.includes("_PERCENT");
+}
+
+export function isMetersConfigKey(key: string): boolean {
+  return METERS_KEYS.has(key) || key.endsWith("_METERS");
 }
 
 export function configGroupForKey(key: string): ConfigGroupId {
@@ -34,7 +42,14 @@ export function configGroupForKey(key: string): ConfigGroupId {
   ) {
     return "financial";
   }
-  if (k.endsWith("_ENABLED") || k === "DEMO_OTP") return "features";
+  if (
+    k.endsWith("_ENABLED") ||
+    k === "DEMO_OTP" ||
+    k.includes("ARRIVAL") ||
+    k.endsWith("_METERS")
+  ) {
+    return "features";
+  }
   return "other";
 }
 
