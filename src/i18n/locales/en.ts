@@ -1180,6 +1180,8 @@ const en = {
     booleanOff: "Off",
     metersUnit: "m",
     invalidMeters: "Enter a whole number of meters (at least 1).",
+    secondsUnit: "sec",
+    invalidSeconds: "Enter a whole number of seconds (at least 1).",
     groups: {
       features: "Features & connectivity",
       financial: "Fees, tax & commission",
@@ -1219,6 +1221,7 @@ const en = {
       COMMISSION_INCLUSIVE: "Commission included in provider fee",
       TAX_INCLUSIVE: "Tax included in gross fee",
       ARRIVAL_MAX_DISTANCE_METERS: "Arrival max distance (meters)",
+      OTP_RESEND_COOLDOWN_SECONDS: "OTP resend cooldown (seconds)",
     },
     scheduler: {
       noticeTitle: "Background jobs — no API restart",

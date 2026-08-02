@@ -151,12 +151,11 @@ const navSections: NavSection[] = [
             path: "/gl-reconciliation",
             allowedRoles: ["ADMIN"],
           },
-          // Temporarily hidden — re-enable when reporting is ready
-          // {
-          //   nameKey: "navigation.adminSupervisorReporting",
-          //   path: "/admin-supervisor-reporting",
-          //   allowedRoles: ["ADMIN", "SUPERVISOR"],
-          // },
+          {
+            nameKey: "navigation.adminSupervisorReporting",
+            path: "/admin-supervisor-reporting",
+            allowedRoles: ["ADMIN", "SUPERVISOR"],
+          },
         ],
       },
     ],

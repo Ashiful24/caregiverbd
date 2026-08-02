@@ -21,6 +21,7 @@ import {
   isBooleanConfigKey,
   isMetersConfigKey,
   isPercentConfigKey,
+  isSecondsConfigKey,
   type ConfigGroupId,
 } from "./configFieldHelpers";
 import {
@@ -111,6 +112,13 @@ export function SystemSettingsPanel() {
         return;
       }
     }
+    if (isSecondsConfigKey(editing.key)) {
+      const n = Number(trimmed);
+      if (!Number.isFinite(n) || !Number.isInteger(n) || n < 1) {
+        setError(t("systemConfig.invalidSeconds"));
+        return;
+      }
+    }
     setSubmitting(true);
     setError("");
     try {
@@ -148,6 +156,13 @@ export function SystemSettingsPanel() {
       return (
         <span className="font-semibold tabular-nums">
           {item.value} {t("systemConfig.metersUnit")}
+        </span>
+      );
+    }
+    if (isSecondsConfigKey(item.key)) {
+      return (
+        <span className="font-semibold tabular-nums">
+          {item.value} {t("systemConfig.secondsUnit")}
         </span>
       );
     }
@@ -356,6 +371,23 @@ export function SystemSettingsPanel() {
                       />
                       <span className="shrink-0 text-sm text-gray-500 dark:text-gray-400">
                         {t("systemConfig.metersUnit")}
+                      </span>
+                    </div>
+                  );
+                }
+                if (isSecondsConfigKey(editing.key)) {
+                  return (
+                    <div className="mt-1 flex items-center gap-2">
+                      <input
+                        type="number"
+                        min={1}
+                        step={1}
+                        value={value}
+                        onChange={(e) => setValue(e.target.value)}
+                        className={`${inputClass} flex-1`}
+                      />
+                      <span className="shrink-0 text-sm text-gray-500 dark:text-gray-400">
+                        {t("systemConfig.secondsUnit")}
                       </span>
                     </div>
                   );

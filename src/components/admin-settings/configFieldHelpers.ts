@@ -19,6 +19,10 @@ const METERS_KEYS = new Set([
   "ARRIVAL_MAX_DISTANCE_METERS",
 ]);
 
+const SECONDS_KEYS = new Set([
+  "OTP_RESEND_COOLDOWN_SECONDS",
+]);
+
 export function isBooleanConfigKey(key: string): boolean {
   return BOOLEAN_KEYS.has(key) || key.endsWith("_ENABLED");
 }
@@ -29,6 +33,10 @@ export function isPercentConfigKey(key: string): boolean {
 
 export function isMetersConfigKey(key: string): boolean {
   return METERS_KEYS.has(key) || key.endsWith("_METERS");
+}
+
+export function isSecondsConfigKey(key: string): boolean {
+  return SECONDS_KEYS.has(key) || key.endsWith("_SECONDS");
 }
 
 export function configGroupForKey(key: string): ConfigGroupId {
@@ -45,8 +53,10 @@ export function configGroupForKey(key: string): ConfigGroupId {
   if (
     k.endsWith("_ENABLED") ||
     k === "DEMO_OTP" ||
+    k.includes("OTP") ||
     k.includes("ARRIVAL") ||
-    k.endsWith("_METERS")
+    k.endsWith("_METERS") ||
+    k.endsWith("_SECONDS")
   ) {
     return "features";
   }
