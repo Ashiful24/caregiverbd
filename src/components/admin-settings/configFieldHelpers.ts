@@ -35,6 +35,21 @@ export function isMetersConfigKey(key: string): boolean {
   return METERS_KEYS.has(key) || key.endsWith("_METERS");
 }
 
+export function isDemoOtpConfigKey(key: string): boolean {
+  return key.toUpperCase() === "DEMO_OTP";
+}
+
+/** True when DEMO_OTP is treated as off (matches backend resolveDemoOtp). */
+export function isDemoOtpOff(value: string | null | undefined): boolean {
+  const lower = String(value ?? "").trim().toLowerCase();
+  return !lower || lower === "off" || lower === "disabled" || lower === "false" || lower === "none";
+}
+
+/** Valid fixed demo OTP: 4–8 digits (matches backend). */
+export function isValidDemoOtpCode(value: string): boolean {
+  return /^\d{4,8}$/.test(value.trim());
+}
+
 export function isSecondsConfigKey(key: string): boolean {
   return SECONDS_KEYS.has(key) || key.endsWith("_SECONDS");
 }

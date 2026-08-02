@@ -1181,6 +1181,13 @@ const bn = {
     booleanOff: "বন্ধ",
     metersUnit: "মিটার",
     invalidMeters: "কমপক্ষে ১ মিটারের পূর্ণ সংখ্যা দিন।",
+    demoOtpOff: "OFF",
+    demoOtpModeOff: "OFF — র‍্যান্ডম OTP ব্যবহার করুন",
+    demoOtpModeCustom: "ফিক্সড ডেমো OTP সেট করুন",
+    demoOtpPlaceholder: "যেমন: 123456",
+    demoOtpHint: "৪–৮ ডিজিট দিন। র‍্যান্ডম OTP-এর বদলে এই কোড গ্রহণ করা হবে।",
+    demoOtpOffHint: "OFF হিসেবে সংরক্ষিত হবে। অ্যাপ র‍্যান্ডম OTP জেনারেট করবে।",
+    invalidDemoOtp: "ডেমো OTP ৪–৮ ডিজিট হতে হবে, অথবা OFF বেছে নিন।",
     secondsUnit: "সেকেন্ড",
     invalidSeconds: "কমপক্ষে ১ সেকেন্ডের পূর্ণ সংখ্যা দিন।",
     groups: {
