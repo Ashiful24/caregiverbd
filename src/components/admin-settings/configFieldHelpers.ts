@@ -15,12 +15,35 @@ const PERCENT_KEYS = new Set([
   "SERVICE_AIT_PERCENT",
 ]);
 
+const METERS_KEYS = new Set([
+  "ARRIVAL_MAX_DISTANCE_METERS",
+]);
+
 export function isBooleanConfigKey(key: string): boolean {
   return BOOLEAN_KEYS.has(key) || key.endsWith("_ENABLED");
 }
 
 export function isPercentConfigKey(key: string): boolean {
   return PERCENT_KEYS.has(key) || key.includes("_PERCENT");
+}
+
+export function isMetersConfigKey(key: string): boolean {
+  return METERS_KEYS.has(key) || key.endsWith("_METERS");
+}
+
+export function isDemoOtpConfigKey(key: string): boolean {
+  return key.toUpperCase() === "DEMO_OTP";
+}
+
+/** True when DEMO_OTP is treated as off (matches backend resolveDemoOtp). */
+export function isDemoOtpOff(value: string | null | undefined): boolean {
+  const lower = String(value ?? "").trim().toLowerCase();
+  return !lower || lower === "off" || lower === "disabled" || lower === "false" || lower === "none";
+}
+
+/** Valid fixed demo OTP: 4–8 digits (matches backend). */
+export function isValidDemoOtpCode(value: string): boolean {
+  return /^\d{4,8}$/.test(value.trim());
 }
 
 export function configGroupForKey(key: string): ConfigGroupId {
@@ -34,7 +57,14 @@ export function configGroupForKey(key: string): ConfigGroupId {
   ) {
     return "financial";
   }
-  if (k.endsWith("_ENABLED") || k === "DEMO_OTP") return "features";
+  if (
+    k.endsWith("_ENABLED") ||
+    k === "DEMO_OTP" ||
+    k.includes("ARRIVAL") ||
+    k.endsWith("_METERS")
+  ) {
+    return "features";
+  }
   return "other";
 }
 

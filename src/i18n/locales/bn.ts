@@ -1179,6 +1179,15 @@ const bn = {
     searchPlaceholder: "কী, ভ্যালু বা বিবরণ দিয়ে খুঁজুন…",
     booleanOn: "চালু",
     booleanOff: "বন্ধ",
+    metersUnit: "মিটার",
+    invalidMeters: "কমপক্ষে ১ মিটারের পূর্ণ সংখ্যা দিন।",
+    demoOtpOff: "OFF",
+    demoOtpModeOff: "OFF — র‍্যান্ডম OTP ব্যবহার করুন",
+    demoOtpModeCustom: "ফিক্সড ডেমো OTP সেট করুন",
+    demoOtpPlaceholder: "যেমন: 123456",
+    demoOtpHint: "৪–৮ ডিজিট দিন। র‍্যান্ডম OTP-এর বদলে এই কোড গ্রহণ করা হবে।",
+    demoOtpOffHint: "OFF হিসেবে সংরক্ষিত হবে। অ্যাপ র‍্যান্ডম OTP জেনারেট করবে।",
+    invalidDemoOtp: "ডেমো OTP ৪–৮ ডিজিট হতে হবে, অথবা OFF বেছে নিন।",
     groups: {
       features: "ফিচার ও সংযোগ",
       financial: "ফি, ট্যাক্স ও কমিশন",
@@ -1217,6 +1226,7 @@ const bn = {
       SERVICE_AIT_PERCENT: "প্রোভাইডার AIT (%)",
       COMMISSION_INCLUSIVE: "কমিশন প্রোভাইডার ফিতে অন্তর্ভুক্ত",
       TAX_INCLUSIVE: "ট্যাক্স মোট ফিতে অন্তর্ভুক্ত",
+      ARRIVAL_MAX_DISTANCE_METERS: "অ্যারাইভাল সর্বোচ্চ দূরত্ব (মিটার)",
     },
     scheduler: {
       noticeTitle: "ব্যাকগ্রাউন্ড জব — API রিস্টার্ট লাগে না",

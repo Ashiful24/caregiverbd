@@ -19,7 +19,11 @@ import {
   formatConfigKeyFallback,
   groupSystemConfigs,
   isBooleanConfigKey,
+  isDemoOtpConfigKey,
+  isDemoOtpOff,
+  isMetersConfigKey,
   isPercentConfigKey,
+  isValidDemoOtpCode,
   type ConfigGroupId,
 } from "./configFieldHelpers";
 import {
@@ -61,6 +65,7 @@ export function SystemSettingsPanel() {
   const [editing, setEditing] = useState<SystemConfigItem | null>(null);
   const [value, setValue] = useState("");
   const [description, setDescription] = useState("");
+  const [demoOtpMode, setDemoOtpMode] = useState<"off" | "custom">("off");
   const [submitting, setSubmitting] = useState(false);
 
   const fetchData = useCallback(async () => {
@@ -94,18 +99,46 @@ export function SystemSettingsPanel() {
 
   const openEdit = (item: SystemConfigItem) => {
     setEditing(item);
-    setValue(item.value);
     setDescription(item.description ?? "");
     setSuccess("");
+    setError("");
+    if (isDemoOtpConfigKey(item.key)) {
+      if (isDemoOtpOff(item.value)) {
+        setDemoOtpMode("off");
+        setValue("OFF");
+      } else {
+        setDemoOtpMode("custom");
+        setValue(item.value);
+      }
+    } else {
+      setDemoOtpMode("off");
+      setValue(item.value);
+    }
   };
 
   const handleSave = async () => {
     if (!editing) return;
+    let trimmed = value.trim();
+    if (isDemoOtpConfigKey(editing.key)) {
+      if (demoOtpMode === "off") {
+        trimmed = "OFF";
+      } else if (!isValidDemoOtpCode(trimmed)) {
+        setError(t("systemConfig.invalidDemoOtp"));
+        return;
+      }
+    }
+    if (isMetersConfigKey(editing.key)) {
+      const n = Number(trimmed);
+      if (!Number.isFinite(n) || !Number.isInteger(n) || n < 1) {
+        setError(t("systemConfig.invalidMeters"));
+        return;
+      }
+    }
     setSubmitting(true);
     setError("");
     try {
       await adminSystemConfigApi.update(editing.key, {
-        value: value.trim(),
+        value: trimmed,
         description: description.trim() || null,
       });
       setEditing(null);
@@ -123,6 +156,16 @@ export function SystemSettingsPanel() {
   };
 
   const renderValue = (item: SystemConfigItem) => {
+    if (isDemoOtpConfigKey(item.key)) {
+      if (isDemoOtpOff(item.value)) {
+        return (
+          <Badge color="light" size="sm">
+            {t("systemConfig.demoOtpOff")}
+          </Badge>
+        );
+      }
+      return <span className="font-mono text-sm font-semibold tabular-nums">{item.value}</span>;
+    }
     if (isBooleanConfigKey(item.key)) {
       const on = item.value === "true" || item.value === "1";
       return (
@@ -133,6 +176,13 @@ export function SystemSettingsPanel() {
     }
     if (isPercentConfigKey(item.key)) {
       return <span className="font-semibold tabular-nums">{item.value}%</span>;
+    }
+    if (isMetersConfigKey(item.key)) {
+      return (
+        <span className="font-semibold tabular-nums">
+          {item.value} {t("systemConfig.metersUnit")}
+        </span>
+      );
     }
     return <span className="font-mono text-sm tabular-nums">{item.value}</span>;
   };
@@ -298,6 +348,53 @@ export function SystemSettingsPanel() {
             <label className="block">
               <span className={labelClass}>{t("systemConfig.value")}</span>
               {(() => {
+                if (isDemoOtpConfigKey(editing.key)) {
+                  return (
+                    <div className="mt-1 space-y-3">
+                      <ThemedSelect
+                        value={demoOtpMode}
+                        onChange={(e) => {
+                          const mode = e.target.value === "custom" ? "custom" : "off";
+                          setDemoOtpMode(mode);
+                          setError("");
+                          if (mode === "off") {
+                            setValue("OFF");
+                          } else if (isDemoOtpOff(value)) {
+                            setValue("");
+                          }
+                        }}
+                        className={inputClass}
+                      >
+                        <option value="off">{t("systemConfig.demoOtpModeOff")}</option>
+                        <option value="custom">{t("systemConfig.demoOtpModeCustom")}</option>
+                      </ThemedSelect>
+                      {demoOtpMode === "custom" ? (
+                        <div>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            maxLength={8}
+                            value={value}
+                            onChange={(e) => {
+                              setValue(e.target.value.replace(/\D/g, "").slice(0, 8));
+                              setError("");
+                            }}
+                            placeholder={t("systemConfig.demoOtpPlaceholder")}
+                            className={inputClass}
+                          />
+                          <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                            {t("systemConfig.demoOtpHint")}
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          {t("systemConfig.demoOtpOffHint")}
+                        </p>
+                      )}
+                    </div>
+                  );
+                }
                 const enumOpts = getEnumOptions(editing.key);
                 if (enumOpts) {
                   return (
@@ -324,6 +421,23 @@ export function SystemSettingsPanel() {
                       <option value="true">{t("systemConfig.booleanOn")}</option>
                       <option value="false">{t("systemConfig.booleanOff")}</option>
                     </ThemedSelect>
+                  );
+                }
+                if (isMetersConfigKey(editing.key)) {
+                  return (
+                    <div className="mt-1 flex items-center gap-2">
+                      <input
+                        type="number"
+                        min={1}
+                        step={1}
+                        value={value}
+                        onChange={(e) => setValue(e.target.value)}
+                        className={`${inputClass} flex-1`}
+                      />
+                      <span className="shrink-0 text-sm text-gray-500 dark:text-gray-400">
+                        {t("systemConfig.metersUnit")}
+                      </span>
+                    </div>
                   );
                 }
                 return (
@@ -359,7 +473,12 @@ export function SystemSettingsPanel() {
               </button>
               <button
                 type="button"
-                disabled={submitting || !value.trim()}
+                disabled={
+                  submitting ||
+                  (isDemoOtpConfigKey(editing.key)
+                    ? demoOtpMode === "custom" && !value.trim()
+                    : !value.trim())
+                }
                 onClick={() => void handleSave()}
                 className={btnPrimary()}
               >
