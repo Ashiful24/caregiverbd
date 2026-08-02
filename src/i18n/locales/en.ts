@@ -1180,6 +1180,13 @@ const en = {
     booleanOff: "Off",
     metersUnit: "m",
     invalidMeters: "Enter a whole number of meters (at least 1).",
+    demoOtpOff: "OFF",
+    demoOtpModeOff: "OFF — use random OTP",
+    demoOtpModeCustom: "Set fixed demo OTP",
+    demoOtpPlaceholder: "e.g. 123456",
+    demoOtpHint: "Enter 4–8 digits. This code will be accepted instead of a random OTP.",
+    demoOtpOffHint: "Saves as OFF. The app will generate random OTPs.",
+    invalidDemoOtp: "Demo OTP must be 4–8 digits, or choose OFF.",
     groups: {
       features: "Features & connectivity",
       financial: "Fees, tax & commission",
