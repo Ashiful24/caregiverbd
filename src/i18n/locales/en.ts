@@ -1180,6 +1180,15 @@ const en = {
     booleanOff: "Off",
     metersUnit: "m",
     invalidMeters: "Enter a whole number of meters (at least 1).",
+    demoOtpOff: "OFF",
+    demoOtpModeOff: "OFF — use random OTP",
+    demoOtpModeCustom: "Set fixed demo OTP",
+    demoOtpPlaceholder: "e.g. 123456",
+    demoOtpHint: "Enter 4–8 digits. This code will be accepted instead of a random OTP.",
+    demoOtpOffHint: "Saves as OFF. The app will generate random OTPs.",
+    invalidDemoOtp: "Demo OTP must be 4–8 digits, or choose OFF.",
+    secondsUnit: "sec",
+    invalidSeconds: "Enter a whole number of seconds (at least 1).",
     groups: {
       features: "Features & connectivity",
       financial: "Fees, tax & commission",
@@ -1219,6 +1228,7 @@ const en = {
       COMMISSION_INCLUSIVE: "Commission included in provider fee",
       TAX_INCLUSIVE: "Tax included in gross fee",
       ARRIVAL_MAX_DISTANCE_METERS: "Arrival max distance (meters)",
+      OTP_RESEND_COOLDOWN_SECONDS: "OTP resend cooldown (seconds)",
     },
     scheduler: {
       noticeTitle: "Background jobs — no API restart",
