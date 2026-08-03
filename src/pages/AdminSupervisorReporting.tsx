@@ -6,19 +6,16 @@ import {
   Calendar,
   CheckCircle2,
   ClipboardList,
-  Coins,
   Download,
   FileSpreadsheet,
   HandCoins,
   Hourglass,
   Percent,
-  PiggyBank,
   RefreshCw,
-  Repeat,
+  Send,
   Timer,
   TrendingUp,
   Undo2,
-  Wallet,
 } from "lucide-react";
 import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import PageMeta from "../components/common/PageMeta";
@@ -41,10 +38,11 @@ import {
   reportingApi,
   type ReportingDailyBreakdownResponse,
   type ReportingDailyBreakdownRow,
-  type ReportingSummaryDto,
+  type ReportingServiceType,
+  type SupervisorReportingSummaryDto,
 } from "../services/api";
 
-// ── KPI cards driven by GET /v1/reporting/summary ─────────────────────────────
+// ── KPI cards driven by GET /v1/reporting/supervisor-summary ──────────────────
 
 type MetricCardConfig = {
   labelKey: string;
@@ -69,18 +67,8 @@ function formatPercent(value: number | null | undefined): string {
   })}%`;
 }
 
-function formatBdtCompact(value: string | number | null | undefined): string {
-  if (value == null || value === "") return "—";
-  const n = typeof value === "number" ? value : Number(value);
-  if (!Number.isFinite(n)) return String(value);
-  return `BDT ${n.toLocaleString("en-US", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  })}`;
-}
-
 function buildMetrics(
-  summary: ReportingSummaryDto | null,
+  summary: SupervisorReportingSummaryDto | null,
 ): { row1: MetricCardConfig[]; row2: MetricCardConfig[]; row3: MetricCardConfig[] } {
   const s = summary;
 
@@ -95,65 +83,65 @@ function buildMetrics(
         "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400",
     },
     {
+      labelKey: "adminSupervisorReporting.kpi.sentToProviders",
+      descKey: "adminSupervisorReporting.kpi.sentToProvidersDesc",
+      value: formatCount(s?.sentToProviders),
+      icon: <Send className="size-5" />,
+      bgClass: "bg-sky-50/80 dark:bg-sky-500/10",
+      iconBgClass: "bg-sky-100 text-sky-600 dark:bg-sky-500/20 dark:text-sky-400",
+    },
+    {
+      labelKey: "adminSupervisorReporting.kpi.acceptedByProvider",
+      descKey: "adminSupervisorReporting.kpi.acceptedByProviderDesc",
+      value: formatCount(s?.acceptedByProvider),
+      icon: <HandCoins className="size-5" />,
+      bgClass: "bg-indigo-50/80 dark:bg-indigo-500/10",
+      iconBgClass:
+        "bg-indigo-100 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400",
+    },
+    {
       labelKey: "adminSupervisorReporting.kpi.confirmedBookings",
       descKey: "adminSupervisorReporting.kpi.confirmedBookingsDesc",
       value: formatCount(s?.confirmedBookings),
       icon: <CheckCircle2 className="size-5" />,
-      bgClass: "bg-sky-50/80 dark:bg-sky-500/10",
-      iconBgClass: "bg-sky-100 text-sky-600 dark:bg-sky-500/20 dark:text-sky-400",
+      bgClass: "bg-violet-50/80 dark:bg-violet-500/10",
+      iconBgClass:
+        "bg-violet-100 text-violet-600 dark:bg-violet-500/20 dark:text-violet-400",
     },
+  ];
+
+  const row2: MetricCardConfig[] = [
     {
       labelKey: "adminSupervisorReporting.kpi.completedServices",
       descKey: "adminSupervisorReporting.kpi.completedServicesDesc",
       value: formatCount(s?.completedServices),
       icon: <TrendingUp className="size-5" />,
-      bgClass: "bg-violet-50/80 dark:bg-violet-500/10",
+      bgClass: "bg-amber-50/80 dark:bg-amber-500/10",
       iconBgClass:
-        "bg-violet-100 text-violet-600 dark:bg-violet-500/20 dark:text-violet-400",
+        "bg-amber-100 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400",
+    },
+    {
+      labelKey: "adminSupervisorReporting.kpi.autoCancelUnpaid",
+      descKey: "adminSupervisorReporting.kpi.autoCancelUnpaidDesc",
+      value: formatCount(s?.autoCancelUnpaid),
+      icon: <Timer className="size-5" />,
+      bgClass: "bg-rose-50/80 dark:bg-rose-500/10",
+      iconBgClass: "bg-rose-100 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400",
+    },
+    {
+      labelKey: "adminSupervisorReporting.kpi.cancelledTotal",
+      descKey: "adminSupervisorReporting.kpi.cancelledTotalDesc",
+      value: formatCount(s?.cancelledTotal),
+      icon: <Undo2 className="size-5" />,
+      bgClass: "bg-orange-50/80 dark:bg-orange-500/10",
+      iconBgClass:
+        "bg-orange-100 text-orange-600 dark:bg-orange-500/20 dark:text-orange-400",
     },
     {
       labelKey: "adminSupervisorReporting.kpi.fulfillmentRate",
       descKey: "adminSupervisorReporting.kpi.fulfillmentRateDesc",
       value: formatPercent(s?.fulfillmentRate),
       icon: <Percent className="size-5" />,
-      bgClass: "bg-amber-50/80 dark:bg-amber-500/10",
-      iconBgClass:
-        "bg-amber-100 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400",
-    },
-  ];
-
-  const row2: MetricCardConfig[] = [
-    {
-      labelKey: "adminSupervisorReporting.kpi.acceptanceRate",
-      descKey: "adminSupervisorReporting.kpi.acceptanceRateDesc",
-      value: formatPercent(s?.acceptanceRate),
-      icon: <Hourglass className="size-5" />,
-      bgClass: "bg-indigo-50/80 dark:bg-indigo-500/10",
-      iconBgClass:
-        "bg-indigo-100 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400",
-    },
-    {
-      labelKey: "adminSupervisorReporting.kpi.paymentExpiryRate",
-      descKey: "adminSupervisorReporting.kpi.paymentExpiryRateDesc",
-      value: formatPercent(s?.paymentExpiryRate),
-      icon: <Timer className="size-5" />,
-      bgClass: "bg-rose-50/80 dark:bg-rose-500/10",
-      iconBgClass: "bg-rose-100 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400",
-    },
-    {
-      labelKey: "adminSupervisorReporting.kpi.cancellationRate",
-      descKey: "adminSupervisorReporting.kpi.cancellationRateDesc",
-      value: formatPercent(s?.cancellationRate),
-      icon: <Repeat className="size-5" />,
-      bgClass: "bg-orange-50/80 dark:bg-orange-500/10",
-      iconBgClass:
-        "bg-orange-100 text-orange-600 dark:bg-orange-500/20 dark:text-orange-400",
-    },
-    {
-      labelKey: "adminSupervisorReporting.kpi.refundAmount",
-      descKey: "adminSupervisorReporting.kpi.refundAmountDesc",
-      value: formatBdtCompact(s?.refundAmount),
-      icon: <Undo2 className="size-5" />,
       bgClass: "bg-pink-50/80 dark:bg-pink-500/10",
       iconBgClass: "bg-pink-100 text-pink-600 dark:bg-pink-500/20 dark:text-pink-400",
     },
@@ -161,36 +149,18 @@ function buildMetrics(
 
   const row3: MetricCardConfig[] = [
     {
-      labelKey: "adminSupervisorReporting.kpi.grossRevenue",
-      descKey: "adminSupervisorReporting.kpi.grossRevenueDesc",
-      value: formatBdtCompact(s?.grossRevenue),
-      icon: <Wallet className="size-5" />,
-      bgClass: "bg-emerald-50/80 dark:bg-emerald-500/10",
-      iconBgClass:
-        "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400",
-    },
-    {
-      labelKey: "adminSupervisorReporting.kpi.ontorCommission",
-      descKey: "adminSupervisorReporting.kpi.ontorCommissionDesc",
-      value: formatBdtCompact(s?.ontorCommission),
-      icon: <Coins className="size-5" />,
-      bgClass: "bg-yellow-50/80 dark:bg-yellow-500/10",
-      iconBgClass:
-        "bg-yellow-100 text-yellow-600 dark:bg-yellow-500/20 dark:text-yellow-400",
-    },
-    {
-      labelKey: "adminSupervisorReporting.kpi.providerPayout",
-      descKey: "adminSupervisorReporting.kpi.providerPayoutDesc",
-      value: formatBdtCompact(s?.providerPayout),
-      icon: <HandCoins className="size-5" />,
+      labelKey: "adminSupervisorReporting.kpi.providerAcceptanceRate",
+      descKey: "adminSupervisorReporting.kpi.providerAcceptanceRateDesc",
+      value: formatPercent(s?.providerAcceptanceRate),
+      icon: <Hourglass className="size-5" />,
       bgClass: "bg-cyan-50/80 dark:bg-cyan-500/10",
       iconBgClass: "bg-cyan-100 text-cyan-600 dark:bg-cyan-500/20 dark:text-cyan-400",
     },
     {
-      labelKey: "adminSupervisorReporting.kpi.pendingPayout",
-      descKey: "adminSupervisorReporting.kpi.pendingPayoutDesc",
-      value: formatBdtCompact(s?.pendingPayout),
-      icon: <PiggyBank className="size-5" />,
+      labelKey: "adminSupervisorReporting.kpi.paymentExpiryRate",
+      descKey: "adminSupervisorReporting.kpi.paymentExpiryRateDesc",
+      value: formatPercent(s?.paymentExpiryRate),
+      icon: <Timer className="size-5" />,
       bgClass: "bg-blue-50/80 dark:bg-blue-500/10",
       iconBgClass: "bg-blue-100 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400",
     },
@@ -199,18 +169,22 @@ function buildMetrics(
   return { row1, row2, row3 };
 }
 
-// ── Data table — driven by GET /v1/reporting/daily-breakdown ──────────────────
+// ── Data table — driven by GET /v1/reporting/supervisor-daily-breakdown ───────
 
 /** Normalized row shape consumed by the table UI. */
 type BreakdownTableRow = {
   date: string;
   rawDate: string;
   totalRequests: number | null;
+  sentToProviders: number | null;
+  acceptedByProvider: number | null;
   confirmedBookings: number | null;
   completedServices: number | null;
+  autoCancelUnpaid: number | null;
+  cancelledTotal: number | null;
   fulfillmentRate: number | null;
-  acceptanceRate: number | null;
-  grossRevenue: number | null;
+  providerAcceptanceRate: number | null;
+  paymentExpiryRate: number | null;
 };
 
 const LIMIT_OPTIONS = [5, 10, 20];
@@ -242,11 +216,17 @@ function normalizeBreakdownRow(r: ReportingDailyBreakdownRow): BreakdownTableRow
     date: formatRowDate(r.date),
     rawDate: r.date,
     totalRequests: toNumberOrNull(r.totalRequests),
+    sentToProviders: toNumberOrNull(r.sentToProviders),
+    acceptedByProvider: toNumberOrNull(r.acceptedByProvider),
     confirmedBookings: toNumberOrNull(r.confirmedBookings),
     completedServices: toNumberOrNull(r.completedServices),
+    autoCancelUnpaid: toNumberOrNull(r.autoCancelUnpaid),
+    cancelledTotal: toNumberOrNull(r.cancelledTotal),
     fulfillmentRate: toNumberOrNull(r.fulfillmentRate),
-    acceptanceRate: toNumberOrNull(r.acceptanceRate),
-    grossRevenue: toNumberOrNull(r.grossRevenue),
+    providerAcceptanceRate: toNumberOrNull(
+      r.providerAcceptanceRate ?? r.acceptanceRate,
+    ),
+    paymentExpiryRate: toNumberOrNull(r.paymentExpiryRate),
   };
 }
 
@@ -283,37 +263,37 @@ const BREAKDOWN_COLUMNS: BreakdownColumn[] = [
   {
     key: "colConfirmedBookings",
     labelKey: "colConfirmedBookings",
-    hideClass: "hidden md:table-cell",
+    hideClass: "",
     render: (r) => formatCount(r.confirmedBookings),
     exportValue: (r) => r.confirmedBookings ?? "",
   },
   {
     key: "colCompletedServices",
     labelKey: "colCompletedServices",
-    hideClass: "hidden sm:table-cell",
+    hideClass: "",
     render: (r) => formatCount(r.completedServices),
     exportValue: (r) => r.completedServices ?? "",
   },
   {
     key: "colFulfillmentRate",
     labelKey: "colFulfillmentRate",
-    hideClass: "hidden lg:table-cell",
+    hideClass: "",
     render: (r) => formatPercent(r.fulfillmentRate),
     exportValue: (r) => r.fulfillmentRate ?? "",
   },
   {
-    key: "colAcceptanceRate",
-    labelKey: "colAcceptanceRate",
-    hideClass: "hidden xl:table-cell",
-    render: (r) => formatPercent(r.acceptanceRate),
-    exportValue: (r) => r.acceptanceRate ?? "",
+    key: "colProviderAcceptanceRate",
+    labelKey: "colProviderAcceptanceRate",
+    hideClass: "",
+    render: (r) => formatPercent(r.providerAcceptanceRate),
+    exportValue: (r) => r.providerAcceptanceRate ?? "",
   },
   {
-    key: "colGrossRevenue",
-    labelKey: "colGrossRevenue",
-    hideClass: "hidden xsm:table-cell",
-    render: (r) => formatBdtCompact(r.grossRevenue),
-    exportValue: (r) => r.grossRevenue ?? "",
+    key: "colPaymentExpiryRate",
+    labelKey: "colPaymentExpiryRate",
+    hideClass: "",
+    render: (r) => formatPercent(r.paymentExpiryRate),
+    exportValue: (r) => r.paymentExpiryRate ?? "",
   },
 ];
 
@@ -468,11 +448,13 @@ export default function AdminSupervisorReporting() {
 
   const [dateRange, setDateRange] = useState<DateRangePickerValue>(EMPTY_RANGE);
   const [appliedRange, setAppliedRange] = useState<DateRangePickerValue>(EMPTY_RANGE);
+  const [serviceType, setServiceType] = useState<ReportingServiceType | "">("");
+  const [appliedServiceType, setAppliedServiceType] = useState<ReportingServiceType | "">("");
   const [lastUpdated, setLastUpdated] = useState(() => format(new Date(), "h:mm a"));
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(5);
 
-  const [summary, setSummary] = useState<ReportingSummaryDto | null>(null);
+  const [summary, setSummary] = useState<SupervisorReportingSummaryDto | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState("");
   const fetchSeq = useRef(0);
@@ -503,7 +485,7 @@ export default function AdminSupervisorReporting() {
         appliedRange.startDate && appliedRange.endDate
           ? `${toBangladeshISODate(appliedRange.startDate)}_${toBangladeshISODate(appliedRange.endDate)}`
           : "all-time";
-      const base = `reporting-daily-breakdown_${rangePart}_${today}`;
+      const base = `supervisor-daily-breakdown_${rangePart}_${today}`;
       if (kind === "csv") {
         downloadBlob(buildCsv(breakdownRows, headers), `${base}.csv`);
       } else {
@@ -514,19 +496,24 @@ export default function AdminSupervisorReporting() {
   );
 
   const fetchSummary = useCallback(
-    async (range: DateRangePickerValue, signal?: AbortSignal) => {
+    async (
+      range: DateRangePickerValue,
+      serviceTypeFilter: ReportingServiceType | "",
+      signal?: AbortSignal,
+    ) => {
       const seq = ++fetchSeq.current;
       setSummaryLoading(true);
       setSummaryError("");
       try {
-        const params: Parameters<typeof reportingApi.getSummary>[0] = {};
+        const params: Parameters<typeof reportingApi.getSupervisorSummary>[0] = {};
         if (range.startDate) params.startDate = toBangladeshISODate(range.startDate);
         if (range.endDate) params.endDate = toBangladeshISODate(range.endDate);
+        if (serviceTypeFilter) params.serviceType = serviceTypeFilter;
         if (supervisorId != null) params.supervisorId = supervisorId;
 
-        const res = await reportingApi.getSummary(params, { signal });
+        const res = await reportingApi.getSupervisorSummary(params, { signal });
         if (seq !== fetchSeq.current) return;
-        const data = (res?.data ?? res) as ReportingSummaryDto;
+        const data = (res?.data ?? res) as SupervisorReportingSummaryDto;
         setSummary(data ?? null);
         setLastUpdated(format(new Date(), "h:mm a"));
       } catch (err: unknown) {
@@ -546,16 +533,21 @@ export default function AdminSupervisorReporting() {
   );
 
   const fetchBreakdown = useCallback(
-    async (range: DateRangePickerValue, signal?: AbortSignal) => {
+    async (
+      range: DateRangePickerValue,
+      serviceTypeFilter: ReportingServiceType | "",
+      signal?: AbortSignal,
+    ) => {
       const seq = ++breakdownFetchSeq.current;
       setBreakdownLoading(true);
       setBreakdownError("");
       try {
-        const baseParams: Parameters<typeof reportingApi.getDailyBreakdown>[0] = {
+        const baseParams: Parameters<typeof reportingApi.getSupervisorDailyBreakdown>[0] = {
           limit: API_PAGE_SIZE,
         };
         if (range.startDate) baseParams.startDate = toBangladeshISODate(range.startDate);
         if (range.endDate) baseParams.endDate = toBangladeshISODate(range.endDate);
+        if (serviceTypeFilter) baseParams.serviceType = serviceTypeFilter;
         if (supervisorId != null) baseParams.supervisorId = supervisorId;
 
         const collected: BreakdownTableRow[] = [];
@@ -563,7 +555,7 @@ export default function AdminSupervisorReporting() {
         let pagesFetched = 0;
         while (pagesFetched < MAX_CURSOR_PAGES) {
           const params = cursor ? { ...baseParams, cursor } : baseParams;
-          const res = await reportingApi.getDailyBreakdown(params, { signal });
+          const res = await reportingApi.getSupervisorDailyBreakdown(params, { signal });
           if (seq !== breakdownFetchSeq.current) return;
           const payload = (res?.data ?? res) as
             | ReportingDailyBreakdownResponse
@@ -608,15 +600,15 @@ export default function AdminSupervisorReporting() {
 
   useEffect(() => {
     const controller = new AbortController();
-    void fetchSummary(appliedRange, controller.signal);
+    void fetchSummary(appliedRange, appliedServiceType, controller.signal);
     return () => controller.abort();
-  }, [appliedRange, fetchSummary]);
+  }, [appliedRange, appliedServiceType, fetchSummary]);
 
   useEffect(() => {
     const controller = new AbortController();
-    void fetchBreakdown(appliedRange, controller.signal);
+    void fetchBreakdown(appliedRange, appliedServiceType, controller.signal);
     return () => controller.abort();
-  }, [appliedRange, fetchBreakdown]);
+  }, [appliedRange, appliedServiceType, fetchBreakdown]);
 
   const handleApply = () => {
     // Only apply when both ends are set — partial ranges are treated as "no filter".
@@ -625,24 +617,42 @@ export default function AdminSupervisorReporting() {
     } else {
       setAppliedRange(EMPTY_RANGE);
     }
+    setAppliedServiceType(serviceType);
     setPage(1);
   };
 
   const handleClearFilter = () => {
     setDateRange(EMPTY_RANGE);
     setAppliedRange(EMPTY_RANGE);
+    setServiceType("");
+    setAppliedServiceType("");
     setPage(1);
   };
 
   const handleRefresh = () => {
-    void fetchSummary(appliedRange);
-    void fetchBreakdown(appliedRange);
+    void fetchSummary(appliedRange, appliedServiceType);
+    void fetchBreakdown(appliedRange, appliedServiceType);
   };
 
-  const isFilterApplied = Boolean(appliedRange.startDate && appliedRange.endDate);
-  const rangeLabel = isFilterApplied
+  const isDateFilterApplied = Boolean(appliedRange.startDate && appliedRange.endDate);
+  const isServiceTypeFilterApplied = Boolean(appliedServiceType);
+  const isFilterApplied = isDateFilterApplied || isServiceTypeFilterApplied;
+  const hasDraftFilters =
+    Boolean(dateRange.startDate || dateRange.endDate) || Boolean(serviceType);
+
+  const rangeLabel = isDateFilterApplied
     ? `${format(appliedRange.startDate as Date, "dd MMM yyyy")} - ${format(appliedRange.endDate as Date, "dd MMM yyyy")}`
     : t(`${R}.allTime`);
+
+  const serviceTypeLabel = appliedServiceType === "SHORT_TERM"
+    ? t(`${R}.shortTerm`)
+    : appliedServiceType === "LONG_TERM"
+      ? t(`${R}.longTerm`)
+      : t(`${R}.allServiceTypes`);
+
+  const filterSummaryLabel = isServiceTypeFilterApplied
+    ? `${rangeLabel} · ${serviceTypeLabel}`
+    : rangeLabel;
 
   return (
     <>
@@ -679,6 +689,22 @@ export default function AdminSupervisorReporting() {
             </div>
 
             <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-end sm:justify-end lg:w-auto">
+              <label className="flex min-w-0 flex-1 flex-col gap-1 sm:max-w-[180px] lg:min-w-[160px]">
+                <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                  {t(`${R}.serviceType`)}
+                </span>
+                <ThemedSelect
+                  value={serviceType}
+                  onChange={(e) =>
+                    setServiceType(e.target.value as ReportingServiceType | "")
+                  }
+                  className="min-h-[42px] w-full"
+                >
+                  <option value="">{t(`${R}.allServiceTypes`)}</option>
+                  <option value="SHORT_TERM">{t(`${R}.shortTerm`)}</option>
+                  <option value="LONG_TERM">{t(`${R}.longTerm`)}</option>
+                </ThemedSelect>
+              </label>
               <label className="flex min-w-0 flex-1 flex-col gap-1 sm:max-w-xs lg:min-w-[240px]">
                 <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
                   {t(`${R}.dateRange`)}
@@ -698,7 +724,7 @@ export default function AdminSupervisorReporting() {
               >
                 {t(`${R}.apply`)}
               </button>
-              {isFilterApplied || dateRange.startDate || dateRange.endDate ? (
+              {isFilterApplied || hasDraftFilters ? (
                 <button
                   type="button"
                   onClick={handleClearFilter}
@@ -710,15 +736,15 @@ export default function AdminSupervisorReporting() {
             </div>
           </div>
 
-          {rangeLabel ? (
+          {filterSummaryLabel ? (
             <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
               <Calendar className="mr-1 inline size-3.5 align-text-bottom" aria-hidden />
-              {rangeLabel}
+              {filterSummaryLabel}
             </p>
           ) : null}
         </section>
 
-        {/* KPI rows — 4 cards per row on xl, sourced from GET /v1/reporting/summary */}
+        {/* KPI rows — 4 cards per row on xl, sourced from GET /v1/reporting/supervisor-summary */}
         {summaryError ? (
           <div
             role="alert"
@@ -752,9 +778,9 @@ export default function AdminSupervisorReporting() {
           <div className="flex flex-col gap-3 border-b border-gray-200 bg-brand-500 px-4 py-3 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <h3 className="text-sm font-semibold uppercase tracking-wide text-white">
               {t(`${R}.table.title`)}
-              {rangeLabel ? (
+              {filterSummaryLabel ? (
                 <span className="ml-1.5 text-xs font-normal normal-case opacity-80">
-                  ({rangeLabel})
+                  ({filterSummaryLabel})
                 </span>
               ) : null}
             </h3>
@@ -780,16 +806,17 @@ export default function AdminSupervisorReporting() {
             </div>
           </div>
 
-          <div className="overflow-x-auto px-0" style={{ WebkitOverflowScrolling: "touch" }}>
-            <Table className="w-full table-auto">
+          <div className="max-w-full overflow-hidden">
+            <Table className="w-full table-fixed">
               <TableHeader className="border-b border-gray-200 bg-gray-50/80 dark:border-gray-800 dark:bg-white/[0.02]">
                 <TableRow>
                   {BREAKDOWN_COLUMNS.map((col) => (
                     <TableCell
                       key={col.key}
                       isHeader
+                      title={t(`${R}.table.${col.labelKey}`)}
                       className={cn(
-                        "whitespace-nowrap py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400",
+                        "!px-2 py-2.5 text-left text-xs font-semibold leading-tight text-gray-500 dark:text-gray-400",
                         col.hideClass,
                       )}
                     >
@@ -805,9 +832,9 @@ export default function AdminSupervisorReporting() {
                       {BREAKDOWN_COLUMNS.map((col) => (
                         <TableCell
                           key={col.key}
-                          className={cn("py-3", col.hideClass)}
+                          className={cn("!px-2 py-2.5", col.hideClass)}
                         >
-                          <div className="h-4 w-24 animate-pulse rounded bg-gray-200/80 dark:bg-gray-700/60" />
+                          <div className="h-4 w-12 animate-pulse rounded bg-gray-200/80 dark:bg-gray-700/60" />
                         </TableCell>
                       ))}
                     </TableRow>
@@ -850,7 +877,8 @@ export default function AdminSupervisorReporting() {
                         <TableCell
                           key={col.key}
                           className={cn(
-                            "whitespace-nowrap py-3 text-theme-sm",
+                            "!px-2 py-2.5 text-theme-sm tabular-nums",
+                            colIdx === 0 ? "whitespace-nowrap" : "",
                             colIdx === 1
                               ? "font-medium text-gray-800 dark:text-white/90"
                               : "text-gray-700 dark:text-gray-300",
