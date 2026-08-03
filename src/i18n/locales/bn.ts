@@ -1188,6 +1188,8 @@ const bn = {
     demoOtpHint: "৪–৮ ডিজিট দিন। র‍্যান্ডম OTP-এর বদলে এই কোড গ্রহণ করা হবে।",
     demoOtpOffHint: "OFF হিসেবে সংরক্ষিত হবে। অ্যাপ র‍্যান্ডম OTP জেনারেট করবে।",
     invalidDemoOtp: "ডেমো OTP ৪–৮ ডিজিট হতে হবে, অথবা OFF বেছে নিন।",
+    secondsUnit: "সেকেন্ড",
+    invalidSeconds: "কমপক্ষে ১ সেকেন্ডের পূর্ণ সংখ্যা দিন।",
     groups: {
       features: "ফিচার ও সংযোগ",
       financial: "ফি, ট্যাক্স ও কমিশন",
@@ -1227,6 +1229,7 @@ const bn = {
       COMMISSION_INCLUSIVE: "কমিশন প্রোভাইডার ফিতে অন্তর্ভুক্ত",
       TAX_INCLUSIVE: "ট্যাক্স মোট ফিতে অন্তর্ভুক্ত",
       ARRIVAL_MAX_DISTANCE_METERS: "অ্যারাইভাল সর্বোচ্চ দূরত্ব (মিটার)",
+      OTP_RESEND_COOLDOWN_SECONDS: "OTP পুনরায় পাঠানোর কুলডাউন (সেকেন্ড)",
     },
     scheduler: {
       noticeTitle: "ব্যাকগ্রাউন্ড জব — API রিস্টার্ট লাগে না",
