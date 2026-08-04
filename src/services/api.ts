@@ -3909,6 +3909,8 @@ export interface FinancialReportFiltersDto {
   endDate: string;
   providerId: number | null;
   patientId: number | null;
+  /** Admin optional filter; supervisors are self-scoped by the API. */
+  supervisorId?: number | null;
   type: FinancialTxType | null;
   paymentMethod: FinancialPaymentMethod | null;
   serviceType: FinancialServiceType | null;
@@ -4119,6 +4121,8 @@ export const adminFinancialApi = {
       endDate: string;
       providerId?: number;
       patientId?: number;
+      /** Admin: filter by supervisor. Supervisors: omit — API self-scopes. */
+      supervisorId?: number;
       type?: FinancialTxType;
       paymentMethod?: FinancialPaymentMethod;
       serviceType?: FinancialServiceType;
@@ -4136,6 +4140,9 @@ export const adminFinancialApi = {
     };
     if (params.providerId != null)    query.providerId    = params.providerId;
     if (params.patientId != null)     query.patientId     = params.patientId;
+    if (params.supervisorId != null && Number.isFinite(params.supervisorId) && params.supervisorId > 0) {
+      query.supervisorId = params.supervisorId;
+    }
     if (params.type)                  query.type          = params.type;
     if (params.paymentMethod)         query.paymentMethod = params.paymentMethod;
     if (params.serviceType)           query.serviceType   = params.serviceType;

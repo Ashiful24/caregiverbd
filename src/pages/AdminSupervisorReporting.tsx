@@ -16,6 +16,7 @@ import {
   Timer,
   TrendingUp,
   Undo2,
+  Wallet,
 } from "lucide-react";
 import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import PageMeta from "../components/common/PageMeta";
@@ -33,14 +34,25 @@ import {
 } from "../components/ui/table";
 import { cn } from "../lib/utils";
 import { useAuth } from "../context/AuthContext";
-import { toBangladeshISODate } from "../utils/format";
 import {
+  bangladeshCalendarRangeToApiParams,
+  toBangladeshISODate,
+} from "../utils/format";
+import {
+  adminFinancialApi,
   reportingApi,
+  type FinancialReportTotalsDto,
+  type FinancialServiceType,
   type ReportingDailyBreakdownResponse,
   type ReportingDailyBreakdownRow,
   type ReportingServiceType,
   type SupervisorReportingSummaryDto,
 } from "../services/api";
+import {
+  fmtBDT,
+  MAX_RANGE_DAYS,
+  toISODateLocal,
+} from "./financial/shared";
 
 // ── KPI cards driven by GET /v1/reporting/supervisor-summary ──────────────────
 
@@ -431,6 +443,220 @@ function MetricsGrid({
   );
 }
 
+/** Resolve a financial-report date window (API requires dates, max 90 days). */
+function resolveFinancialWindow(range: DateRangePickerValue): {
+  startDate: string;
+  endDate: string;
+  usedFallback: boolean;
+  clamped: boolean;
+} {
+  const today = toISODateLocal(new Date());
+  const fallbackStart = toISODateLocal(
+    new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+  );
+  const usedFallback = !(range.startDate && range.endDate);
+  let startDate = range.startDate ? toBangladeshISODate(range.startDate) : fallbackStart;
+  let endDate = range.endDate ? toBangladeshISODate(range.endDate) : today;
+
+  const utcMidnight = (s: string) =>
+    Date.UTC(Number(s.slice(0, 4)), Number(s.slice(5, 7)) - 1, Number(s.slice(8, 10)));
+  let clamped = false;
+  const diffDays =
+    (utcMidnight(endDate) - utcMidnight(startDate)) / (24 * 60 * 60 * 1000);
+  if (diffDays > MAX_RANGE_DAYS) {
+    const endMs = utcMidnight(endDate);
+    const startMs = endMs - MAX_RANGE_DAYS * 24 * 60 * 60 * 1000;
+    const d = new Date(startMs);
+    startDate = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+    clamped = true;
+  }
+  return { startDate, endDate, usedFallback, clamped };
+}
+
+type FinancialMetricTone = "inflow" | "outflow" | "neutral" | "accent";
+
+type FinancialMetricItem = {
+  key: string;
+  label: string;
+  value: string;
+  hint?: string;
+  tone: FinancialMetricTone;
+};
+
+const FINANCIAL_TONE_BAR: Record<FinancialMetricTone, string> = {
+  inflow: "bg-emerald-500",
+  outflow: "bg-rose-500",
+  neutral: "bg-slate-400",
+  accent: "bg-teal-500",
+};
+
+const FINANCIAL_TONE_VALUE: Record<FinancialMetricTone, string> = {
+  inflow: "text-emerald-700 dark:text-emerald-400",
+  outflow: "text-rose-700 dark:text-rose-400",
+  neutral: "text-slate-800 dark:text-slate-100",
+  accent: "text-teal-800 dark:text-teal-300",
+};
+
+/** Money KPIs — slate panel + top accent bars (visually distinct from request pastel cards). */
+function FinancialKpiSection({
+  totals,
+  loading,
+  error,
+  rangeNote,
+  onRetry,
+}: {
+  totals: FinancialReportTotalsDto | null;
+  loading: boolean;
+  error: string;
+  rangeNote: string;
+  onRetry: () => void;
+}) {
+  const { t } = useTranslation();
+  const R = "adminSupervisorReporting";
+
+  const items: FinancialMetricItem[] = useMemo(() => {
+    if (!totals) return [];
+    return [
+      {
+        key: "inflow",
+        label: t(`${R}.financialKpi.totalInflow`),
+        value: fmtBDT(totals.totalInflow),
+        hint: t(`${R}.financialKpi.inflowHint`, {
+          online: fmtBDT(totals.onlinePayments),
+          cash: fmtBDT(totals.cashPayments),
+        }),
+        tone: "inflow",
+      },
+      {
+        key: "provider",
+        label: t(`${R}.financialKpi.providerEarnings`),
+        value: fmtBDT(totals.totalProviderEarningsAllocated),
+        tone: "neutral",
+      },
+      {
+        key: "supervisor",
+        label: t(`${R}.financialKpi.supervisorCommission`),
+        value: fmtBDT(totals.totalSupervisorCommission ?? "0"),
+        tone: "accent",
+      },
+      {
+        key: "platform",
+        label: t(`${R}.financialKpi.platformEarnings`),
+        value: fmtBDT(totals.netPlatformEarnings),
+        hint: t(`${R}.financialKpi.platformHint`, {
+          commission: fmtBDT(totals.totalCommission),
+        }),
+        tone: "inflow",
+      },
+      {
+        key: "vat",
+        label: t(`${R}.financialKpi.vat`),
+        value: fmtBDT(totals.totalVat ?? totals.totalTax ?? "0"),
+        tone: "neutral",
+      },
+      {
+        key: "ait",
+        label: t(`${R}.financialKpi.ait`),
+        value: fmtBDT(totals.totalAit ?? "0"),
+        tone: "neutral",
+      },
+      {
+        key: "withdrawals",
+        label: t(`${R}.financialKpi.withdrawals`),
+        value: fmtBDT(totals.totalWithdrawals),
+        tone: "outflow",
+      },
+    ];
+  }, [totals, t]);
+
+  return (
+    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/90 shadow-sm dark:border-slate-700/80 dark:bg-slate-900/40">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 bg-slate-900 px-4 py-3 dark:border-slate-700 sm:px-5">
+        <div className="flex items-center gap-2.5 text-white">
+          <span className="inline-flex size-8 items-center justify-center rounded-lg bg-teal-500/20 text-teal-300">
+            <Wallet className="size-4" aria-hidden />
+          </span>
+          <div>
+            <h3 className="text-sm font-semibold tracking-wide">
+              {t(`${R}.financialKpi.title`)}
+            </h3>
+            {rangeNote ? (
+              <p className="mt-0.5 text-[11px] font-normal text-slate-300">
+                {rangeNote}
+              </p>
+            ) : null}
+          </div>
+        </div>
+      </div>
+
+      {error ? (
+        <div
+          role="alert"
+          className="flex flex-col gap-2 px-4 py-4 text-sm text-rose-700 dark:text-rose-300 sm:flex-row sm:items-center sm:justify-between sm:px-5"
+        >
+          <span>{error}</span>
+          <button
+            type="button"
+            onClick={onRetry}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-rose-300 bg-white px-3 py-1.5 text-xs font-medium text-rose-700 transition hover:bg-rose-50 dark:border-rose-700 dark:bg-rose-900/30 dark:text-rose-200"
+          >
+            <RefreshCw className="size-3.5" aria-hidden />
+            {t(`${R}.retry`)}
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-px bg-slate-200/70 dark:bg-slate-700/50 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+          {loading && items.length === 0
+            ? Array.from({ length: 7 }, (_, i) => (
+                <div
+                  key={`sk-${i}`}
+                  className="bg-white px-4 py-3.5 dark:bg-slate-950/50"
+                >
+                  <div className="mb-2 h-1 w-8 animate-pulse rounded-full bg-slate-200 dark:bg-slate-700" />
+                  <div className="h-3 w-20 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+                  <div className="mt-2 h-6 w-24 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+                </div>
+              ))
+            : items.map((m) => (
+                <div
+                  key={m.key}
+                  className="relative bg-white px-4 py-3.5 dark:bg-slate-950/50"
+                >
+                  <span
+                    className={cn(
+                      "absolute inset-x-0 top-0 h-0.5",
+                      FINANCIAL_TONE_BAR[m.tone],
+                    )}
+                    aria-hidden
+                  />
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    {m.label}
+                  </p>
+                  {loading ? (
+                    <div className="mt-2 h-6 w-24 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+                  ) : (
+                    <p
+                      className={cn(
+                        "mt-1.5 text-lg font-semibold tabular-nums tracking-tight",
+                        FINANCIAL_TONE_VALUE[m.tone],
+                      )}
+                    >
+                      {m.value}
+                    </p>
+                  )}
+                  {m.hint && !loading ? (
+                    <p className="mt-1 text-[10px] leading-snug text-slate-400 dark:text-slate-500">
+                      {m.hint}
+                    </p>
+                  ) : null}
+                </div>
+              ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function AdminSupervisorReporting() {
@@ -463,6 +689,18 @@ export default function AdminSupervisorReporting() {
   const [breakdownLoading, setBreakdownLoading] = useState(false);
   const [breakdownError, setBreakdownError] = useState("");
   const breakdownFetchSeq = useRef(0);
+
+  const [financialTotals, setFinancialTotals] =
+    useState<FinancialReportTotalsDto | null>(null);
+  const [financialLoading, setFinancialLoading] = useState(false);
+  const [financialError, setFinancialError] = useState("");
+  const [financialRangeMeta, setFinancialRangeMeta] = useState<{
+    usedFallback: boolean;
+    clamped: boolean;
+    startDate: string;
+    endDate: string;
+  } | null>(null);
+  const financialFetchSeq = useRef(0);
 
   const totalEntries = breakdownRows.length;
   const totalPages = Math.max(1, Math.ceil(totalEntries / limit));
@@ -598,6 +836,53 @@ export default function AdminSupervisorReporting() {
     [supervisorId, t],
   );
 
+  const fetchFinancial = useCallback(
+    async (
+      range: DateRangePickerValue,
+      serviceTypeFilter: ReportingServiceType | "",
+      signal?: AbortSignal,
+    ) => {
+      const seq = ++financialFetchSeq.current;
+      setFinancialLoading(true);
+      setFinancialError("");
+      try {
+        const window = resolveFinancialWindow(range);
+        setFinancialRangeMeta({
+          usedFallback: window.usedFallback,
+          clamped: window.clamped,
+          startDate: window.startDate,
+          endDate: window.endDate,
+        });
+        const { startDate: startApi, endDate: endApi } =
+          bangladeshCalendarRangeToApiParams(window.startDate, window.endDate);
+        const res = await adminFinancialApi.getFinancialReport(
+          {
+            startDate: startApi,
+            endDate: endApi,
+            supervisorId,
+            serviceType: serviceTypeFilter
+              ? (serviceTypeFilter as FinancialServiceType)
+              : undefined,
+            page: 1,
+            limit: 1,
+            paginationOnly: false,
+          },
+          { signal },
+        );
+        if (seq !== financialFetchSeq.current) return;
+        setFinancialTotals(res.data?.summary?.totals ?? null);
+      } catch (err: unknown) {
+        if (err instanceof Error && err.name === "AbortError") return;
+        if (seq !== financialFetchSeq.current) return;
+        setFinancialError(t(`${R}.financialKpi.loadError`));
+        setFinancialTotals(null);
+      } finally {
+        if (seq === financialFetchSeq.current) setFinancialLoading(false);
+      }
+    },
+    [supervisorId, t],
+  );
+
   useEffect(() => {
     const controller = new AbortController();
     void fetchSummary(appliedRange, appliedServiceType, controller.signal);
@@ -609,6 +894,12 @@ export default function AdminSupervisorReporting() {
     void fetchBreakdown(appliedRange, appliedServiceType, controller.signal);
     return () => controller.abort();
   }, [appliedRange, appliedServiceType, fetchBreakdown]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetchFinancial(appliedRange, appliedServiceType, controller.signal);
+    return () => controller.abort();
+  }, [appliedRange, appliedServiceType, fetchFinancial]);
 
   const handleApply = () => {
     // Only apply when both ends are set — partial ranges are treated as "no filter".
@@ -632,7 +923,29 @@ export default function AdminSupervisorReporting() {
   const handleRefresh = () => {
     void fetchSummary(appliedRange, appliedServiceType);
     void fetchBreakdown(appliedRange, appliedServiceType);
+    void fetchFinancial(appliedRange, appliedServiceType);
   };
+
+  const financialRangeNote = useMemo(() => {
+    if (!financialRangeMeta) return "";
+    if (financialRangeMeta.usedFallback) {
+      return t(`${R}.financialKpi.fallbackRangeNote`, {
+        start: financialRangeMeta.startDate,
+        end: financialRangeMeta.endDate,
+      });
+    }
+    if (financialRangeMeta.clamped) {
+      return t(`${R}.financialKpi.clampedRangeNote`, {
+        maxDays: MAX_RANGE_DAYS,
+        start: financialRangeMeta.startDate,
+        end: financialRangeMeta.endDate,
+      });
+    }
+    return t(`${R}.financialKpi.rangeNote`, {
+      start: financialRangeMeta.startDate,
+      end: financialRangeMeta.endDate,
+    });
+  }, [financialRangeMeta, t]);
 
   const isDateFilterApplied = Boolean(appliedRange.startDate && appliedRange.endDate);
   const isServiceTypeFilterApplied = Boolean(appliedServiceType);
@@ -764,6 +1077,14 @@ export default function AdminSupervisorReporting() {
         <MetricsGrid metrics={row1} loading={summaryLoading} />
         <MetricsGrid metrics={row2} loading={summaryLoading} />
         <MetricsGrid metrics={row3} loading={summaryLoading} />
+
+        <FinancialKpiSection
+          totals={financialTotals}
+          loading={financialLoading}
+          error={financialError}
+          rangeNote={financialRangeNote}
+          onRetry={() => void fetchFinancial(appliedRange, appliedServiceType)}
+        />
 
         {/* Supervisor note */}
         <div
