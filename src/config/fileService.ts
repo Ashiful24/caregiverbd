@@ -37,17 +37,21 @@ export function getFileServiceUploadUrl(): string {
 }
 
 function unwrapStoredPath(raw: string): string {
-  let trimmed = raw.trim();
+  const trimmed = raw.trim();
   if (!trimmed) return "";
 
   try {
-    const parsed = JSON.parse(trimmed) as { accessUrl?: string; path?: string };
+    const parsed = JSON.parse(trimmed) as {
+      accessUrl?: string;
+      path?: string;
+      url?: string;
+    };
     if (parsed && typeof parsed === "object") {
-      if (typeof parsed.accessUrl === "string" && parsed.accessUrl.trim()) {
-        return parsed.accessUrl.trim();
-      }
-      if (typeof parsed.path === "string" && parsed.path.trim()) {
-        return parsed.path.trim();
+      for (const key of ["accessUrl", "path", "url"] as const) {
+        const value = parsed[key];
+        if (typeof value === "string" && value.trim()) {
+          return value.trim();
+        }
       }
     }
   } catch {
@@ -58,14 +62,16 @@ function unwrapStoredPath(raw: string): string {
 }
 
 /**
- * In Docker (same-origin mode), force `/files/...` through nginx even when the API stored a full URL
- * pointing at localhost or an internal port that the browser cannot reach.
+ * Turn a stored file path into a browser URL.
+ * - Docker (empty VITE_FILE_SERVICE_URL): keep `/files/...` same-origin for nginx proxy.
+ * - Local / absolute base set: prefix VITE_FILE_SERVICE_URL so images load off the Vite host.
  */
 function normalizeFilesPath(trimmed: string): string {
   const withSlash = trimmed.startsWith("files/") ? `/${trimmed}` : trimmed;
+  const base = getFileServiceBaseUrl();
 
   if (withSlash.startsWith("/files/")) {
-    return withSlash;
+    return base ? `${base}${withSlash}` : withSlash;
   }
 
   if (withSlash.startsWith("http://") || withSlash.startsWith("https://")) {
@@ -80,7 +86,6 @@ function normalizeFilesPath(trimmed: string): string {
     return withSlash;
   }
 
-  const base = getFileServiceBaseUrl();
   const path = withSlash.startsWith("/") ? withSlash : `/${withSlash}`;
   return base ? `${base}${path}` : path;
 }
