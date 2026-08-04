@@ -13,10 +13,13 @@ import {
   TableHeader,
   TableRow,
 } from "../components/ui/table";
+import { useAuth } from "../context/AuthContext";
 import {
   adminFinancialApi,
+  adminSupervisorsApi,
   providersApi,
   patientsApi,
+  normalizeAdminSupervisorsListResponse,
   type FinancialReportResponseDto,
   type FinancialReportTxItemDto,
   type FinancialTxDetailResponseDto,
@@ -28,6 +31,7 @@ import {
   type PatientListItem,
   type AdminProviderListResponse,
   type PatientsListResponse,
+  type AdminSupervisorDto,
 } from "../services/api";
 import {
   bangladeshCalendarRangeToApiParams,
@@ -47,13 +51,32 @@ import {
 
 const PARTY_PAGE_SIZE = 10;
 
+function supervisorOptionLabel(s: AdminSupervisorDto): string {
+  const first = s.firstName?.trim() ?? "";
+  const last = s.lastName?.trim() ?? "";
+  const joined = [first, last].filter(Boolean).join(" ");
+  if (joined) return joined;
+  return s.email?.trim() || s.username?.trim() || `Supervisor #${s.id}`;
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // Page
 // ────────────────────────────────────────────────────────────────────────────
 
 export default function MasterFinancialReport() {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const M = "financialReports.master";
+
+  const currentRole = String(user?.role ?? "").toUpperCase();
+  const isAdmin = currentRole === "ADMIN";
+  /** Supervisors are self-scoped by the API; we still send their id for clarity. */
+  const selfSupervisorId =
+    currentRole === "SUPERVISOR" &&
+    Number.isFinite(Number(user?.id)) &&
+    Number(user?.id) > 0
+      ? Number(user?.id)
+      : undefined;
 
   // ── Financial report (combined: summary + paginated transactions) ─────────
   const [startDate, setStartDate] = useState(() => {
@@ -64,6 +87,7 @@ export default function MasterFinancialReport() {
 
   const [providerId, setProviderId] = useState<number | "">("");
   const [patientId, setPatientId]   = useState<number | "">("");
+  const [supervisorId, setSupervisorId] = useState<number | "">("");
   const [type, setType] = useState<FinancialTxType | "">("");
   const [paymentMethod, setPaymentMethod] = useState<FinancialPaymentMethod | "">("");
   const [serviceType, setServiceType] = useState<FinancialServiceType | "">("");
@@ -83,12 +107,25 @@ export default function MasterFinancialReport() {
         endDate,
         providerId,
         patientId,
+        supervisorId: isAdmin ? supervisorId : selfSupervisorId ?? null,
         type,
         paymentMethod,
         serviceType,
         status,
       }),
-    [startDate, endDate, providerId, patientId, type, paymentMethod, serviceType, status],
+    [
+      startDate,
+      endDate,
+      providerId,
+      patientId,
+      supervisorId,
+      isAdmin,
+      selfSupervisorId,
+      type,
+      paymentMethod,
+      serviceType,
+      status,
+    ],
   );
 
   const validateRange = useCallback((): string | null => {
@@ -123,6 +160,11 @@ export default function MasterFinancialReport() {
           endDate: endApi,
           providerId: providerId === "" ? undefined : Number(providerId),
           patientId:  patientId  === "" ? undefined : Number(patientId),
+          supervisorId: isAdmin
+            ? supervisorId === ""
+              ? undefined
+              : Number(supervisorId)
+            : selfSupervisorId,
           type:          type === "" ? undefined : type,
           paymentMethod: paymentMethod === "" ? undefined : paymentMethod,
           serviceType:   serviceType === "" ? undefined : serviceType,
@@ -154,6 +196,9 @@ export default function MasterFinancialReport() {
       endDate,
       providerId,
       patientId,
+      supervisorId,
+      isAdmin,
+      selfSupervisorId,
       type,
       paymentMethod,
       serviceType,
@@ -241,6 +286,28 @@ export default function MasterFinancialReport() {
     [t, M]
   );
 
+  const fetchSupervisorPage = useCallback(
+    async (
+      params: { page: number; limit: number; search?: string },
+      signal?: AbortSignal
+    ) => {
+      const res = await adminSupervisorsApi.getAll(
+        { page: params.page, limit: params.limit, search: params.search },
+        { signal }
+      );
+      const norm = normalizeAdminSupervisorsListResponse(res?.data ?? res);
+      return {
+        items: norm.supervisors.map((s) => ({
+          value: s.id,
+          label: supervisorOptionLabel(s),
+          hint: s.email ?? s.username ?? undefined,
+        })),
+        total: norm.total || norm.supervisors.length,
+      };
+    },
+    []
+  );
+
   // ── Detail modal ──────────────────────────────────────────────────────────
   const [detailOpen, setDetailOpen] = useState(false);
   const [detail, setDetail] = useState<FinancialTxDetailResponseDto | null>(null);
@@ -272,6 +339,7 @@ export default function MasterFinancialReport() {
   const resetFilters = () => {
     setProviderId("");
     setPatientId("");
+    setSupervisorId("");
     setType("");
     setPaymentMethod("");
     setServiceType("");
@@ -370,6 +438,28 @@ export default function MasterFinancialReport() {
                 className="min-h-[42px] w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
               />
             </label>
+            {isAdmin ? (
+              <label className="flex min-w-0 flex-col gap-1 sm:col-span-2 lg:col-span-4">
+                <span className="flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400">
+                  {t(`${M}.filters.supervisor`)}
+                  <InfoTooltip text={t(`${M}.filters.ttSupervisor`)} />
+                </span>
+                <PaginatedSearchableSelect<number>
+                  value={supervisorId === "" ? null : supervisorId}
+                  onChange={(v) => setSupervisorId(v == null ? "" : v)}
+                  fetchPage={fetchSupervisorPage}
+                  pageSize={PARTY_PAGE_SIZE}
+                  placeholder={t(`${M}.filters.allSupervisors`)}
+                  clearLabel={t(`${M}.filters.allSupervisors`)}
+                  searchPlaceholder={t(`${M}.filters.searchByName`)}
+                  seeMoreLabel={t(`${M}.filters.seeMore`)}
+                  loadingLabel={t("systemConfig.loading")}
+                  loadingMoreLabel={t("common.actions.loadingMore")}
+                  noMatchesLabel={t(`${M}.filters.noMatches`)}
+                  className="min-h-[42px]"
+                />
+              </label>
+            ) : null}
             <label className="flex min-w-0 flex-col gap-1 sm:col-span-2 lg:col-span-4">
               <span className="flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400">
                 {t(`${M}.filters.provider`)}
