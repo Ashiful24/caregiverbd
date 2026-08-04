@@ -39,7 +39,7 @@ const EMPLOYMENT_TYPE_OPTIONS = [{ value: "" }, { value: "INDEPENDENT" }, { valu
 const IMAGE_FILE_INPUT_CLASS =
   "block w-full text-sm text-gray-600 file:mr-4 file:rounded-lg file:border-0 file:bg-brand-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-brand-700 hover:file:bg-brand-100 dark:text-gray-400 dark:file:bg-brand-500/10 dark:file:text-brand-300";
 
-/** Preview for a new file (object URL) or an existing stored image URL. */
+/** Preview for a new file (compact) or an existing stored image (full size). */
 function ImagePickPreview({
   previewUrl,
   fileName,
@@ -51,20 +51,32 @@ function ImagePickPreview({
   existingCaption?: string | null;
 }) {
   const { t } = useTranslation();
+  // New pick: small thumb beside the filename (near the file input). Existing: keep larger preview.
+  if (fileName && previewUrl) {
+    return (
+      <div className="mt-1.5 flex items-center gap-2">
+        <img
+          src={previewUrl}
+          alt=""
+          className="h-9 w-9 shrink-0 rounded border border-gray-200 object-cover dark:border-gray-700"
+        />
+        <p className="min-w-0 truncate text-xs text-gray-600 dark:text-gray-300">
+          {t("consultationTypesTree.selectedFile", { name: fileName })}
+        </p>
+      </div>
+    );
+  }
+  if (!previewUrl) return null;
   return (
     <>
-      {previewUrl ? (
-        <div className="mt-2 overflow-hidden rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-900/50">
-          <img
-            src={previewUrl}
-            alt=""
-            className="mx-auto max-h-48 w-full object-contain"
-          />
-        </div>
-      ) : null}
-      {fileName ? (
-        <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">{t("consultationTypesTree.selectedFile", { name: fileName })}</p>
-      ) : existingCaption && previewUrl ? (
+      <div className="mt-2 overflow-hidden rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-900/50">
+        <img
+          src={previewUrl}
+          alt=""
+          className="mx-auto max-h-48 w-full object-contain"
+        />
+      </div>
+      {existingCaption ? (
         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{existingCaption}</p>
       ) : null}
     </>
@@ -591,6 +603,13 @@ export default function ConsultationTypeTree() {
       setFormDescription(en?.description ?? "");
       setFormNameBn(bn?.name ?? "");
       setFormDescriptionBn(bn?.description ?? "");
+      // Prefer imageUrl from fresh API node so edit preview uses the stored file path.
+      const imageFromApi = (en?.imageUrl ?? bn?.imageUrl ?? node.imageUrl)?.trim();
+      if (imageFromApi) {
+        setSelectedNode((prev) =>
+          prev && prev.id === node.id ? { ...prev, imageUrl: imageFromApi } : prev
+        );
+      }
     } catch {
       setFormName(node.name);
       setFormDescription(node.description ?? "");
