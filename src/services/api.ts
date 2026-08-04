@@ -3909,6 +3909,8 @@ export interface FinancialReportFiltersDto {
   endDate: string;
   providerId: number | null;
   patientId: number | null;
+  /** Admin optional filter; supervisors are self-scoped by the API. */
+  supervisorId?: number | null;
   type: FinancialTxType | null;
   paymentMethod: FinancialPaymentMethod | null;
   serviceType: FinancialServiceType | null;
@@ -4119,6 +4121,8 @@ export const adminFinancialApi = {
       endDate: string;
       providerId?: number;
       patientId?: number;
+      /** Admin: filter by supervisor. Supervisors: omit — API self-scopes. */
+      supervisorId?: number;
       type?: FinancialTxType;
       paymentMethod?: FinancialPaymentMethod;
       serviceType?: FinancialServiceType;
@@ -4136,6 +4140,9 @@ export const adminFinancialApi = {
     };
     if (params.providerId != null)    query.providerId    = params.providerId;
     if (params.patientId != null)     query.patientId     = params.patientId;
+    if (params.supervisorId != null && Number.isFinite(params.supervisorId) && params.supervisorId > 0) {
+      query.supervisorId = params.supervisorId;
+    }
     if (params.type)                  query.type          = params.type;
     if (params.paymentMethod)         query.paymentMethod = params.paymentMethod;
     if (params.serviceType)           query.serviceType   = params.serviceType;
@@ -4751,6 +4758,37 @@ export interface ReportingSummaryDto {
   refundAmount: string | null;
 }
 
+/** Query params for GET /v1/reporting/supervisor-summary. */
+export interface SupervisorReportingSummaryParams {
+  /** Start date — `YYYY-MM-DD` (inclusive). */
+  startDate?: string;
+  /** End date — `YYYY-MM-DD` (inclusive). */
+  endDate?: string;
+  serviceType?: ReportingServiceType;
+  supervisorId?: number;
+}
+
+/**
+ * Response of GET /v1/reporting/supervisor-summary.
+ * Counts are integers; rates are 0–100 numbers.
+ */
+export interface SupervisorReportingSummaryDto {
+  supervisorId: number | null;
+  serviceType: ReportingServiceType | null;
+  startDate: string | null;
+  endDate: string | null;
+  totalRequests: number | null;
+  sentToProviders: number | null;
+  acceptedByProvider: number | null;
+  confirmedBookings: number | null;
+  completedServices: number | null;
+  autoCancelUnpaid: number | null;
+  cancelledTotal: number | null;
+  fulfillmentRate: number | null;
+  providerAcceptanceRate: number | null;
+  paymentExpiryRate: number | null;
+}
+
 /**
  * Single row in GET /v1/reporting/daily-breakdown.
  * Money fields are decimal strings; counts and rates are numeric.
@@ -4758,13 +4796,19 @@ export interface ReportingSummaryDto {
 export interface ReportingDailyBreakdownRow {
   /** Day in `YYYY-MM-DD` (Bangladesh calendar). */
   date: string;
-  fulfillmentRate?: number | null;
-  acceptanceRate?: number | null;
-  paymentExpiryRate?: number | null;
-  cancellationRate?: number | null;
   totalRequests?: number | null;
+  sentToProviders?: number | null;
+  acceptedByProvider?: number | null;
   confirmedBookings?: number | null;
   completedServices?: number | null;
+  autoCancelUnpaid?: number | null;
+  cancelledTotal?: number | null;
+  fulfillmentRate?: number | null;
+  acceptanceRate?: number | null;
+  /** Alias used by supervisor-daily-breakdown. */
+  providerAcceptanceRate?: number | null;
+  paymentExpiryRate?: number | null;
+  cancellationRate?: number | null;
   grossRevenue?: string | number | null;
   ontorCommission?: string | number | null;
   providerPayout?: string | number | null;
@@ -4782,6 +4826,13 @@ export interface ReportingDailyBreakdownResponse {
 
 /** Extends summary params with a forward-only `cursor` for paginated breakdown calls. */
 export interface ReportingDailyBreakdownParams extends ReportingSummaryParams {
+  cursor?: string;
+}
+
+/** Query params for GET /v1/reporting/supervisor-daily-breakdown. */
+export interface SupervisorDailyBreakdownParams
+  extends SupervisorReportingSummaryParams {
+  limit?: number;
   cursor?: string;
 }
 
@@ -4804,6 +4855,21 @@ export const reportingApi = {
       signal: config?.signal,
     });
   },
+  /** GET /v1/reporting/supervisor-summary — supervisor operational KPI summary. */
+  getSupervisorSummary: async (
+    params?: SupervisorReportingSummaryParams,
+    config?: { signal?: AbortSignal }
+  ) => {
+    const query: Record<string, string | number> = {};
+    if (params?.startDate) query.startDate = params.startDate;
+    if (params?.endDate) query.endDate = params.endDate;
+    if (params?.serviceType) query.serviceType = params.serviceType;
+    if (params?.supervisorId != null) query.supervisorId = params.supervisorId;
+    return httpService.get<SupervisorReportingSummaryDto>(
+      "/reporting/supervisor-summary",
+      { params: query, signal: config?.signal }
+    );
+  },
   /** GET /v1/reporting/daily-breakdown — cursor-paginated per-day breakdown. */
   getDailyBreakdown: async (
     params?: ReportingDailyBreakdownParams,
@@ -4820,6 +4886,23 @@ export const reportingApi = {
     if (params?.cursor) query.cursor = params.cursor;
     return httpService.get<ReportingDailyBreakdownResponse>(
       "/reporting/daily-breakdown",
+      { params: query, signal: config?.signal }
+    );
+  },
+  /** GET /v1/reporting/supervisor-daily-breakdown — supervisor per-day breakdown. */
+  getSupervisorDailyBreakdown: async (
+    params?: SupervisorDailyBreakdownParams,
+    config?: { signal?: AbortSignal }
+  ) => {
+    const query: Record<string, string | number> = {};
+    if (params?.startDate) query.startDate = params.startDate;
+    if (params?.endDate) query.endDate = params.endDate;
+    if (params?.serviceType) query.serviceType = params.serviceType;
+    if (params?.supervisorId != null) query.supervisorId = params.supervisorId;
+    if (params?.limit != null) query.limit = params.limit;
+    if (params?.cursor) query.cursor = params.cursor;
+    return httpService.get<ReportingDailyBreakdownResponse>(
+      "/reporting/supervisor-daily-breakdown",
       { params: query, signal: config?.signal }
     );
   },
