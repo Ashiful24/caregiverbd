@@ -430,6 +430,8 @@ const en = {
     errOverlap: "This nurse is already assigned in an overlapping time range.",
     errCreate: "Failed to create schedule. Please try again.",
     errSubmit: "Failed to submit schedule. Please try again.",
+    errAssignAllShifts:
+      "Assign a provider to every shift before submitting. {{remaining}} of {{total}} shift(s) still need a provider.",
     cancel: "Cancel",
     createEvent: "Add to schedule",
     creating: "Adding...",

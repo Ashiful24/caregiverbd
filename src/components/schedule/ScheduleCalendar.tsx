@@ -9,6 +9,7 @@ import {
   addMonths,
   addWeeks,
   differenceInMinutes,
+  eachDayOfInterval,
   format,
   isAfter,
   isBefore,
@@ -174,6 +175,26 @@ function eventToProviderSlot(event: ScheduleEventRecord): {
     startTime: format(start, "HH:mm"),
     endTime: format(end, "HH:mm"),
   };
+}
+
+/** One shift per calendar day in the long-term request window (inclusive). */
+function listRequiredShiftDates(requestStart: Date, requestEnd: Date): string[] {
+  const start = startOfDay(requestStart);
+  const end = startOfDay(requestEnd);
+  if (isAfter(start, end)) return [];
+  return eachDayOfInterval({ start, end }).map((d) => format(d, "yyyy-MM-dd"));
+}
+
+function eventHasProvider(event: ScheduleEventRecord): boolean {
+  const id = String(event.nurseId ?? "").trim();
+  if (!id) return false;
+  const n = Number(id);
+  return Number.isFinite(n) ? n > 0 : true;
+}
+
+function eventShiftDateKey(event: ScheduleEventRecord): string {
+  const { start } = parseEventRange(event);
+  return format(start, "yyyy-MM-dd");
 }
 
 export function ScheduleCalendar({
@@ -528,9 +549,29 @@ export function ScheduleCalendar({
 
   const submitPendingSchedule = async () => {
     if (pendingEvents.length === 0) return;
-    setSubmittingSchedule(true);
     setSubmitError(null);
     setSubmitSuccess(false);
+
+    // Block API until every shift day in the LTO window has a provider (saved + drafts).
+    const requiredDates = listRequiredShiftDates(requestStart, requestEnd);
+    if (requiredDates.length > 0) {
+      const covered = new Set(
+        [...events, ...pendingEvents].filter(eventHasProvider).map(eventShiftDateKey)
+      );
+      const remaining = requiredDates.filter((d) => !covered.has(d)).length;
+      if (remaining > 0) {
+        setSubmitError(
+          t("scheduleCalendar.errAssignAllShifts", {
+            remaining,
+            total: requiredDates.length,
+            assigned: requiredDates.length - remaining,
+          })
+        );
+        return;
+      }
+    }
+
+    setSubmittingSchedule(true);
     try {
       const slots = pendingEvents.map(eventToProviderSlot);
       await adminLongTermOpportunitiesApi.createProviderSchedule(requestId, { slots });
