@@ -9,6 +9,7 @@ import {
   TableRow,
 } from "../ui/table";
 import ThemedSelect from "../form/ThemedSelect";
+import Switch from "../form/switch/Switch";
 import { Modal } from "../ui/modal";
 import Badge from "../ui/badge/Badge";
 import { adminSystemConfigApi, type SystemConfigItem } from "../../services/api";
@@ -27,6 +28,9 @@ import {
   isSecondsConfigKey,
   type ConfigGroupId,
 } from "./configFieldHelpers";
+
+const ENFORCE_SERVICE_START_ON_SCHEDULED_DATE_KEY =
+  "ENFORCE_SERVICE_START_ON_SCHEDULED_DATE";
 import {
   SettingsAlert,
   SettingsToolbar,
@@ -407,6 +411,19 @@ export function SystemSettingsPanel() {
                           {t("systemConfig.demoOtpOffHint")}
                         </p>
                       )}
+                    </div>
+                  );
+                }
+                if (editing.key === ENFORCE_SERVICE_START_ON_SCHEDULED_DATE_KEY) {
+                  const checked = value === "true" || value === "1";
+                  return (
+                    <div className="mt-1">
+                      <Switch
+                        key={`${editing.key}-${editing.value}`}
+                        label={checked ? t("systemConfig.booleanOn") : t("systemConfig.booleanOff")}
+                        defaultChecked={checked}
+                        onChange={(on) => setValue(on ? "true" : "false")}
+                      />
                     </div>
                   );
                 }
