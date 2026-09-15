@@ -68,6 +68,7 @@ export function configGroupForKey(key: string): ConfigGroupId {
   if (
     k.endsWith("_ENABLED") ||
     k === "DEMO_OTP" ||
+    k === "ENFORCE_SERVICE_START_ON_SCHEDULED_DATE" ||
     k.includes("OTP") ||
     k.includes("ARRIVAL") ||
     k.endsWith("_METERS") ||
