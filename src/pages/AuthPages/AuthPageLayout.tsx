@@ -3,9 +3,9 @@ import LanguageSwitcher from "../../components/common/LanguageSwitcher";
 import ThemeTogglerTwo from "../../components/common/ThemeTogglerTwo";
 
 const CAROUSEL_SLIDES: { src: string; alt: string }[] = [
-  { src: "/images/carousel/carousel1.webp", alt: "Hope Pro – Caregivers in action" },
-  { src: "/images/carousel/carousel2.webp", alt: "Hope Pro – Patient care experience" },
-  { src: "/images/carousel/carousel1.webp", alt: "Hope Pro – Trusted home care" },
+  { src: "/images/carousel/carousel1.webp", alt: "Ontor Pro – Caregivers in action" },
+  { src: "/images/carousel/carousel2.webp", alt: "Ontor Pro – Patient care experience" },
+  { src: "/images/carousel/carousel1.webp", alt: "Ontor Pro – Trusted home care" },
 ];
 
 const SLIDE_INTERVAL_MS = 2000;
@@ -53,7 +53,7 @@ function AuthCarousel() {
       className="relative h-full w-full overflow-hidden"
       role="region"
       aria-roledescription="carousel"
-      aria-label="Hope Pro highlights"
+      aria-label="Ontor Pro highlights"
     >
       <div
         className="flex h-full"

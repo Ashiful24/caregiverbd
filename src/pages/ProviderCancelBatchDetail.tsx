@@ -249,7 +249,7 @@ export default function ProviderCancelBatchDetail() {
   if (loading) {
     return (
       <>
-        <PageMeta title="Provider Cancel Batch | Hope Admin" description="Review multi-shift provider cancellation batch." />
+        <PageMeta title="Provider Cancel Batch | Ontor Admin" description="Review multi-shift provider cancellation batch." />
         <PageBreadcrumb pageTitle="Batch Review" />
         <div className="py-8 text-center text-gray-500 dark:text-gray-400">
           {t("systemConfig.loading")}
@@ -261,7 +261,7 @@ export default function ProviderCancelBatchDetail() {
   if (error && !batch) {
     return (
       <>
-        <PageMeta title="Provider Cancel Batch | Hope Admin" description="Review multi-shift provider cancellation batch." />
+        <PageMeta title="Provider Cancel Batch | Ontor Admin" description="Review multi-shift provider cancellation batch." />
         <PageBreadcrumb pageTitle="Batch Review" />
         <p className="text-rose-600 dark:text-rose-400">{error}</p>
         <Link to="/provider-cancel-requests" className="mt-4 inline-block text-brand-600 hover:underline dark:text-brand-400">
@@ -275,7 +275,7 @@ export default function ProviderCancelBatchDetail() {
 
   return (
     <>
-      <PageMeta title="Provider Cancel Batch | Hope Admin" description="Review multi-shift provider cancellation batch." />
+      <PageMeta title="Provider Cancel Batch | Ontor Admin" description="Review multi-shift provider cancellation batch." />
       <PageBreadcrumb
         pageTitle={`Batch Review — ${batch.shiftCount} shift${batch.shiftCount !== 1 ? "s" : ""}`}
       />
