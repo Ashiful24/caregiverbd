@@ -374,7 +374,7 @@ export default function ConsultationTypeConfig() {
   return (
     <>
       <PageMeta
-        title={`${t("consultationConfig.configPrefix")}: ${typeName} | Hope - BMQAS`}
+        title={`${t("consultationConfig.configPrefix")}: ${typeName} | Ontor - BMQAS`}
         description={t("consultationConfig.metaDescription")}
       />
       <PageBreadcrumb pageTitle={`${t("consultationConfig.configPrefix")}: ${typeName || `${t("consultationConfig.typePrefix")} #${typeId}`}`} />
