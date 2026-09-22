@@ -43,7 +43,7 @@ export default function GlReconciliation() {
   return (
     <>
       <PageMeta
-        title="GL Reconciliation | Hope - BMQAS"
+        title="GL Reconciliation | Ontor - BMQAS"
         description="Live snapshot of platform ledger health: wallet balances and money summary."
       />
       <PageBreadcrumb pageTitle="GL Reconciliation" />
