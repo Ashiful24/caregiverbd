@@ -44,16 +44,20 @@ const FCM_LOG_PREFIX = "[FCM]";
 /** Runs FCM init assuming notification permission is already granted. Called only after permission is granted. */
 async function doFcmInitCore(options: FcmOptions): Promise<string | null> {
   try {
-    console.info(FCM_LOG_PREFIX, "Step 5: Initializing Firebase app…");
+    console.info(FCM_LOG_PREFIX, "Step 5: Initializing Firebase app…", {
+      projectId: firebaseConfig.projectId,
+    });
     const app = getApps().length > 0 ? getApp() : initializeApp({
       apiKey: firebaseConfig.apiKey,
       authDomain: firebaseConfig.authDomain || undefined,
       projectId: firebaseConfig.projectId,
-      storageBucket: firebaseConfig.storageBucket || undefined, 
+      storageBucket: firebaseConfig.storageBucket || undefined,
       messagingSenderId: firebaseConfig.messagingSenderId,
       appId: firebaseConfig.appId,
     } as import("firebase/app").FirebaseOptions);
-    console.info(FCM_LOG_PREFIX, "Step 5: Firebase app ready ✓");
+    console.info(FCM_LOG_PREFIX, "Step 5: Firebase app ready ✓", {
+      projectId: app.options.projectId,
+    });
 
     console.info(FCM_LOG_PREFIX, "Step 6: Getting Firebase Messaging instance…");
     const messaging = getMessaging(app);
@@ -82,17 +86,29 @@ async function doFcmInitCore(options: FcmOptions): Promise<string | null> {
       console.warn(FCM_LOG_PREFIX, "Step 8: Stopped — no FCM token (check VAPID key in Firebase Console)");
       return null;
     }
-    console.info(FCM_LOG_PREFIX, "Step 8: FCM token received ✓ (length:", token?.length ?? 0, ")");
+    console.info(FCM_LOG_PREFIX, "Step 8: FCM token received ✓", {
+      projectId: firebaseConfig.projectId,
+      tokenLength: token.length,
+      tokenPrefix: `${token.slice(0, 12)}…`,
+    });
 
     const deviceId = options.deviceId ?? getStableDeviceId();
-    console.info(FCM_LOG_PREFIX, "Step 9: Registering device with backend (POST /notifications/device)…", { deviceId, device: "web" });
+    console.info(FCM_LOG_PREFIX, "Step 9: Registering device with backend (POST /notifications/device)…", {
+      deviceId,
+      device: "web",
+      type: "web",
+      projectId: firebaseConfig.projectId,
+    });
     await notificationsApi.registerDevice({
       deviceId,
       regToken: token,
       device: "web",
       type: "web",
     });
-    console.info(FCM_LOG_PREFIX, "Step 9: Backend registration successful ✓");
+    console.info(FCM_LOG_PREFIX, "Step 9: Backend registration successful ✓", {
+      deviceId,
+      projectId: firebaseConfig.projectId,
+    });
 
     console.info(FCM_LOG_PREFIX, "Step 10: Setting up foreground message handler…");
     options.onTokenRegistered?.(token);
@@ -124,7 +140,11 @@ export async function initFcm(options: FcmOptions = {}): Promise<string | null> 
     console.info(FCM_LOG_PREFIX, "Step 3: Skipped — Firebase not configured (check VITE_FIREBASE_* in .env)");
     return null;
   }
-  console.info(FCM_LOG_PREFIX, "Step 3: Firebase config present ✓");
+  console.info(FCM_LOG_PREFIX, "Step 3: Firebase config present ✓", {
+    projectId: firebaseConfig.projectId,
+    messagingSenderId: firebaseConfig.messagingSenderId,
+    appId: firebaseConfig.appId,
+  });
 
   if (!("Notification" in window) || !("serviceWorker" in navigator)) {
     console.info(FCM_LOG_PREFIX, "Step 4: Skipped — Notification or ServiceWorker API not supported");

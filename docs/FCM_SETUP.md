@@ -35,7 +35,7 @@ So for the **frontend** Firebase connection you need the **Web app config** from
 
 ### Step 1 – Web app config (API Key, Project ID, App ID, etc.)
 
-1. Open **[Firebase Console](https://console.firebase.google.com/)** and select your project (e.g. **hope-7ea3f**).
+1. Open **[Firebase Console](https://console.firebase.google.com/)** and select your project (**ontor-a20b9** — same as mobile).
 2. Click the **gear icon** next to “Project Overview” → **Project settings**.
 3. In **General**, scroll to **Your apps**.
 4. If you don’t have a **Web** app yet: click **</>** (Add app) → register a name → **Register app** (you can skip Firebase Hosting for now).
