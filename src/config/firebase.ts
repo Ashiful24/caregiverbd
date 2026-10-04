@@ -1,6 +1,7 @@
 /**
  * Firebase config for FCM (push notifications) on web.
- * Set VITE_FIREBASE_* in .env (see .env.example).
+ * Project must match mobile: ontor-a20b9 (see WEB_FCM_SETUP.md / .env.example).
+ * Set VITE_FIREBASE_* in .env — keep in sync with public/firebase-messaging-sw.js.
  *
  * NOTE: src/fcm/firebase-service-account.json holds the Admin SDK service account
  * (private key, client email). It is gitignored and must never be imported here —

@@ -30,7 +30,7 @@ Open DevTools (F12) → Console and copy the printed token.
 
 ## Step 2 – Send a test from Firebase Console
 
-1. Go to [Firebase Console](https://console.firebase.google.com/) → your project (**hope-7ea3f**)
+1. Go to [Firebase Console](https://console.firebase.google.com/) → your project (**ontor-a20b9**)
 2. Left menu: **Engage** → **Messaging** (or **Build** → **Cloud Messaging**)
 3. Click **Create your first campaign** or **New campaign** → **Firebase Notification messages**
 4. Enter **Notification title** and **Notification text** (e.g. "Test" / "Hello from FCM")
