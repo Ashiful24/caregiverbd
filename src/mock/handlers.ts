@@ -7,6 +7,7 @@ import * as db from "./db";
 import type { Row } from "./db";
 import { ADMIN_USER } from "./db";
 import { DEMO_ACCOUNTS } from "./config";
+import { logEvent, notifyPatient, notifyProvider, notifyUser } from "./notify";
 import {
   cursorPage,
   dayOffset,
@@ -35,7 +36,7 @@ type Handler = (ctx: MockContext) => unknown;
 
 const routes: Array<{ method: string; pattern: RegExp; keys: string[]; handler: Handler }> = [];
 
-function on(method: string, path: string, handler: Handler) {
+export function on(method: string, path: string, handler: Handler) {
   const keys: string[] = [];
   const pattern = new RegExp(
     "^" + path.replace(/:([a-zA-Z]+)/g, (_, k) => (keys.push(k), "([^/]+)")) + "/?$"
@@ -256,6 +257,7 @@ on("POST", "/admin/documents/:id/verify", ({ params, body }) => {
     if (d) {
       d.status = body?.status ?? d.status;
       d.adminComment = body?.adminComment ?? null;
+      notifyUser(d.userId, `Document ${String(d.status).toLowerCase()}`, `Your ${String(d.type).replace(/_/g, " ").toLowerCase()} was ${String(d.status).toLowerCase()}.${d.adminComment ? ` ${d.adminComment}` : ""}`, "DOCUMENT_STATUS");
       return d;
     }
   }
@@ -619,9 +621,18 @@ on("GET", "/admin/providers/:id/service-requests", ({ params, query }) =>
 );
 on("PATCH", "/admin/providers/:id/verify", ({ params, body }) => {
   const p = providerOrThrow(params.id);
+  const before = p.status;
   p.status = body?.status === "DEACTIVATED" ? "ARCHIVED" : body?.status ?? p.status;
   if (body?.levelId) p.levelId = body.levelId;
   p.updatedAt = now();
+  if (p.status !== before) {
+    notifyProvider(
+      p.id,
+      p.status === "ACTIVE" ? "Profile verified" : "Profile status changed",
+      p.status === "ACTIVE" ? "You can now go online and accept jobs." : `Your profile is now ${String(p.status).toLowerCase()}.${body?.comment ? ` ${body.comment}` : ""}`,
+      "PROFILE_STATUS"
+    );
+  }
   return p;
 });
 on("PATCH", "/admin/providers/:id/level", ({ params, body }) => {
@@ -636,12 +647,14 @@ on("PATCH", "/certifications/:id/verify", ({ params, body }) => {
   for (const certs of db.providerCertifications.values()) {
     const c = certs.find((x) => x.id === Number(params.id));
     if (c) {
-      return Object.assign(c, {
+      Object.assign(c, {
         status: body?.status,
         adminComment: body?.adminComment ?? null,
         approvedAt: now(),
         approvedByName: `${ADMIN_USER.firstName} ${ADMIN_USER.lastName}`,
       });
+      notifyProvider(c.providerId, `Certification ${String(c.status).toLowerCase()}`, `${c.certificationTypeName} was ${String(c.status).toLowerCase()}.`, "CERTIFICATION_STATUS");
+      return c;
     }
   }
   return notFound("Certification");
@@ -852,8 +865,10 @@ on("GET", "/admin/patients/:id/details", ({ params }) => {
 });
 on("PATCH", "/admin/patients/:id/status", ({ params, body }) => {
   const p = db.findPatient(params.id) ?? notFound("Patient");
+  const before = p.status;
   p.status = body?.status ?? p.status;
   p.isActive = !["DEACTIVATED", "ARCHIVED", "REJECTED"].includes(p.status);
+  if (p.status !== before) notifyPatient(p.id, "Account status changed", `Your account is now ${String(p.status).toLowerCase()}.`, "PROFILE_STATUS");
   return p;
 });
 on("GET", "/admin/patients/:id/beneficiaries", ({ params }) => beneficiariesFor(db.findPatient(params.id) ?? notFound("Patient")));
@@ -1007,7 +1022,15 @@ on("POST", "/long-term-opportunities/:id/provider-schedule", ({ params, body }) 
     }
   }
   db.ltoSchedules.set(lto.id, list);
-  if (lto.status === "REQUESTED" || lto.status === "CHANGE_REQUESTED") lto.status = "SCHEDULE_PROPOSED";
+  if (lto.status === "REQUESTED" || lto.status === "CHANGE_REQUESTED") {
+    lto.status = "SCHEDULE_PROPOSED";
+    logEvent(lto, "SCHEDULE_PROPOSED", "ADMIN", `${ADMIN_USER.firstName} ${ADMIN_USER.lastName}`, `${list.length} shifts`);
+    notifyPatient(lto.patientId, "Your care schedule is ready", `${lto.requestNo}: ${list.length} shifts proposed. Review and accept to pay.`, "SCHEDULE_PROPOSED", { longTermOpportunityId: lto.id });
+  }
+  const assigned = new Set<number>((body?.slots ?? []).map((s: Row) => Number(s.providerId)));
+  for (const id of assigned) {
+    notifyProvider(id, "New long-term assignment", `You were assigned shifts for ${lto.requestNo} (${lto.patientName}). They are confirmed once the patient pays.`, "LONG_TERM_ASSIGNED", { longTermOpportunityId: lto.id });
+  }
   return { message: "Schedule created", count: (body?.slots ?? []).length };
 });
 on("PATCH", "/long-term-opportunities/:id/schedule-reject/:slotId", ({ params }) => {
@@ -1016,7 +1039,16 @@ on("PATCH", "/long-term-opportunities/:id/schedule-reject/:slotId", ({ params })
   if (i >= 0) list.splice(i, 1);
   return { message: "Slot removed" };
 });
-on("PATCH", "/long-term-opportunities/:id", ({ params, body }) => Object.assign(ltoOrThrow(params.id), body));
+on("PATCH", "/long-term-opportunities/:id", ({ params, body }) => {
+  const lto = ltoOrThrow(params.id);
+  const before = lto.status;
+  Object.assign(lto, body);
+  if (body?.status && body.status !== before) {
+    logEvent(lto, String(body.status), "ADMIN", `${ADMIN_USER.firstName} ${ADMIN_USER.lastName}`, "Status updated by Caregiver BD");
+    notifyPatient(lto.patientId, "Long-term request updated", `${lto.requestNo} is now ${String(body.status).replace(/_/g, " ").toLowerCase()}.`, "LONG_TERM_UPDATED", { longTermOpportunityId: lto.id });
+  }
+  return lto;
+});
 on("PUT", "/admin/long-term-opportunities/:id/supervisor", ({ params, body }) => {
   const lto = ltoOrThrow(params.id);
   const s = db.supervisors.find((x) => x.id === Number(body?.supervisorId));
@@ -1092,7 +1124,18 @@ on("POST", "/admin/provider-cancel-requests/batch/:batchId/process", ({ params, 
   const decisions: Record<string, string> = { approve: "APPROVED", reject: "REJECTED", reassign: "REASSIGNED" };
   for (const a of body?.actions ?? []) {
     const s = b.shifts.find((x: Row) => x.cancellationId === a.cancellationId);
-    if (s) s.reviewStatus = decisions[a.decision] ?? s.reviewStatus;
+    if (!s) continue;
+    s.reviewStatus = decisions[a.decision] ?? s.reviewStatus;
+    // Apply the decision to the real shift so the apps see it.
+    const slot = (db.ltoSchedules.get(b.opportunityId) ?? []).find((x) => x.providerSchedule.id === s.shiftId);
+    if (slot) {
+      slot.serviceRequest.cancelRequested = false;
+      if (s.reviewStatus === "APPROVED") slot.serviceRequest.status = "CANCELLED";
+      const p = s.reviewStatus === "REASSIGNED" ? db.findProvider(a.newProviderId) : null;
+      if (p) Object.assign(slot.providerSchedule, { providerId: p.id, providerName: db.providerName(p) });
+      if (p) notifyProvider(p.id, "New shift assigned", `You were assigned the ${s.scheduledDate} shift for ${b.patient?.name}.`, "LONG_TERM_ASSIGNED", { longTermOpportunityId: b.opportunityId });
+    }
+    notifyProvider(b.provider?.id, `Shift cancel ${String(s.reviewStatus).toLowerCase()}`, `Admin ${String(s.reviewStatus).toLowerCase()} your request for the ${s.scheduledDate} shift.`, "CANCEL_REVIEWED", { longTermOpportunityId: b.opportunityId });
   }
   if (b.shifts.every((s: Row) => s.reviewStatus !== "PENDING")) {
     b.reviewStatus = "APPROVED";
@@ -1121,7 +1164,21 @@ on("GET", "/admin/provider-cancel-requests/:id", ({ params }) => {
 function reviewCancel(id: unknown, reviewStatus: string, extra: Row = {}) {
   const r = db.providerCancelRequests.find((x) => x.id === Number(id)) ?? notFound("Cancel request");
   Object.assign(r, { reviewStatus, reviewedAt: now(), ...extra });
-  if (reviewStatus === "APPROVED") r.serviceRequest.status = "CANCELLED";
+  const sr = db.serviceRequests.find((s) => s.id === r.serviceRequest.id);
+  if (reviewStatus === "APPROVED") {
+    r.serviceRequest.status = "CANCELLED";
+    if (sr) Object.assign(sr, { status: "CANCELLED", cancelledAt: now(), cancelRequested: false });
+  }
+  if (reviewStatus === "REJECTED" && sr) sr.cancelRequested = false;
+  if (reviewStatus === "REASSIGNED" && sr && extra.provider) {
+    Object.assign(sr, { providerId: extra.provider.id, providerName: extra.provider.name, cancelRequested: false });
+    notifyProvider(extra.provider.id, "New job assigned", `Admin assigned you ${sr.patientName}'s ${sr.scheduledDate} ${sr.scheduledTime} service.`, "REQUEST_ACCEPTED", { serviceRequestId: sr.id });
+    notifyPatient(sr.patientId, "Provider changed", `${extra.provider.name} will now take your ${sr.scheduledDate} service.`, "PROVIDER_REASSIGNED", { serviceRequestId: sr.id });
+  }
+  if (reviewStatus === "APPROVED" && sr) {
+    notifyPatient(sr.patientId, "Booking cancelled", `${sr.providerName} cannot attend your ${sr.scheduledDate} service. Please book another provider.`, "REQUEST_CANCELLED", { serviceRequestId: sr.id });
+  }
+  notifyProvider(r.provider?.id, `Cancel request ${reviewStatus.toLowerCase()}`, `Admin ${reviewStatus.toLowerCase()} your request to cancel the ${r.serviceRequest.scheduledDate} service.`, "CANCEL_REVIEWED", { serviceRequestId: r.serviceRequest.id });
   return r;
 }
 on("POST", "/admin/provider-cancel-requests/:id/approve", ({ params }) => reviewCancel(params.id, "APPROVED"));
@@ -1172,6 +1229,7 @@ on("GET", "/admin/upgrade-requests/:id", ({ params }) => byId(db.upgradeRequests
 on("PATCH", "/admin/upgrade-requests/:id", ({ params, body }) => {
   const u = byId(db.upgradeRequests, params.id, "Upgrade request");
   Object.assign(u, { status: body?.status, adminComment: body?.adminComment ?? null, reviewedBy: 1, reviewedAt: now() });
+  notifyProvider(u.providerId, `Upgrade ${String(body?.status).toLowerCase()}`, `Your request to move to ${u.targetConsultationTypeName} was ${String(body?.status).toLowerCase()}.`, "UPGRADE_STATUS");
   if (body?.status === "APPROVED") {
     const p = db.findProvider(u.providerId);
     if (p) {
@@ -1250,6 +1308,41 @@ function reviewWithdrawal(id: unknown, status: string, body: Row) {
     ...(status === "APPROVED" ? { approvedAt: now() } : {}),
     ...(status === "COMPLETED" ? { completedAt: now(), reference: w.reference ?? `TRX${Date.now() % 1e8}` } : {}),
   });
+  // Paid out: book it in the ledger so it leaves the provider's claimable balance (once).
+  if (status === "COMPLETED" && !db.transactions.some((t) => t.type === "WITHDRAWAL" && t.withdrawalId === w.id)) {
+    const amount = num(w.amount);
+    db.transactions.unshift({
+      transactionId: db.transactions.reduce((m, t) => Math.max(m, num(t.transactionId)), 10000) + 1,
+      withdrawalId: w.id,
+      date: w.completedAt,
+      type: "WITHDRAWAL",
+      status: "COMPLETED",
+      paymentMethod: w.method,
+      serviceType: null,
+      longTermOpportunityId: null,
+      serviceRequestId: null,
+      consultationTypeName: null,
+      scheduledDate: null,
+      providerId: w.providerId,
+      providerName: w.providerName,
+      patientId: null,
+      patientName: null,
+      supervisorId: db.findProvider(w.providerId)?.supervisorId ?? null,
+      isEscrow: false,
+      totalFee: amount,
+      tax: 0,
+      commission: 0,
+      supervisorCommission: 0,
+      ait: 0,
+      providerFee: amount,
+    });
+  }
+  notifyProvider(
+    w.providerId,
+    `Withdrawal ${status.toLowerCase()}`,
+    status === "COMPLETED" ? `৳${w.amount} sent to your ${w.method} account (ref ${w.reference}).` : `Your ৳${w.amount} withdrawal was ${status.toLowerCase()}.${w.adminNote ? ` ${w.adminNote}` : ""}`,
+    "WITHDRAWAL_STATUS"
+  );
   return w;
 }
 on("PATCH", "/financial/withdrawal/admin/:id/approve", ({ params, body }) => reviewWithdrawal(params.id, "APPROVED", body));

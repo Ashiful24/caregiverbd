@@ -1,12 +1,26 @@
 import { SidebarProvider, useSidebar } from "../context/SidebarContext";
+import { useEffect, useState } from "react";
 import { Outlet } from "react-router";
+import { DEMO_DATA_EVENT } from "../mock";
 import AppHeader from "./AppHeader";
 import Backdrop from "./Backdrop";
 import AppSidebar from "./AppSidebar";
 import { FcmInit } from "../components/common/FcmInit";
 
+/** Remount the page when the demo data changes in another tab (e.g. the mobile app view). */
+function useDemoDataVersion() {
+  const [version, setVersion] = useState(0);
+  useEffect(() => {
+    const bump = () => setVersion((v) => v + 1);
+    window.addEventListener(DEMO_DATA_EVENT, bump);
+    return () => window.removeEventListener(DEMO_DATA_EVENT, bump);
+  }, []);
+  return version;
+}
+
 const LayoutContent: React.FC = () => {
   const { isExpanded, isHovered, isMobileOpen } = useSidebar();
+  const demoVersion = useDemoDataVersion();
 
   return (
     <div className="min-h-screen xl:flex">
@@ -21,7 +35,7 @@ const LayoutContent: React.FC = () => {
       >
         <AppHeader />
         <div className="p-4 mx-auto max-w-(--breakpoint-2xl) md:p-6">
-          <Outlet />
+          <Outlet key={demoVersion} />
         </div>
       </div>
     </div>

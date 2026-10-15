@@ -5,7 +5,7 @@
 export const DEMO_MODE = String(import.meta.env.VITE_DEMO_MODE ?? "true").toLowerCase() !== "false";
 
 /** Simulated network latency (ms) so loaders and spinners still show briefly. */
-export const DEMO_LATENCY_MS = 250;
+export const DEMO_LATENCY_MS = 60;
 
 /** Demo logins. Every demo supervisor's email also works with the supervisor password. */
 export const DEMO_ACCOUNTS = {

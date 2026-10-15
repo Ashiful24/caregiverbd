@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Routes, Route } from "react-router";
 import SignIn from "./pages/AuthPages/SignIn";
 import SignUp from "./pages/AuthPages/SignUp";
@@ -35,6 +36,8 @@ import NurseScheduleCalendarPage from "./pages/NurseScheduleCalendarPage";
 import SupervisorList from "./pages/SupervisorList";
 import ProtectedRoute from "./components/common/ProtectedRoute";
 import PublicRoute from "./components/common/PublicRoute";
+
+const MobileApp = lazy(() => import("./mobile/MobileApp"));
 
 export default function App() {
   return (
@@ -299,6 +302,16 @@ export default function App() {
             <PublicRoute>
               <ForgotPassword />
             </PublicRoute>
+          }
+        />
+
+        {/* Patient / provider mobile app views (demo data) */}
+        <Route
+          path="/app/*"
+          element={
+            <Suspense fallback={null}>
+              <MobileApp />
+            </Suspense>
           }
         />
 

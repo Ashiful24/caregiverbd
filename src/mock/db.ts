@@ -494,6 +494,8 @@ for (const lto of longTermOpportunities) {
 }
 
 export function nextSlotId(): number {
+  // Persisted data may hold ids handed out in an earlier session.
+  for (const rows of ltoSchedules.values()) for (const r of rows) slotId = Math.max(slotId, r.providerSchedule.id + 1);
   return slotId++;
 }
 
@@ -742,6 +744,7 @@ for (const p of providers) {
   );
 }
 export function nextDocId(): number {
+  for (const docs of userDocuments.values()) for (const d of docs) docId = Math.max(docId, d.id + 1);
   return docId++;
 }
 
@@ -783,6 +786,7 @@ for (const p of providers) {
     : []);
 }
 export function nextRateId(): number {
+  for (const map of [billingRates, salaries]) for (const rows of map.values()) for (const r of rows) rateId = Math.max(rateId, r.id + 1);
   return rateId++;
 }
 

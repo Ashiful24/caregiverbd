@@ -2,8 +2,11 @@
 import type { ApiError, ApiResponse } from "../services/httpService";
 import { DEMO_LATENCY_MS } from "./config";
 import { MockHttpError, resolveRoute } from "./handlers";
+import "./mobileHandlers";
+import { scheduleSaveDemoData } from "./persist";
 
 export { DEMO_MODE, DEMO_ACCOUNTS } from "./config";
+export { DEMO_DATA_EVENT, resetDemoData } from "./persist";
 
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -38,6 +41,8 @@ export async function mockRequest<T = any>(
   const body = options.body == null ? options.body : JSON.parse(JSON.stringify(options.body));
   try {
     const data = route.handler({ params: route.params, query: { ...query, ...(options.params ?? {}) }, body });
+    // GETs may also write (lazy seeding, auto-expiry); saves are batched and skipped when nothing changed.
+    scheduleSaveDemoData();
     return {
       data: (data === undefined ? null : JSON.parse(JSON.stringify(data))) as T,
       status: data == null ? 204 : 200,
