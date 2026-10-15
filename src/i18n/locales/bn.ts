@@ -61,17 +61,17 @@ const bn = {
   },
   auth: {
     meta: {
-      signInTitle: "সাইন ইন | Ontor - BMQAS",
-      signInDescription: "Ontor Pro এর সাইন ইন পেজ",
-      signUpTitle: "সাইন আপ | Ontor - BMQAS",
-      signUpDescription: "Ontor Pro এর সাইন আপ পেজ",
-      forgotPasswordTitle: "পাসওয়ার্ড ভুলে গেছেন | Ontor - BMQAS",
-      forgotPasswordDescription: "আপনার Ontor Pro অ্যাকাউন্টের পাসওয়ার্ড রিসেট লিঙ্ক চান",
-      resetPasswordTitle: "পাসওয়ার্ড রিসেট | Ontor - BMQAS",
-      resetPasswordDescription: "আপনার Ontor Pro অ্যাকাউন্টের জন্য নতুন পাসওয়ার্ড নির্ধারণ করুন",
+      signInTitle: "সাইন ইন | Caregiver BD",
+      signInDescription: "Caregiver BD এর সাইন ইন পেজ",
+      signUpTitle: "সাইন আপ | Caregiver BD",
+      signUpDescription: "Caregiver BD এর সাইন আপ পেজ",
+      forgotPasswordTitle: "পাসওয়ার্ড ভুলে গেছেন | Caregiver BD",
+      forgotPasswordDescription: "আপনার Caregiver BD অ্যাকাউন্টের পাসওয়ার্ড রিসেট লিঙ্ক চান",
+      resetPasswordTitle: "পাসওয়ার্ড রিসেট | Caregiver BD",
+      resetPasswordDescription: "আপনার Caregiver BD অ্যাকাউন্টের জন্য নতুন পাসওয়ার্ড নির্ধারণ করুন",
     },
     layout: {
-      bannerText: "Ontor Pro - BMQAS এর অ্যাডমিন ড্যাশবোর্ড",
+      bannerText: "Caregiver BD অ্যাডমিন ড্যাশবোর্ড",
     },
     signIn: {
       title: "সাইন ইন",
@@ -210,8 +210,8 @@ const bn = {
     userProfile: "আমার প্রোফাইল",
   },
   dashboard: {
-    metaTitle: "ড্যাশবোর্ড | Ontor - BMQAS",
-    metaDescription: "Ontor Pro এর ড্যাশবোর্ড পেজ",
+    metaTitle: "ড্যাশবোর্ড | Caregiver BD",
+    metaDescription: "Caregiver BD এর ড্যাশবোর্ড পেজ",
     loadError: "ড্যাশবোর্ড লোড করা যায়নি।",
     totalPatients: "মোট রোগী",
     totalProviders: "মোট প্রোভাইডার",
@@ -232,7 +232,7 @@ const bn = {
     status: "স্ট্যাটাস",
   },
   supervisor: {
-    metaTitle: "সুপারভাইজার | Ontor - BMQAS",
+    metaTitle: "সুপারভাইজার | Caregiver BD",
     metaDescription: "সুপারভাইজার ডিরেক্টরি",
     pageTitle: "সুপারভাইজার",
     heading: "সুপারভাইজার",
@@ -328,8 +328,8 @@ const bn = {
     pageNumber: "পৃষ্ঠা {{page}}",
   },
   schedule: {
-    metaTitle: "সার্ভিস রিকোয়েস্ট | Ontor - BMQAS",
-    metaDescription: "দীর্ঘমেয়াদি সার্ভিস রিকোয়েস্ট - Ontor Pro",
+    metaTitle: "সার্ভিস রিকোয়েস্ট | Caregiver BD",
+    metaDescription: "দীর্ঘমেয়াদি সার্ভিস রিকোয়েস্ট - Caregiver BD",
     pageTitle: "সার্ভিস রিকোয়েস্ট",
     heading: "সার্ভিস রিকোয়েস্ট",
     subheading: "দীর্ঘমেয়াদি সুযোগ ও শিডিউলিং ওয়ার্কফ্লো। ক্যালেন্ডার দেখতে একটি সারি খুলুন।",
@@ -374,9 +374,9 @@ const bn = {
     notFound: "এই সার্ভিস রিকোয়েস্ট পাওয়া যায়নি।",
     backToList: "রিকোয়েস্ট তালিকায় ফিরে যান",
     allRequests: "সব সার্ভিস রিকোয়েস্ট",
-    metaTitle: "সার্ভিস রিকোয়েস্ট | Ontor - BMQAS",
-    metaNotFoundTitle: "সার্ভিস রিকোয়েস্ট পাওয়া যায়নি | Ontor - BMQAS",
-    metaTitleWithNo: "{{requestNo}} — সার্ভিস রিকোয়েস্ট | Ontor - BMQAS",
+    metaTitle: "সার্ভিস রিকোয়েস্ট | Caregiver BD",
+    metaNotFoundTitle: "সার্ভিস রিকোয়েস্ট পাওয়া যায়নি | Caregiver BD",
+    metaTitleWithNo: "{{requestNo}} — সার্ভিস রিকোয়েস্ট | Caregiver BD",
     metaDescriptionPatient: "{{name}} এর ক্যালেন্ডার",
     pageBreadcrumb: "সার্ভিস রিকোয়েস্ট",
     titleFallback: "সার্ভিস রিকোয়েস্ট",
@@ -471,8 +471,8 @@ const bn = {
     minutesAbbr: "মি",
   },
   appointments: {
-    metaTitle: "অ্যাপয়েন্টমেন্ট | Ontor - BMQAS",
-    metaDescription: "Ontor Pro এর সব সার্ভিস রিকোয়েস্ট (অ্যাপয়েন্টমেন্ট)",
+    metaTitle: "অ্যাপয়েন্টমেন্ট | Caregiver BD",
+    metaDescription: "Caregiver BD এর সব সার্ভিস রিকোয়েস্ট (অ্যাপয়েন্টমেন্ট)",
     pageTitle: "অ্যাপয়েন্টমেন্ট",
     heading: "অ্যাপয়েন্টমেন্ট",
     subheading: "সব সার্ভিস রিকোয়েস্ট। ডাক্তার বা রোগী দিয়ে খুঁজুন।",
@@ -589,8 +589,8 @@ const bn = {
     typePrefix: "টাইপ",
   },
   users: {
-    metaTitle: "সব ব্যবহারকারী | Ontor - BMQAS",
-    metaDescription: "Ontor Pro এর সব ব্যবহারকারীর অ্যাডমিন ভিউ",
+    metaTitle: "সব ব্যবহারকারী | Caregiver BD",
+    metaDescription: "Caregiver BD এর সব ব্যবহারকারীর অ্যাডমিন ভিউ",
     pageTitle: "সব ব্যবহারকারী",
     heading: "সব ব্যবহারকারী",
     subheading: "অ্যাডমিন, প্রোভাইডার, রোগীসহ সব ব্যবহারকারীর সার্ভার-পেজিনেটেড ভিউ",
@@ -647,8 +647,8 @@ const bn = {
     failedLoad: "ব্যবহারকারী তালিকা লোড করা যায়নি।",
   },
   providers: {
-    metaTitle: "প্রোভাইডার তালিকা | Ontor - BMQAS",
-    metaDescription: "Ontor Pro এর প্রোভাইডার প্রোফাইল (providers টেবিল)",
+    metaTitle: "প্রোভাইডার তালিকা | Caregiver BD",
+    metaDescription: "Caregiver BD এর প্রোভাইডার প্রোফাইল (providers টেবিল)",
     pageTitle: "প্রোভাইডার",
     heading: "প্রোভাইডার",
     subheading: "providers টেবিলের প্রোফাইল (user account নয়)",
@@ -893,8 +893,8 @@ const bn = {
     },
   },
   patients: {
-    metaTitle: "রোগীর তালিকা | Ontor - BMQAS",
-    metaDescription: "Ontor Pro এর নতুন আবেদনকৃত রোগী প্রোফাইল তালিকা",
+    metaTitle: "রোগীর তালিকা | Caregiver BD",
+    metaDescription: "Caregiver BD এর নতুন আবেদনকৃত রোগী প্রোফাইল তালিকা",
     pageTitle: "রোগীর তালিকা",
     heading: "নতুন আবেদনকৃত রোগী",
     subheading: "সার্ভার-পেজিনেশনসহ নিবন্ধিত সব রোগী",
@@ -914,7 +914,7 @@ const bn = {
     failedLoad: "রোগীর তালিকা লোড করা যায়নি।",
   },
   consultationTypesTree: {
-    metaTitle: "কনসালটেশন টাইপ ট্রি | Ontor - BMQAS",
+    metaTitle: "কনসালটেশন টাইপ ট্রি | Caregiver BD",
     metaDescription: "কনসালটেশন টাইপের হায়ারার্কি ম্যানেজ করুন",
     pageTitle: "কনসালটেশন টাইপ ট্রি",
     heading: "কনসালটেশন টাইপসমূহ",
@@ -981,7 +981,7 @@ const bn = {
     removeConfirm: "\"{{name}}\" (#{{id}}) মুছতে চান? টাইপটি ব্যবহৃত হলে এটি ব্যর্থ হতে পারে। চাইল্ড থাকলে আগে সরানো বা মুছতে হতে পারে।",
   },
   verificationDocumentTypes: {
-    metaTitle: "ভেরিফিকেশন ডকুমেন্ট টাইপ | Ontor - BMQAS",
+    metaTitle: "ভেরিফিকেশন ডকুমেন্ট টাইপ | Caregiver BD",
     metaDescription: "ভেরিফিকেশন ডকুমেন্ট টাইপ entity ম্যানেজ করুন (যোগ, আপডেট, অ্যাক্টিভ/ইনঅ্যাক্টিভ)। এই কোডগুলো কনসালটেশন টাইপের প্রয়োজনীয়তা এবং ডকুমেন্ট আপলোডে ব্যবহৃত হয়।",
     pageTitle: "ভেরিফিকেশন ডকুমেন্ট টাইপ",
     heading: "ভেরিফিকেশন ডকুমেন্ট টাইপ",
@@ -1019,7 +1019,7 @@ const bn = {
     failedUpdateStatus: "স্ট্যাটাস আপডেট করা যায়নি।",
   },
   certificationTypes: {
-    metaTitle: "সার্টিফিকেশন টাইপ | Ontor - BMQAS",
+    metaTitle: "সার্টিফিকেশন টাইপ | Caregiver BD",
     metaDescription:
       "সার্টিফিকেশন টাইপ ম্যানেজ করুন (যোগ, আপডেট, সক্রিয়/নিষ্ক্রিয়)। এগুলো কনসালটেশন টাইপের সার্টিফিকেশন প্রয়োজনীয়তা হিসেবে ম্যাপ করা হয়।",
     pageTitle: "সার্টিফিকেশন টাইপ",
@@ -1062,7 +1062,7 @@ const bn = {
     failedUpdateStatus: "স্ট্যাটাস আপডেট করা যায়নি।",
   },
   serviceChecklistGroups: {
-    metaTitle: "সার্ভিস চেকলিস্ট গ্রুপ | Ontor - BMQAS",
+    metaTitle: "সার্ভিস চেকলিস্ট গ্রুপ | Caregiver BD",
     metaDescription:
       "ইংরেজি ও বাংলা নাম ও বিবরণ সহ সার্ভিস চেকলিস্ট গ্রুপ ম্যানেজ করুন।",
     pageTitle: "সার্ভিস চেকলিস্ট গ্রুপ",
@@ -1104,7 +1104,7 @@ const bn = {
     failedDelete: "গ্রুপ মুছে ফেলা ব্যর্থ হয়েছে।",
   },
   consultationTypeLevels: {
-    metaTitle: "কনসালটেশন টাইপ লেভেল | Ontor - BMQAS",
+    metaTitle: "কনসালটেশন টাইপ লেভেল | Caregiver BD",
     metaDescription: "ডাক্তার ও কেয়ারগিভারের জন্য কনসালটেশন টাইপ লেভেল (বেতন ব্যান্ড ও লেভেল নম্বর) ম্যানেজ করুন।",
     pageTitle: "কনসালটেশন টাইপ লেভেল",
     heading: "কনসালটেশন টাইপ লেভেল",
@@ -1164,7 +1164,7 @@ const bn = {
     },
   },
   systemConfig: {
-    metaTitle: "সিস্টেম কনফিগারেশন | Ontor - BMQAS",
+    metaTitle: "সিস্টেম কনফিগারেশন | Caregiver BD",
     metaDescription: "সিস্টেম কনফিগারেশন দেখুন ও আপডেট করুন (কমিশন, OTP, ডিফল্ট ইত্যাদি)",
     pageTitle: "সিস্টেম কনফিগারেশন",
     heading: "প্ল্যাটফর্ম সেটিংস",
@@ -1176,7 +1176,7 @@ const bn = {
     subheading: "ডাটাবেসে সংরক্ষিত key-value সেটিংস। সহজ পর্যালোচনার জন্য গ্রুপ করা।",
     restartNoticeTitle: "সিস্টেম সেটিংসের জন্য রিস্টার্ট প্রয়োজন",
     restartNoticeMessage:
-      "এই ট্যাবে পরিবর্তন সঙ্গে সঙ্গে ডাটাবেসে সংরক্ষিত হয়, তবে Ontor API অ্যাপ্লিকেশন বেশিরভাগ মান স্টার্টআপে লোড করে। সংরক্ষণের পর ব্যাকএন্ড API সার্ভিস রিস্টার্ট করুন (বা রিডিপ্লয়) যাতে নতুন মান সব জায়গায় কার্যকর হয়।",
+      "এই ট্যাবে পরিবর্তন সঙ্গে সঙ্গে ডাটাবেসে সংরক্ষিত হয়, তবে Caregiver API অ্যাপ্লিকেশন বেশিরভাগ মান স্টার্টআপে লোড করে। সংরক্ষণের পর ব্যাকএন্ড API সার্ভিস রিস্টার্ট করুন (বা রিডিপ্লয়) যাতে নতুন মান সব জায়গায় কার্যকর হয়।",
     editRestartHint: "এখনই ডাটাবেসে সংরক্ষিত। প্রোডাকশনে প্রয়োগের জন্য API অ্যাপ্লিকেশন রিস্টার্ট করুন।",
     searchPlaceholder: "কী, ভ্যালু বা বিবরণ দিয়ে খুঁজুন…",
     booleanOn: "চালু",
@@ -1236,7 +1236,7 @@ const bn = {
     scheduler: {
       noticeTitle: "ব্যাকগ্রাউন্ড জব — API রিস্টার্ট লাগে না",
       noticeMessage:
-        "এই জবগুলো Ontor Scheduler মাইক্রোসার্ভিসে চলে। ইন্টারভাল বা মেটাডাটা পরিবর্তন করলে পরবর্তী ডিসপ্যাচার টিকে (~৫ মিনিটের মধ্যে) প্রয়োগ হয়। Scheduler প্রসেস চালু আছে কিনা নিশ্চিত করুন। রিফান্ড রিকনসাইলের জন্য scheduler-এ SSL Commerz ক্রেডেনশিয়াল থাকতে হবে।",
+        "এই জবগুলো Caregiver Scheduler মাইক্রোসার্ভিসে চলে। ইন্টারভাল বা মেটাডাটা পরিবর্তন করলে পরবর্তী ডিসপ্যাচার টিকে (~৫ মিনিটের মধ্যে) প্রয়োগ হয়। Scheduler প্রসেস চালু আছে কিনা নিশ্চিত করুন। রিফান্ড রিকনসাইলের জন্য scheduler-এ SSL Commerz ক্রেডেনশিয়াল থাকতে হবে।",
       failedLoad: "Scheduler জব লোড করা যায়নি।",
       failedUpdate: "Scheduler জব আপডেট ব্যর্থ।",
       invalidInterval: "ইন্টারভাল কমপক্ষে ১ মিনিট হতে হবে।",
@@ -1343,7 +1343,7 @@ const bn = {
       adminFeeInvalid: "বৈধ অ্যাডমিন ফি দিন (০ বা তার বেশি)।",
       exceptions: "এক্সসেপশন",
       exceptionsHint: "নির্বাচিত ফল্টের কারণে বাতিল হলে ফি মওকুফ।",
-      exception_HOPE_FAULT: "Ontor fault (ফি মওকুফ)",
+      exception_HOPE_FAULT: "Platform fault (ফি মওকুফ)",
       policyActive: "পলিসি সক্রিয়",
       windowMin: "উইন্ডো (মিনিট)",
       windowMinHint: "সার্ভিস শুরুর আগে বাতিলের সময়সীমা মিনিটে (শুধু pre-service স্টেজ)।",
@@ -1358,7 +1358,7 @@ const bn = {
     },
   },
   upgradeRequests: {
-    listMetaTitle: "আপগ্রেড রিকোয়েস্ট | Ontor - BMQAS",
+    listMetaTitle: "আপগ্রেড রিকোয়েস্ট | Caregiver BD",
     listMetaDescription: "প্রোভাইডারের কনসালটেশন টাইপ আপগ্রেড রিকোয়েস্ট রিভিউ, অনুমোদন বা প্রত্যাখ্যান করুন",
     listPageTitle: "আপগ্রেড রিকোয়েস্ট",
     listHeading: "প্রোভাইডার আপগ্রেড রিকোয়েস্ট",
@@ -1372,7 +1372,7 @@ const bn = {
     requested: "অনুরোধের সময়",
     actions: "অ্যাকশন",
     failedLoadList: "আপগ্রেড রিকোয়েস্ট লোড করা যায়নি।",
-    detailMetaTitle: "আপগ্রেড রিকোয়েস্ট | Ontor - BMQAS",
+    detailMetaTitle: "আপগ্রেড রিকোয়েস্ট | Caregiver BD",
     detailMetaDescription: "আপগ্রেড রিকোয়েস্ট এবং ভেরিফিকেশন ডকুমেন্ট রিভিউ করুন",
     detailPageTitle: "আপগ্রেড রিকোয়েস্ট",
     detailPageTitleWithId: "আপগ্রেড রিকোয়েস্ট #{{id}}",
@@ -1409,7 +1409,7 @@ const bn = {
     rejectUpgrade: "আপগ্রেড প্রত্যাখ্যান",
   },
   financialReports: {
-    metaTitle: "ফিন্যান্সিয়াল রিপোর্টস | Ontor - BMQAS",
+    metaTitle: "ফিন্যান্সিয়াল রিপোর্টস | Caregiver BD",
     metaDescription: "GL রিকনসিলিয়েশন ও প্রোভাইডার ট্রানজ্যাকশন হিস্টরি",
     pageTitle: "ফিন্যান্সিয়াল রিপোর্টস",
     glSummaryTitle: "GL রিকনসিলিয়েশন সারাংশ",
@@ -1446,7 +1446,7 @@ const bn = {
     failedLoadGlHistory: "GL হিস্ট্রি লোড করা যায়নি।",
     failedLoadTransactions: "ট্রানজ্যাকশন লোড করা যায়নি।",
     master: {
-      metaTitle: "প্রধান ফিন্যান্সিয়াল রিপোর্ট | Ontor - BMQAS",
+      metaTitle: "প্রধান ফিন্যান্সিয়াল রিপোর্ট | Caregiver BD",
       metaDescription:
         "দৈনিক অর্থ প্রবাহ, সারাংশ মোট ও পুরো ভাঙুনসহ পেজযুক্ত লেনদেন তালিকা (অ্যাডমিন)।",
       pageTitle: "প্রধান আর্থিক রিপোর্ট",
@@ -1674,7 +1674,7 @@ const bn = {
     },
   },
   adminSupervisorReporting: {
-    metaTitle: "এডমিন / সুপারভাইজার রিপোর্টিং | Ontor - BMQAS",
+    metaTitle: "এডমিন / সুপারভাইজার রিপোর্টিং | Caregiver BD",
     metaDescription:
       "অপারেশনাল কেপিআই, সুপারভাইজার পারফরম্যান্স এবং দৈনিক ব্রেকডাউন সহ রিপোর্ট ড্যাশবোর্ড।",
     pageTitle: "এডমিন / সুপারভাইজার রিপোর্টিং",
@@ -1773,7 +1773,7 @@ const bn = {
     },
   },
   withdrawalRequests: {
-    metaTitle: "উইথড্রয়াল রিকোয়েস্ট | Ontor - BMQAS",
+    metaTitle: "উইথড্রয়াল রিকোয়েস্ট | Caregiver BD",
     metaDescription: "অ্যাডমিনের জন্য উইথড্রয়াল রিকোয়েস্ট তালিকা",
     pageTitle: "উইথড্রয়াল রিকোয়েস্ট",
     heading: "উইথড্রয়াল রিকোয়েস্ট",
@@ -1821,10 +1821,10 @@ const bn = {
     failedToLoad: "উইথড্রয়াল রিকোয়েস্ট লোড করা যায়নি।",
   },
   providerCancelRequests: {
-    metaTitle: "প্রোভাইডার বাতিল রিকোয়েস্ট | Ontor - BMQAS",
+    metaTitle: "প্রোভাইডার বাতিল রিকোয়েস্ট | Caregiver BD",
     metaDescription: "প্রোভাইডারের বাতিল অনুরোধ পর্যালোচনা: অনুমোদন, প্রত্যাখ্যান বা পুনরায় নিয়োগ।",
     pageTitle: "প্রোভাইডার বাতিল রিকোয়েস্ট",
-    detailMetaTitle: "প্রোভাইডার বাতিল রিকোয়েস্ট | Ontor - BMQAS",
+    detailMetaTitle: "প্রোভাইডার বাতিল রিকোয়েস্ট | Caregiver BD",
     detailMetaDescription: "একটি প্রোভাইডার বাতিল অনুরোধ পর্যালোচনা ও সিদ্ধান্ত।",
     detailPageTitle: "প্রোভাইডার বাতিল রিকোয়েস্ট",
     detailPageTitleWithId: "রিকোয়েস্ট #{{id}}",
@@ -1935,7 +1935,7 @@ const bn = {
     actionFailed: "কাজ ব্যর্থ।",
   },
   cancellationRefunds: {
-    metaTitle: "বাতিল ও রিফান্ড | Ontor - BMQAS",
+    metaTitle: "বাতিল ও রিফান্ড | Caregiver BD",
     metaDescription:
       "সংযুক্ত রিফান্ড ট্রানজ্যাকশনসহ সেবা বাতিলের অ্যাডমিন সারি এবং গেটওয়ে রিকনসাইল।",
     pageTitle: "বাতিল ও রিফান্ড",
@@ -1985,7 +1985,7 @@ const bn = {
     loadingMore: "লোড হচ্ছে…",
   },
   notificationsPage: {
-    metaTitle: "নোটিফিকেশন | Ontor - BMQAS",
+    metaTitle: "নোটিফিকেশন | Caregiver BD",
     metaDescription: "আপনার নোটিফিকেশন দেখুন এবং পরিচালনা করুন",
     pageTitle: "নোটিফিকেশন",
     heading: "নোটিফিকেশন",
@@ -2010,7 +2010,7 @@ const bn = {
     notSent: "পাঠানো যায়নি।",
     failedSendTestPush: "টেস্ট পুশ পাঠানো যায়নি।",
     defaultTestTitle: "টেস্ট নোটিফিকেশন",
-    defaultTestBody: "এটি Ontor admin থেকে একটি টেস্ট পুশ।",
+    defaultTestBody: "এটি Caregiver BD admin থেকে একটি টেস্ট পুশ।",
   },
 };
 

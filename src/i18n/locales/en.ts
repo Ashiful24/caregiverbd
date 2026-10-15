@@ -61,17 +61,17 @@ const en = {
   },
   auth: {
     meta: {
-      signInTitle: "Sign In | Ontor - BMQAS",
-      signInDescription: "Sign In page for Ontor Pro by Bengal Mobile QA Solution",
-      signUpTitle: "Sign Up | Ontor - BMQAS",
-      signUpDescription: "Sign Up page for Ontor Pro by Bengal Mobile QA Solution",
-      forgotPasswordTitle: "Forgot password | Ontor - BMQAS",
-      forgotPasswordDescription: "Request a password reset link for your Ontor Pro account",
-      resetPasswordTitle: "Reset password | Ontor - BMQAS",
-      resetPasswordDescription: "Choose a new password for your Ontor Pro account",
+      signInTitle: "Sign In | Caregiver BD",
+      signInDescription: "Sign In page",
+      signUpTitle: "Sign Up | Caregiver BD",
+      signUpDescription: "Sign Up page",
+      forgotPasswordTitle: "Forgot password | Caregiver BD",
+      forgotPasswordDescription: "Request a password reset link for your Caregiver BD account",
+      resetPasswordTitle: "Reset password | Caregiver BD",
+      resetPasswordDescription: "Choose a new password for your Caregiver BD account",
     },
     layout: {
-      bannerText: "Ontor Pro - Admin Dashboard by BMQAS",
+      bannerText: "Caregiver BD - Admin Dashboard",
     },
     signIn: {
       title: "Sign In",
@@ -210,8 +210,8 @@ const en = {
     userProfile: "My profile",
   },
   dashboard: {
-    metaTitle: "Dashboard | Ontor - BMQAS",
-    metaDescription: "Dashboard page for Ontor Pro by Bengal Mobile QA Solution",
+    metaTitle: "Dashboard | Caregiver BD",
+    metaDescription: "Dashboard page",
     loadError: "Failed to load dashboard.",
     totalPatients: "Total patients",
     totalProviders: "Total providers",
@@ -232,7 +232,7 @@ const en = {
     status: "Status",
   },
   supervisor: {
-    metaTitle: "Supervisors | Ontor - BMQAS",
+    metaTitle: "Supervisors | Caregiver BD",
     metaDescription: "Supervisor directory",
     pageTitle: "Supervisors",
     heading: "Supervisors",
@@ -328,8 +328,8 @@ const en = {
     pageNumber: "Page {{page}}",
   },
   schedule: {
-    metaTitle: "Service requests | Ontor - BMQAS",
-    metaDescription: "Long-term service requests - Ontor Pro",
+    metaTitle: "Service requests | Caregiver BD",
+    metaDescription: "Long-term service requests - Caregiver BD",
     pageTitle: "Service request",
     heading: "Service requests",
     subheading: "Long-term opportunities and scheduling workflow. Open a row to view the calendar.",
@@ -374,9 +374,9 @@ const en = {
     notFound: "This service request was not found.",
     backToList: "Back to request list",
     allRequests: "All service requests",
-    metaTitle: "Service request | Ontor - BMQAS",
-    metaNotFoundTitle: "Service request not found | Ontor - BMQAS",
-    metaTitleWithNo: "{{requestNo}} — Service request | Ontor - BMQAS",
+    metaTitle: "Service request | Caregiver BD",
+    metaNotFoundTitle: "Service request not found | Caregiver BD",
+    metaTitleWithNo: "{{requestNo}} — Service request | Caregiver BD",
     metaDescriptionPatient: "Calendar for {{name}}",
     pageBreadcrumb: "Service request",
     titleFallback: "Service request",
@@ -471,8 +471,8 @@ const en = {
     minutesAbbr: "m",
   },
   appointments: {
-    metaTitle: "Appointments | Ontor - BMQAS",
-    metaDescription: "All service requests (appointments) for Ontor Pro by BMQAS",
+    metaTitle: "Appointments | Caregiver BD",
+    metaDescription: "All service requests (appointments)",
     pageTitle: "Appointments",
     heading: "Appointments",
     subheading: "All service requests. Search by doctor or patient.",
@@ -589,8 +589,8 @@ const en = {
     typePrefix: "Type",
   },
   users: {
-    metaTitle: "All Users | Ontor - BMQAS",
-    metaDescription: "Admin view of all users for Ontor Pro by BMQAS",
+    metaTitle: "All Users | Caregiver BD",
+    metaDescription: "Admin view of all users",
     pageTitle: "All Users",
     heading: "All Users",
     subheading: "Admin view of all users (Admin, Provider, Patient) with server-side pagination",
@@ -647,8 +647,8 @@ const en = {
     failedLoad: "Failed to load users.",
   },
   providers: {
-    metaTitle: "Providers List | Ontor - BMQAS",
-    metaDescription: "Provider profiles (providers table) for Ontor Pro by BMQAS",
+    metaTitle: "Providers List | Caregiver BD",
+    metaDescription: "Provider profiles (providers table)",
     pageTitle: "Providers",
     heading: "Providers",
     subheading: "Provider profiles from the providers table (not user accounts)",
@@ -892,8 +892,8 @@ const en = {
     },
   },
   patients: {
-    metaTitle: "Patient List | Ontor - BMQAS",
-    metaDescription: "Newly applied patient profile list for Ontor Pro by BMQAS",
+    metaTitle: "Patient List | Caregiver BD",
+    metaDescription: "Newly applied patient profile list",
     pageTitle: "Patient List",
     heading: "Newly Applied Patients",
     subheading: "All registered patients with server-side pagination",
@@ -913,7 +913,7 @@ const en = {
     failedLoad: "Failed to load patients.",
   },
   consultationTypesTree: {
-    metaTitle: "Consultation Type Tree | Ontor - BMQAS",
+    metaTitle: "Consultation Type Tree | Caregiver BD",
     metaDescription: "Manage consultation type hierarchy",
     pageTitle: "Consultation Type Tree",
     heading: "Consultation Types",
@@ -980,7 +980,7 @@ const en = {
     removeConfirm: "Remove \"{{name}}\" (#{{id}})? This may fail if the type is in use. Children (if any) may need to be moved or removed first.",
   },
   verificationDocumentTypes: {
-    metaTitle: "Verification Document Types | Ontor - BMQAS",
+    metaTitle: "Verification Document Types | Caregiver BD",
     metaDescription: "Manage the verification document types entity (add, update, activate/deactivate). These codes are used in consultation type requirements and document uploads.",
     pageTitle: "Verification Document Types",
     heading: "Verification document types",
@@ -1018,7 +1018,7 @@ const en = {
     failedUpdateStatus: "Failed to update status.",
   },
   certificationTypes: {
-    metaTitle: "Certification Types | Ontor - BMQAS",
+    metaTitle: "Certification Types | Caregiver BD",
     metaDescription:
       "Manage certification types (add, update, activate/deactivate). These are mapped to consultation types as certification requirements.",
     pageTitle: "Certification Types",
@@ -1061,7 +1061,7 @@ const en = {
     failedUpdateStatus: "Failed to update status.",
   },
   serviceChecklistGroups: {
-    metaTitle: "Service Checklist Groups | Ontor - BMQAS",
+    metaTitle: "Service Checklist Groups | Caregiver BD",
     metaDescription:
       "Manage service checklist groups with English and Bangla names and descriptions.",
     pageTitle: "Service Checklist Groups",
@@ -1103,7 +1103,7 @@ const en = {
     failedDelete: "Failed to delete group.",
   },
   consultationTypeLevels: {
-    metaTitle: "Consultation type levels | Ontor - BMQAS",
+    metaTitle: "Consultation type levels | Caregiver BD",
     metaDescription: "Manage consultation type levels for doctors and caregivers (salary bands and level numbers).",
     pageTitle: "Consultation type levels",
     heading: "Consultation type levels",
@@ -1163,7 +1163,7 @@ const en = {
     },
   },
   systemConfig: {
-    metaTitle: "System Configuration | Ontor - BMQAS",
+    metaTitle: "System Configuration | Caregiver BD",
     metaDescription: "View and update system configuration (commission, OTP, defaults, etc.)",
     pageTitle: "System Configuration",
     heading: "Platform settings",
@@ -1175,7 +1175,7 @@ const en = {
     subheading: "Key-value settings stored in the database. Grouped for easier review.",
     restartNoticeTitle: "Restart required for system settings",
     restartNoticeMessage:
-      "Changes on this tab are saved immediately to the database, but the Ontor API application loads most values at startup. After you save, restart the backend API service (or redeploy) for the new values to take effect everywhere.",
+      "Changes on this tab are saved immediately to the database, but the Caregiver API application loads most values at startup. After you save, restart the backend API service (or redeploy) for the new values to take effect everywhere.",
     editRestartHint: "Saved to the database now. Restart the API application for this value to apply in production.",
     searchPlaceholder: "Search by key, value, or description…",
     booleanOn: "On",
@@ -1235,7 +1235,7 @@ const en = {
     scheduler: {
       noticeTitle: "Background jobs — no API restart",
       noticeMessage:
-        "These jobs run in the Ontor Scheduler microservice. When you change the interval or metadata, the scheduler picks it up on its next dispatcher tick (about every 5 minutes). Ensure the scheduler process is running. SSL Commerz credentials must be configured on the scheduler for refund reconciliation.",
+        "These jobs run in the Caregiver Scheduler microservice. When you change the interval or metadata, the scheduler picks it up on its next dispatcher tick (about every 5 minutes). Ensure the scheduler process is running. SSL Commerz credentials must be configured on the scheduler for refund reconciliation.",
       failedLoad: "Failed to load scheduler jobs.",
       failedUpdate: "Failed to update scheduler job.",
       invalidInterval: "Run interval must be at least 1 minute.",
@@ -1342,7 +1342,7 @@ const en = {
       adminFeeInvalid: "Enter a valid admin fee (0 or greater).",
       exceptions: "Exceptions",
       exceptionsHint: "Waive fee when cancellation is due to the selected fault.",
-      exception_HOPE_FAULT: "Ontor fault (waive fee)",
+      exception_HOPE_FAULT: "Platform fault (waive fee)",
       policyActive: "Policy active",
       windowMin: "Window (minutes)",
       windowMinHint: "Cancellation window in minutes before service starts (pre-service stage only).",
@@ -1357,7 +1357,7 @@ const en = {
     },
   },
   upgradeRequests: {
-    listMetaTitle: "Upgrade Requests | Ontor - BMQAS",
+    listMetaTitle: "Upgrade Requests | Caregiver BD",
     listMetaDescription: "Review and approve or reject provider consultation type upgrade requests",
     listPageTitle: "Upgrade Requests",
     listHeading: "Provider upgrade requests",
@@ -1371,7 +1371,7 @@ const en = {
     requested: "Requested",
     actions: "Actions",
     failedLoadList: "Failed to load upgrade requests.",
-    detailMetaTitle: "Upgrade Request | Ontor - BMQAS",
+    detailMetaTitle: "Upgrade Request | Caregiver BD",
     detailMetaDescription: "Review upgrade request and verification documents",
     detailPageTitle: "Upgrade Request",
     detailPageTitleWithId: "Upgrade Request #{{id}}",
@@ -1408,7 +1408,7 @@ const en = {
     rejectUpgrade: "Reject upgrade",
   },
   financialReports: {
-    metaTitle: "Financial Reports | Ontor - BMQAS",
+    metaTitle: "Financial Reports | Caregiver BD",
     metaDescription: "GL reconciliation and provider transaction history",
     pageTitle: "Financial Reports",
     glSummaryTitle: "GL Reconciliation Summary",
@@ -1445,7 +1445,7 @@ const en = {
     failedLoadGlHistory: "Failed to load GL history.",
     failedLoadTransactions: "Failed to load transactions.",
     master: {
-      metaTitle: "Master Financial Report | Ontor - BMQAS",
+      metaTitle: "Master Financial Report | Caregiver BD",
       metaDescription:
         "Daily money flow, summary totals, and paginated transactions with full breakdown (admin).",
       pageTitle: "Master financial report",
@@ -1663,7 +1663,7 @@ const en = {
     },
   },
   adminSupervisorReporting: {
-    metaTitle: "Admin / Supervisor Reporting | Ontor - BMQAS",
+    metaTitle: "Admin / Supervisor Reporting | Caregiver BD",
     metaDescription:
       "Reports dashboard with operational KPIs, supervisor performance and daily breakdown.",
     pageTitle: "Admin / Supervisor Reporting",
@@ -1762,7 +1762,7 @@ const en = {
     },
   },
   withdrawalRequests: {
-    metaTitle: "Withdrawal Requests | Ontor - BMQAS",
+    metaTitle: "Withdrawal Requests | Caregiver BD",
     metaDescription: "Admin list of withdrawal requests",
     pageTitle: "Withdrawal Requests",
     heading: "Withdrawal requests",
@@ -1810,11 +1810,11 @@ const en = {
     failedToLoad: "Failed to load withdrawal requests.",
   },
   providerCancelRequests: {
-    metaTitle: "Provider cancel requests | Ontor - BMQAS",
+    metaTitle: "Provider cancel requests | Caregiver BD",
     metaDescription:
       "Review provider-initiated cancellation requests: approve full refund, reject, or reassign another provider.",
     pageTitle: "Provider cancel requests",
-    detailMetaTitle: "Provider cancel request | Ontor - BMQAS",
+    detailMetaTitle: "Provider cancel request | Caregiver BD",
     detailMetaDescription: "Review and action a provider cancellation request.",
     detailPageTitle: "Provider cancel request",
     detailPageTitleWithId: "Request #{{id}}",
@@ -1948,7 +1948,7 @@ const en = {
     },
   },
   cancellationRefunds: {
-    metaTitle: "Cancellations & refunds | Ontor - BMQAS",
+    metaTitle: "Cancellations & refunds | Caregiver BD",
     metaDescription:
       "Admin queue of service cancellations with linked refund transactions and gateway reconciliation.",
     pageTitle: "Cancellations & refunds",
@@ -1998,7 +1998,7 @@ const en = {
     loadingMore: "Loading…",
   },
   notificationsPage: {
-    metaTitle: "Notifications | Ontor - BMQAS",
+    metaTitle: "Notifications | Caregiver BD",
     metaDescription: "View and manage your notifications",
     pageTitle: "Notifications",
     heading: "Notifications",
@@ -2023,7 +2023,7 @@ const en = {
     notSent: "Not sent.",
     failedSendTestPush: "Failed to send test push.",
     defaultTestTitle: "Test notification",
-    defaultTestBody: "This is a test push from Ontor admin.",
+    defaultTestBody: "This is a test push from Caregiver BD admin.",
   },
 };
 

@@ -7,6 +7,8 @@
  * (private key, client email). It is gitignored and must never be imported here —
  * it is a backend-only credential and would be exposed in the browser bundle.
  */
+import { DEMO_MODE } from "../mock/config";
+
 export const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY ?? "",
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN ?? "",
@@ -20,6 +22,8 @@ export const firebaseConfig = {
 export const vapidKey: string = import.meta.env.VITE_FIREBASE_VAPID_KEY ?? "";
 
 export function isFirebaseConfigured(): boolean {
+  // Demo mode is fully offline: no push registration with Firebase.
+  if (DEMO_MODE) return false;
   return !!(
     firebaseConfig.apiKey &&
     firebaseConfig.projectId &&

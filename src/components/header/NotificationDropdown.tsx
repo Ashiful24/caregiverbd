@@ -84,7 +84,7 @@ export default function NotificationDropdown() {
           try {
             new Notification(String(payload.title), {
               body: payload?.body ? String(payload.body) : undefined,
-              icon: "/favicon.png",
+              icon: "/favicon.svg",
             });
           } catch {
             // ignore

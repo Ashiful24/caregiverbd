@@ -115,8 +115,8 @@ const AppHeader: React.FC = () => {
 
             <Link to="/" className="lg:hidden">
               <img
-                src="./images/logo/ontor-logo-horizontal.png"
-                alt="Ontor Care"
+                src="./images/logo/logo-horizontal.svg"
+                alt="Caregiver BD"
                 width={120}
                 height={42}
               />

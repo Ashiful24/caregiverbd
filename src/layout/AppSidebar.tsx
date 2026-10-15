@@ -392,15 +392,15 @@ const AppSidebar: React.FC = () => {
         <Link to="/">
           {isExpanded || isHovered || isMobileOpen ? (
             <img
-              src="/images/logo/ontor-logo-horizontal.png"
-              alt="Ontor Care"
+              src="/images/logo/logo-horizontal.svg"
+              alt="Caregiver BD"
               width={160}
               height={56}
             />
           ) : (
             <img
-              src="/images/logo/logo-icon.png"
-              alt="Ontor Care"
+              src="/images/logo/logo-icon.svg"
+              alt="Caregiver BD"
               width={36}
               height={36}
             />

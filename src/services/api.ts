@@ -6,6 +6,7 @@
 
 import httpService from "./httpService";
 import { getFileServiceApiKey, getFileServiceUploadUrl } from "../config/fileService";
+import { DEMO_MODE, mockUploadFile } from "../mock";
 
 // ============== Auth & Login ==============
 
@@ -581,6 +582,7 @@ export interface UpdateConsultationTypeRequest {
  * treats Authorization as the project API key and rejects JWTs with "Invalid API key".
  */
 export async function uploadFileToStorage(file: File): Promise<unknown> {
+  if (DEMO_MODE) return mockUploadFile(file);
   const url = getFileServiceUploadUrl();
   const formData = new FormData();
   formData.append("file", file);

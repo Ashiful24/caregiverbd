@@ -171,7 +171,7 @@ export default function VerificationDocuments() {
   return (
     <>
       <PageMeta
-        title="Verification Documents | Ontor - BMQAS"
+        title="Verification Documents | Caregiver BD"
         description="Upload and manage your verification documents (BMDC, NID, degree, etc.)"
       />
       <PageBreadcrumb pageTitle="Verification Documents" />

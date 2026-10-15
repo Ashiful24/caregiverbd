@@ -43,7 +43,7 @@ export default function GlReconciliation() {
   return (
     <>
       <PageMeta
-        title="GL Reconciliation | Ontor - BMQAS"
+        title="GL Reconciliation | Caregiver BD"
         description="Live snapshot of platform ledger health: wallet balances and money summary."
       />
       <PageBreadcrumb pageTitle="GL Reconciliation" />
@@ -137,7 +137,7 @@ export default function GlReconciliation() {
                 value={fmtBDT(glSummary.moneySummary.supervisorCommissionReleased)}
                 tone="neutral"
                 hint="Credited to supervisor wallets"
-                tooltip="Total supervisor commission credited to assigned supervisors' CLAIMABLE wallets on service completion. Still inside the platform — supervisors can withdraw this when they request a payout. When no supervisor is assigned, that amount goes to Ontor's COMMISSION_GL and is already included in 'Commission earned'."
+                tooltip="Total supervisor commission credited to assigned supervisors' CLAIMABLE wallets on service completion. Still inside the platform — supervisors can withdraw this when they request a payout. When no supervisor is assigned, that amount goes to the platform's COMMISSION_GL and is already included in 'Commission earned'."
               />
             </div>
 

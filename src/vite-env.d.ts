@@ -1,6 +1,8 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
+  /** "false" to call the real backend; anything else answers API calls from `src/mock`. */
+  readonly VITE_DEMO_MODE?: string;
   readonly VITE_API_BASE_URL?: string;
   /** File microservice base URL (upload + public file paths). No trailing slash. */
   readonly VITE_FILE_SERVICE_URL?: string;

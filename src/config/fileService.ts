@@ -67,6 +67,8 @@ function unwrapStoredPath(raw: string): string {
  * - Local / absolute base set: prefix VITE_FILE_SERVICE_URL so images load off the Vite host.
  */
 function normalizeFilesPath(trimmed: string): string {
+  // Demo-mode uploads live in the browser as object URLs.
+  if (trimmed.startsWith("blob:") || trimmed.startsWith("data:")) return trimmed;
   const withSlash = trimmed.startsWith("files/") ? `/${trimmed}` : trimmed;
   const base = getFileServiceBaseUrl();
 

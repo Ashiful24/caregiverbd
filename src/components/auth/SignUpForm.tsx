@@ -54,10 +54,10 @@ export default function SignUpForm() {
       </div>
       <div className="flex flex-col justify-center flex-1 w-full max-w-md mx-auto">
         <div>
-          <Link to="/" aria-label="Ontor Care home" className="mb-6 inline-block sm:mb-8">
+          <Link to="/" aria-label="Caregiver BD home" className="mb-6 inline-block sm:mb-8">
             <img
-              src="/images/logo/ontor-logo-horizontal.png"
-              alt="Ontor Care"
+              src="/images/logo/logo-horizontal.svg"
+              alt="Caregiver BD"
               width={160}
               height={48}
               className="h-10 w-auto sm:h-12"

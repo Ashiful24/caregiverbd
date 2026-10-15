@@ -21,7 +21,7 @@ messaging.onBackgroundMessage((payload) => {
   const title = payload?.notification?.title ?? payload?.data?.title ?? "Notification";
   const options = {
     body: payload?.notification?.body ?? payload?.data?.body ?? "",
-    icon: "/favicon.png",
+    icon: "/favicon.svg",
     data: payload?.data ?? {},
   };
   return self.registration.showNotification(title, options);

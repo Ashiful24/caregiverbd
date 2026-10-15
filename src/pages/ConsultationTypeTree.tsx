@@ -36,6 +36,9 @@ const TREE_NODE_TYPE = "CONSULTATION_TYPE_TREE_NODE";
 /** Employment type options for create/edit (Independent or Salaried). */
 const EMPLOYMENT_TYPE_OPTIONS = [{ value: "" }, { value: "INDEPENDENT" }, { value: "SALARIED" }];
 
+/** Add / edit type forms: wide enough for EN + BN side by side, scrolls inside the viewport. */
+const TYPE_FORM_MODAL_CLASS = "max-w-3xl max-h-[calc(100vh-2rem)] overflow-y-auto p-6 sm:p-8";
+
 const IMAGE_FILE_INPUT_CLASS =
   "block w-full text-sm text-gray-600 file:mr-4 file:rounded-lg file:border-0 file:bg-brand-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-brand-700 hover:file:bg-brand-100 dark:text-gray-400 dark:file:bg-brand-500/10 dark:file:text-brand-300";
 
@@ -132,6 +135,8 @@ function BilingualTypeFields({
           ? t("consultationTypesTree.formIntroBn")
           : t("consultationTypesTree.formIntroEn")}
       </p>
+      <div className="grid gap-x-5 gap-y-4 sm:grid-cols-2">
+      <div className="min-w-0 space-y-4">
       <p className="text-xs font-semibold uppercase tracking-wide text-brand-600 dark:text-brand-400">
         {t("consultationTypesTree.sectionEnglish")}
       </p>
@@ -162,6 +167,8 @@ function BilingualTypeFields({
           placeholder={t("consultationTypesTree.shortDescriptionPlaceholder")}
         />
       </div>
+      </div>
+      <div className="min-w-0 space-y-4">
       <p className="text-xs font-semibold uppercase tracking-wide text-brand-600 dark:text-brand-400">
         {t("consultationTypesTree.sectionBangla")}
       </p>
@@ -202,6 +209,8 @@ function BilingualTypeFields({
           }}
           placeholder={t("consultationTypesTree.descriptionBnPlaceholder")}
         />
+      </div>
+      </div>
       </div>
     </>
   );
@@ -1100,7 +1109,7 @@ export default function ConsultationTypeTree() {
       </div>
 
       {/* Edit modal */}
-      <Modal isOpen={modalMode === "edit"} onClose={closeModal} className="max-w-lg p-6 sm:p-8">
+      <Modal isOpen={modalMode === "edit"} onClose={closeModal} className={TYPE_FORM_MODAL_CLASS}>
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{t("consultationTypesTree.editType")}</h2>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">ID: {selectedNode?.id}</p>
         <div className="mt-5 space-y-4">
@@ -1125,6 +1134,7 @@ export default function ConsultationTypeTree() {
               onClearError={() => setFormError("")}
             />
           )}
+          <div className="grid gap-4 sm:grid-cols-3">
           <div>
             <Label htmlFor="edit-code">{t("consultationTypesTree.codeOptional")}</Label>
             <Input
@@ -1165,6 +1175,7 @@ export default function ConsultationTypeTree() {
               onChange={(e) => setFormCommissionPercent(e.target.value)}
               placeholder={t("consultationTypesTree.commissionPlaceholder")}
             />
+          </div>
           </div>
           <div>
             <Label htmlFor="edit-image">{t("consultationTypesTree.imageOptional")}</Label>
@@ -1214,7 +1225,7 @@ export default function ConsultationTypeTree() {
       </Modal>
 
       {/* Add child modal */}
-      <Modal isOpen={modalMode === "addChild"} onClose={closeModal} className="max-w-lg p-6 sm:p-8">
+      <Modal isOpen={modalMode === "addChild"} onClose={closeModal} className={TYPE_FORM_MODAL_CLASS}>
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{t("consultationTypesTree.addChildType")}</h2>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
           Parent: {selectedNode?.name} (#{selectedNode?.id})
@@ -1235,6 +1246,7 @@ export default function ConsultationTypeTree() {
             formError={formError}
             onClearError={() => setFormError("")}
           />
+          <div className="grid gap-4 sm:grid-cols-3">
           <div>
             <Label htmlFor="add-code">{t("consultationTypesTree.codeOptional")}</Label>
             <Input
@@ -1276,6 +1288,7 @@ export default function ConsultationTypeTree() {
               placeholder={t("consultationTypesTree.commissionPlaceholder")}
             />
           </div>
+          </div>
           <div>
             <Label htmlFor="add-image">{t("consultationTypesTree.imageOptional")}</Label>
             <input
@@ -1303,7 +1316,7 @@ export default function ConsultationTypeTree() {
       </Modal>
 
       {/* Add root modal */}
-      <Modal isOpen={modalMode === "addRoot"} onClose={closeModal} className="max-w-lg p-6 sm:p-8">
+      <Modal isOpen={modalMode === "addRoot"} onClose={closeModal} className={TYPE_FORM_MODAL_CLASS}>
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{t("consultationTypesTree.addRootTypeTitle")}</h2>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
           {t("consultationTypesTree.newTopLevelHelp")}
@@ -1324,6 +1337,7 @@ export default function ConsultationTypeTree() {
             formError={formError}
             onClearError={() => setFormError("")}
           />
+          <div className="grid gap-4 sm:grid-cols-3">
           <div>
             <Label htmlFor="root-code">{t("consultationTypesTree.codeOptional")}</Label>
             <Input
@@ -1364,6 +1378,7 @@ export default function ConsultationTypeTree() {
               onChange={(e) => setFormCommissionPercent(e.target.value)}
               placeholder={t("consultationTypesTree.commissionPlaceholder")}
             />
+          </div>
           </div>
           <div>
             <Label htmlFor="root-image">{t("consultationTypesTree.imageOptional")}</Label>

@@ -3,6 +3,8 @@
  * Handles all HTTP requests with automatic token management
  */
 
+import { DEMO_MODE, mockRequest } from "../mock";
+
 // API Base URL - Update this with your backend API URL
 // Reads from .env file in project root: VITE_API_BASE_URL
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://116.68.207.105:8080/api";
@@ -277,6 +279,7 @@ class HttpService {
    * GET request
    */
   async get<T = any>(endpoint: string, config?: RequestConfig): Promise<ApiResponse<T>> {
+    if (DEMO_MODE) return mockRequest<T>("GET", endpoint, { params: config?.params });
     const url = buildUrl(endpoint, config?.params);
     logRequest("GET", url, undefined, buildHeaders(config));
     const response = await fetchWithAuthRetry("GET", url, undefined, config?.signal, config);
@@ -296,6 +299,7 @@ class HttpService {
     data?: any,
     config?: RequestConfig
   ): Promise<ApiResponse<T>> {
+    if (DEMO_MODE) return mockRequest<T>("POST", endpoint, { params: config?.params, body: data });
     const url = buildUrl(endpoint, config?.params);
     const body = data ? JSON.stringify(data) : undefined;
     logRequest("POST", url, data, buildHeaders(config));
@@ -316,6 +320,7 @@ class HttpService {
     data?: any,
     config?: RequestConfig
   ): Promise<ApiResponse<T>> {
+    if (DEMO_MODE) return mockRequest<T>("PUT", endpoint, { params: config?.params, body: data });
     const url = buildUrl(endpoint, config?.params);
     const body = data ? JSON.stringify(data) : undefined;
     logRequest("PUT", url, data, buildHeaders(config));
@@ -336,6 +341,7 @@ class HttpService {
     data?: any,
     config?: RequestConfig
   ): Promise<ApiResponse<T>> {
+    if (DEMO_MODE) return mockRequest<T>("PATCH", endpoint, { params: config?.params, body: data });
     const url = buildUrl(endpoint, config?.params);
     const body = data ? JSON.stringify(data) : undefined;
     logRequest("PATCH", url, data, buildHeaders(config));
@@ -352,6 +358,7 @@ class HttpService {
    * DELETE request
    */
   async delete<T = any>(endpoint: string, config?: RequestConfig): Promise<ApiResponse<T>> {
+    if (DEMO_MODE) return mockRequest<T>("DELETE", endpoint, { params: config?.params });
     const url = buildUrl(endpoint, config?.params);
     logRequest("DELETE", url, undefined, buildHeaders(config));
     const response = await fetchWithAuthRetry("DELETE", url, undefined, config?.signal, config);
@@ -371,6 +378,10 @@ class HttpService {
     endpoint: string,
     config?: RequestConfig
   ): Promise<{ data: Blob; headers: Headers }> {
+    if (DEMO_MODE) {
+      const text = "Demo document — files are not stored in demo mode.";
+      return { data: new Blob([text], { type: "text/plain" }), headers: new Headers({ "content-type": "text/plain" }) };
+    }
     const url = buildUrl(endpoint, config?.params);
     logRequest("GET (blob)", url, undefined, buildHeaders(config));
     const response = await fetchWithAuthRetry("GET", url, undefined, config?.signal, config);
@@ -403,6 +414,7 @@ class HttpService {
     file: File | FormData,
     config?: RequestConfig
   ): Promise<ApiResponse<T>> {
+    if (DEMO_MODE) return mockRequest<T>("POST", endpoint, { params: config?.params });
     const url = buildUrl(endpoint, config?.params);
     const formBody = file instanceof FormData ? file : (() => {
       const fd = new FormData();
@@ -445,6 +457,7 @@ class HttpService {
     data?: any,
     config?: RequestConfig
   ): Promise<ApiResponse<T>> {
+    if (DEMO_MODE) return mockRequest<T>(method, endpoint, { params: config?.params, body: data });
     const url = buildUrl(endpoint, config?.params);
     const headers = buildHeaders(config, false); // Don't include auth
     const body = data ? JSON.stringify(data) : undefined;
